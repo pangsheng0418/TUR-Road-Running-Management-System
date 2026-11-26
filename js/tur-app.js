@@ -65,6 +65,7 @@
     activeView: 'public-home',
     regEventId: '',
     regMode: 'solo', // 'solo' | 'group'
+    multiOwner: '', // 先鎖定單一承辦人 (ownerUsername)，不同承辦人收款帳戶不同不可混單
     multiPayMode: '', // 'MANUAL_ATM' | 'ONLINE_PAYUNi'
     multiSelected: {}, // { [eventId]: { selected, catId, addons: [], customFields: {} } }
     multiLastReceipt: null,
@@ -755,11 +756,36 @@
   }
 
   /* --------------------------------------------------------------------------
-   * View B2: 多場活動聯合報名（一次填表・合併繳費・跨場記帳）
+   * View B2: 多場活動聯合報名（先選同一承辦人 → 再選其名下同金流場次 → 合併繳費）
    * -------------------------------------------------------------------------- */
-  function getOpenEventsByPayMode() {
+  function getEventOwnerKey(ev) {
+    return String(ev?.ownerUsername || ev?.organizerZh || 'TUR').trim();
+  }
+
+  function getOpenMultiOrganizers() {
     const openEvs = State.events
       .filter((e) => e.status === 'open' || e.status === 'auto')
+      .sort((a, b) => String(a.regStart || '').localeCompare(String(b.regStart || '')));
+    const map = new Map();
+    openEvs.forEach((ev) => {
+      const key = getEventOwnerKey(ev);
+      if (!map.has(key)) {
+        const u = State.users.find((x) => x.username === key);
+        map.set(key, {
+          ownerKey: key,
+          displayName: u?.displayName || ev.organizerZh || key,
+          organizerZh: ev.organizerZh || u?.displayName || key,
+          events: []
+        });
+      }
+      map.get(key).events.push(ev);
+    });
+    return [...map.values()].sort((a, b) => b.events.length - a.events.length);
+  }
+
+  function getOpenEventsByOwnerAndPayMode(ownerKey) {
+    const openEvs = State.events
+      .filter((e) => (e.status === 'open' || e.status === 'auto') && getEventOwnerKey(e) === String(ownerKey || ''))
       .sort((a, b) => String(a.regStart || '').localeCompare(String(b.regStart || '')));
     return {
       MANUAL_ATM: openEvs.filter((e) => C.getEventPaymentMode(e) === 'MANUAL_ATM'),
@@ -768,7 +794,19 @@
   }
 
   function renderPublicMultiRegister() {
-    const byMode = getOpenEventsByPayMode();
+    const organizers = getOpenMultiOrganizers();
+    if (!organizers.length) {
+      $('#multiPayModeBar').innerHTML = '<div class="text-sm text-slate-500 text-center py-4">目前暫無開放報名的賽事。</div>';
+      $('#multiEventsList').innerHTML = '';
+      renderMultiSummaryAndValidate();
+      return;
+    }
+
+    if (!State.multiOwner || !organizers.some((o) => o.ownerKey === State.multiOwner)) {
+      State.multiOwner = organizers[0].ownerKey;
+    }
+    const activeOrg = organizers.find((o) => o.ownerKey === State.multiOwner) || organizers[0];
+    const byMode = getOpenEventsByOwnerAndPayMode(State.multiOwner);
     if (!State.multiPayMode || !(byMode[State.multiPayMode] || []).length) {
       State.multiPayMode = byMode.MANUAL_ATM.length >= byMode.ONLINE_PAYUNi.length ? 'MANUAL_ATM' : 'ONLINE_PAYUNi';
     }
@@ -776,18 +814,54 @@
     const evs = byMode[mode] || [];
     const isPayuni = mode === 'ONLINE_PAYUNi';
 
-    // 同金流防呆模式切換列
+    // 兩段式嚴格防呆：步驟 0A 先選承辦人（不同承辦人收款不同）→ 步驟 0B 再選同金流群組
     $('#multiPayModeBar').innerHTML = `
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <div class="font-black text-sm text-slate-900">💰 請選擇合併繳費之金流群組（同金流活動方可合併為同一筆結帳）</div>
-          <div class="text-xs text-slate-500 mt-0.5">避免「銀行轉帳」與「PAYUNi 線上金流」混單造成對帳異常；切換群組時會僅結算該群組勾選場次。</div>
+      <div class="space-y-3">
+        <div class="space-y-2">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div class="font-black text-sm text-slate-900">👤 步驟 0A：先選擇承辦人 / 收款主辦單位（僅限同一承辦人活動合併繳費）</div>
+              <div class="text-xs text-slate-500 mt-0.5">因不同承辦人收款帳戶與對帳作業各自獨立，發起統一報名須先指定單一承辦人，再勾選其舉辦的場次。</div>
+            </div>
+            <span class="px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-900 font-bold text-xs">共 ${organizers.length} 位承辦人開放中</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
+            ${organizers.map((o) => {
+              const act = o.ownerKey === State.multiOwner;
+              const oAtm = o.events.filter((e) => C.getEventPaymentMode(e) === 'MANUAL_ATM').length;
+              const oPu = o.events.filter((e) => C.getEventPaymentMode(e) === 'ONLINE_PAYUNi').length;
+              return `
+                <button type="button" data-multi-owner="${C.escapeHtml(o.ownerKey)}" class="p-3 rounded-xl border-2 text-left transition ${act ? 'border-slate-900 bg-slate-900 text-white shadow' : 'border-slate-200 bg-slate-50 text-slate-800 hover:border-indigo-400'}">
+                  <div class="flex items-center justify-between gap-1">
+                    <span class="font-black text-sm truncate">👤 ${C.escapeHtml(o.displayName)}</span>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 ${act ? 'bg-amber-400 text-slate-950' : 'bg-white border text-slate-700'}">${o.events.length} 場開放</span>
+                  </div>
+                  <div class="text-[11px] mt-1 ${act ? 'text-slate-300' : 'text-slate-500'}">主辦：${C.escapeHtml(o.organizerZh)} · <span class="mono">${C.escapeHtml(o.ownerKey)}</span></div>
+                  <div class="text-[10px] mt-1 ${act ? 'text-emerald-300' : 'text-slate-600'}">轉帳 ${oAtm} 場 ｜ PAYUNi ${oPu} 場</div>
+                </button>`;
+            }).join('')}
+          </div>
         </div>
-        <div class="flex flex-wrap gap-2 text-xs">
-          <button type="button" data-multi-mode="MANUAL_ATM" class="px-3.5 py-2 rounded-xl border-2 font-black transition ${!isPayuni ? 'border-amber-500 bg-amber-500 text-slate-950 shadow' : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-amber-300'}">🏦 轉帳核對末五碼（${byMode.MANUAL_ATM.length} 場開放）</button>
-          <button type="button" data-multi-mode="ONLINE_PAYUNi" class="px-3.5 py-2 rounded-xl border-2 font-black transition ${isPayuni ? 'border-emerald-600 bg-emerald-600 text-white shadow' : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-400'}">💳 PAYUNi 線上金流（${byMode.ONLINE_PAYUNi.length} 場開放）</button>
+
+        <div class="pt-2.5 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div class="font-black text-xs sm:text-sm text-slate-900">💰 步驟 0B：選擇「${C.escapeHtml(activeOrg.displayName)}」名下同金流群組</div>
+            <div class="text-[11px] text-slate-500 mt-0.5">同承辦人且同金流模式之活動方可合併為 1 筆結帳。</div>
+          </div>
+          <div class="flex flex-wrap gap-2 text-xs">
+            <button type="button" data-multi-mode="MANUAL_ATM" class="px-3.5 py-2 rounded-xl border-2 font-black transition ${!isPayuni ? 'border-amber-500 bg-amber-500 text-slate-950 shadow' : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-amber-300'}">🏦 轉帳核對末五碼（${byMode.MANUAL_ATM.length} 場）</button>
+            <button type="button" data-multi-mode="ONLINE_PAYUNi" class="px-3.5 py-2 rounded-xl border-2 font-black transition ${isPayuni ? 'border-emerald-600 bg-emerald-600 text-white shadow' : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-400'}">💳 PAYUNi 線上金流（${byMode.ONLINE_PAYUNi.length} 場）</button>
+          </div>
         </div>
       </div>`;
+    $$('[data-multi-owner]').forEach((b) => {
+      b.onclick = () => {
+        State.multiOwner = b.dataset.multiOwner;
+        const nextByMode = getOpenEventsByOwnerAndPayMode(State.multiOwner);
+        State.multiPayMode = nextByMode.MANUAL_ATM.length >= nextByMode.ONLINE_PAYUNi.length ? 'MANUAL_ATM' : 'ONLINE_PAYUNi';
+        renderPublicMultiRegister();
+      };
+    });
     $$('[data-multi-mode]').forEach((b) => {
       b.onclick = () => {
         State.multiPayMode = b.dataset.multiMode;
@@ -805,15 +879,17 @@
     const bankAcc = getConfigVal('bankAccount', '123-456-789012');
     const bankHolder = getConfigVal('bankAccountName', '台灣超馬協會 TUR');
     $('#multiBankInfoBox').innerHTML = isPayuni
-      ? `<div class="font-bold text-emerald-800">💳 PAYUNi 合併一次結帳</div><div>送出後將產生統一金流單號，付款完成即秒級同步標記全部勾選場次為 PAID 並各自配號。</div>`
-      : `<div class="font-bold text-slate-900">🏦 大會統一匯款帳戶（請合併匯入下方總金額）</div><div class="mono mt-0.5">(${C.escapeHtml(bankCode)}) ${C.escapeHtml(bankName)} · <b>${C.escapeHtml(bankAcc)}</b></div><div>戶名：${C.escapeHtml(bankHolder)}</div>`;
+      ? `<div class="font-bold text-emerald-800">💳 ${C.escapeHtml(activeOrg.displayName)} — PAYUNi 合併一次結帳</div><div>送出後將產生統一金流單號，付款完成即秒級同步標記本承辦人所選場次為 PAID 並各自配號。</div>`
+      : `<div class="font-bold text-slate-900">🏦 ${C.escapeHtml(activeOrg.displayName)} — 統一匯款帳戶（請合併匯入下方總金額）</div><div class="mono mt-0.5">(${C.escapeHtml(bankCode)}) ${C.escapeHtml(bankName)} · <b>${C.escapeHtml(bankAcc)}</b></div><div>戶名：${C.escapeHtml(bankHolder)}</div>`;
 
     // 渲染可勾選之活動與組別清單
     const listBox = $('#multiEventsList');
     if (!evs.length) {
-      listBox.innerHTML = '<div class="p-8 text-center text-slate-400 text-sm">此金流群組目前尚無開放報名之活動，請切換另一金流群組。</div>';
+      listBox.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm">承辦人「${C.escapeHtml(activeOrg.displayName)}」在此金流群組目前尚無開放報名活動，請切換上方承辦人或金流群組。</div>`;
     } else {
-      listBox.innerHTML = evs.map((ev) => {
+      listBox.innerHTML = (evs.length === 1
+        ? `<div class="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-950">💡 承辦人「<b>${C.escapeHtml(activeOrg.displayName)}</b>」目前於「${isPayuni ? 'PAYUNi 線上金流' : '轉帳核對末五碼'}」共有 <b>1 場</b>開放中活動（不同承辦人收款不同已自動隔離；當該承辦人開立第 2 場以上同金流活動時，將自動並列於此處供一次勾選合併匯款）。</div>`
+        : `<div class="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-950">✅ 承辦人「<b>${C.escapeHtml(activeOrg.displayName)}</b>」目前共有 <b>${evs.length} 場</b>同金流活動開放中，勾選 2 場以上即可合併 1 筆匯款記帳！</div>`) + evs.map((ev) => {
         const cats = State.categories.filter((c) => c.eventId === ev.eventId);
         const schema = C.parseJsonSafe(ev.formSchemaJson, C.defaultFormSchema());
         const addons = Array.isArray(schema.addons) ? schema.addons : [];
@@ -1010,7 +1086,7 @@
   }
 
   function renderMultiSummaryAndValidate() {
-    const byMode = getOpenEventsByPayMode();
+    const byMode = getOpenEventsByOwnerAndPayMode(State.multiOwner);
     const mode = State.multiPayMode || 'MANUAL_ATM';
     const evs = byMode[mode] || [];
     const isPayuni = mode === 'ONLINE_PAYUNi';
@@ -1085,7 +1161,9 @@
     if (!isPayuni && last5 && !/^\d{5}$/.test(last5)) errs.push('匯款末五碼限 5 位純數字');
     if (!consent) errs.push('請勾選同意參賽切結書');
 
-    // 跨場逐一檢查重複報名、活動總名額、分組名額與自訂必填欄
+    // 跨場逐一檢查同一承辦人、重複報名、活動總名額、分組名額與自訂必填欄
+    const pickedOwners = new Set(picked.map((x) => getEventOwnerKey(x.ev)));
+    if (pickedOwners.size > 1) errs.push('僅限合併同一位承辦人舉辦之活動');
     picked.forEach((it) => {
       const dup = idCard && State.participants.some((p) => p.eventId === it.ev.eventId && String(p.idCard).toUpperCase() === idCard && String(p.payStatus).toUpperCase() !== 'CANCELLED');
       if (dup) errs.push(`身分證 ${idCard} 已報名「${it.ev.nameZh}」，請取消勾選該場`);
@@ -1925,7 +2003,7 @@
       const n = li + 10, w = [1, 9, 8, 7, 6, 5, 4, 3, 2, 1];
       const d = [Math.floor(n / 10), n % 10, gc, ...body];
       const chk = (10 - (d.reduce((a, x, i) => a + x * w[i], 0) % 10)) % 10;
-      const byMode = getOpenEventsByPayMode();
+      const byMode = getOpenEventsByOwnerAndPayMode(State.multiOwner);
       const evs = byMode[State.multiPayMode || 'MANUAL_ATM'] || [];
       evs.slice(0, 2).forEach((ev) => {
         const cats = State.categories.filter((c) => c.eventId === ev.eventId);
