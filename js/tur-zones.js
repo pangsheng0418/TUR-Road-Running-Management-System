@@ -56,7 +56,8 @@
   /* --------------------------------------------------------------------------
    * Official 3-Sheet Excel (.xlsx), Chip CSV, DUV & 800-Warriors Export
    * -------------------------------------------------------------------------- */
-  function export3SheetExcel(App, ev, masked = false) {
+  async function export3SheetExcel(App, ev, masked = false) {
+    await C.ensureExternalLib('xlsx');
     const rows = C.computeLeaderboard({
       event: ev,
       categories: App.State.categories,
@@ -171,7 +172,8 @@
     }
   }
 
-  function export800WarriorsExcel(App, ev) {
+  async function export800WarriorsExcel(App, ev) {
+    await C.ensureExternalLib('xlsx');
     const rows = C.computeLeaderboard({
       event: ev, categories: App.State.categories, stations: App.State.stations,
       participants: App.State.participants, timingLogs: App.State.timingLogs
@@ -333,8 +335,31 @@
   }
 
   /* --------------------------------------------------------------------------
-   * 專區 1：🏃 進行中活動管理（6 分頁）
+   * 專區 1：🏃 進行中活動管理（6 分頁按需渲染 Lazy Render，操作零延遲）
    * -------------------------------------------------------------------------- */
+  let z1DirtyTabs = new Set(['setup', 'recon', 'chip', 'gun', 'score', 'ops']);
+  let z1RenderedEventId = '';
+
+  function getActiveZ1Tab() {
+    const activeBtn = document.querySelector('[data-z1tab].active');
+    return activeBtn ? activeBtn.dataset.z1tab : 'setup';
+  }
+
+  function renderZone1Tab(App, tabName, force = false) {
+    const managed = getManagedEvents(App, false);
+    const ev = managed.find((e) => e.eventId === App.State.z1EventId);
+    if (!ev) return;
+    if (!force && z1RenderedEventId === ev.eventId && !z1DirtyTabs.has(tabName)) return;
+    if (tabName === 'setup') renderZ1Setup(App, ev);
+    else if (tabName === 'recon') renderZ1Recon(App, ev);
+    else if (tabName === 'chip') renderZ1ChipOps(App, ev);
+    else if (tabName === 'gun') renderZ1Gun(App, ev);
+    else if (tabName === 'score') renderZ1Score(App, ev);
+    else if (tabName === 'ops') renderZ1Ops(App, ev);
+    z1RenderedEventId = ev.eventId;
+    z1DirtyTabs.delete(tabName);
+  }
+
   function renderZone1(App) {
     const managed = getManagedEvents(App, false);
     const sel = $('#z1EventSelect');
@@ -349,13 +374,10 @@
     sel.innerHTML = managed.map((e) => `<option value="${e.eventId}" ${e.eventId === App.State.z1EventId ? 'selected' : ''}>${C.escapeHtml(e.nameZh)} (${e.ownerUsername})</option>`).join('');
     const ev = managed.find((e) => e.eventId === App.State.z1EventId);
 
+    z1DirtyTabs = new Set(['setup', 'recon', 'chip', 'gun', 'score', 'ops']);
+    z1RenderedEventId = ev.eventId;
     renderZ1StageGateBar(App, ev);
-    renderZ1Setup(App, ev);
-    renderZ1Recon(App, ev);
-    renderZ1ChipOps(App, ev);
-    renderZ1Gun(App, ev);
-    renderZ1Score(App, ev);
-    renderZ1Ops(App, ev);
+    renderZone1Tab(App, getActiveZ1Tab(), true);
   }
 
   function renderZ1StageGateBar(App, ev) {
@@ -1063,8 +1085,9 @@
         ['陳小美', 'F229988772', 'F', c2, '', 'TWN', '1992-03-20', '0922334455', 'mei@example.com', '', '外場報名']
       ];
     };
-    $('#btnZ1DlExtXlsx').onclick = () => {
+    $('#btnZ1DlExtXlsx').onclick = async () => {
       const rows = buildExtSampleRows();
+      await C.ensureExternalLib('xlsx');
       if (global.XLSX) {
         const wb = global.XLSX.utils.book_new();
         global.XLSX.utils.book_append_sheet(wb, global.XLSX.utils.aoa_to_sheet(rows), '外部選手名單範本');
@@ -1134,6 +1157,7 @@
     $('#z1ExtCsvFile').onchange = async (e) => {
       const f = e.target.files?.[0];
       if (!f) return;
+      if (/\.(xlsx|xls)$/i.test(f.name)) await C.ensureExternalLib('xlsx');
       if (/\.(xlsx|xls)$/i.test(f.name) && global.XLSX) {
         const buf = await f.arrayBuffer();
         const wb = global.XLSX.read(buf, { type: 'array' });
@@ -1866,6 +1890,7 @@
   let z2CustomBgImg = null;
 
   function renderZone2(App) {
+    C.ensureCertFonts();
     const finished = getManagedEvents(App, true);
     const box = $('#view-zone2');
     if (!finished.length) {
@@ -2117,7 +2142,7 @@
     $('#certFontSel').onchange = (e) => { cfg.fontId = e.target.value; redraw(); };
     $('#certLayoutSel').onchange = (e) => { cfg.layoutId = e.target.value; redraw(); };
     $('#certPaletteSel').onchange = (e) => { cfg.paletteId = e.target.value; redraw(); };
-    $('#certDirectorInput').oninput = (e) => { cfg.raceDirectorName = e.target.value; redraw(); };
+    C.bindFastInput($('#certDirectorInput'), (e) => { cfg.raceDirectorName = e.target.value; redraw(); }, 150);
     $('#certPreviewRunner').onchange = redraw;
     $$('.cert-toggle').forEach((cb) => { cb.onchange = () => { cfg[cb.dataset.ckey] = cb.checked; redraw(); }; });
     $('#certCustomColor').oninput = (e) => { cfg.customTextPos.color = e.target.value; redraw(); };
@@ -2162,6 +2187,7 @@
 
     $('#btnZ2BatchZip').onclick = async () => {
       if (!certRows.length) return App.toast('🔒 本活動無符合「已結案完賽有成績」之選手，無法批次匯出證書', 'warning');
+      if (!global.JSZip) { App.toast('⏳ 正在載入壓縮套件...', 'info'); await C.ensureExternalLib('jszip'); }
       if (!global.JSZip) return App.toast('JSZip 未載入', 'error');
       const zip = new global.JSZip();
       const tmp = document.createElement('canvas');
@@ -2175,8 +2201,9 @@
       App.toast(`📦 離線批次匯出完成！共 ${certRows.length} 張完賽證書 (.zip)`, 'success');
     };
 
-    $('#btnZ2BatchPdf').onclick = () => {
+    $('#btnZ2BatchPdf').onclick = async () => {
       if (!certRows.length) return App.toast('🔒 本活動無符合「已結案完賽有成績」之選手，無法匯出證書 PDF', 'warning');
+      if (!global.jspdf?.jsPDF) { App.toast('⏳ 正在載入 PDF 套件...', 'info'); await C.ensureExternalLib('jspdf'); }
       if (!global.jspdf?.jsPDF) return App.toast('jsPDF 未載入', 'error');
       const orient = cfg.orientation === 'portrait' ? 'portrait' : 'landscape';
       const pdf = new global.jspdf.jsPDF({ orientation: orient, unit: 'mm', format: 'a4' });
@@ -2660,5 +2687,5 @@
     }
   }
 
-  global.TurZones = { renderZone1, renderZone2, renderZone3, renderZone4, renderZone5 };
+  global.TurZones = { renderZone1, renderZone1Tab, renderZone2, renderZone3, renderZone4, renderZone5 };
 })(window);

@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>TUR 公開成績查詢・八百壯士英雄榜・官方與客製化完賽證書 v3.0</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;800&family=Noto+Sans+TC:wght@500;700;900&family=Noto+Serif+TC:wght@600;900&family=Oswald:wght@600;700&family=Zen+Maru+Gothic:wght@500;700;900&display=swap" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&display=swap" media="print" onload="this.media='all'" />
   <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", sans-serif; line-height: 1.6; }
     .mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
@@ -288,8 +288,8 @@
   </section>
 </main>
 
-<script src="js/tur-logo.js?v=4.7"></script>
-<script src="js/tur-core.js?v=4.7"></script>
+<script src="js/tur-logo.js?v=4.8"></script>
+<script src="js/tur-core.js?v=4.8"></script>
 <script>
 (() => {
   'use strict';
@@ -314,7 +314,9 @@
     quote: '突破極限，感謝每一站熱情的志工！',
     certMode: 'official', // 'official' | 'custom_runner'
     overrideOrient: '', overrideLayout: '', overridePalette: '', overrideFont: '',
-    dragging: false, dx0: 0, dy0: 0
+    dragging: false, dx0: 0, dy0: 0,
+    activeTab: 'live',
+    dirtyTabs: { live: true, history: true, warriors: true, cert: true }
   };
 
   function stripToPublicData(raw) {
@@ -334,53 +336,77 @@
     };
   }
 
-  async function loadAll(forceDemo = false) {
-    const gasUrl = (localStorage.getItem('TUR_GAS_URL') || C.DEFAULT_GAS_URL || '').trim();
-    let ok = false;
-
-    if (!forceDemo && gasUrl && navigator.onLine) {
-      try {
-        const res = await C.gasGet(gasUrl, { action: 'publicLookup' });
-        if (res && res.ok && res.data && res.data.events?.length && (res.data.participants?.length || 0) > 0) {
-          Object.assign(Pub, stripToPublicData(res.data));
-          ok = true;
-        }
-      } catch (_) {}
-    }
-
-    if (!forceDemo && !ok) {
-      await C.TurDB.open();
-      const [events, categories, stations, participants, timingLogs, historyResults] = await Promise.all([
-        C.TurDB.getAll('events'), C.TurDB.getAll('categories'), C.TurDB.getAll('stations'),
-        C.TurDB.getAll('participants'), C.TurDB.getAll('timingLogs'), C.TurDB.getAll('historyResults')
-      ]);
-      const oldSeedIds = new Set(['TUR-20260001', 'TUR-20260002', 'TUR-20260003', 'TUR-20260004', 'TUR-20260005', 'TUR-FIN-001', 'TUR-FIN-002', 'TUR-FIN-003', 'TUR-F24-001']);
-      const isOldSeed = events.length > 0 && participants.length <= 9 && participants.every((p) => oldSeedIds.has(p.participantId));
-      if (events.length && !isOldSeed) {
-        Object.assign(Pub, stripToPublicData({ events, categories, stations, participants, timingLogs, historyResults }));
-        ok = true;
-      }
-    }
-
-    if (!ok) {
-      const seed = C.buildFull5EventsSeed();
-      Object.assign(Pub, stripToPublicData(seed));
-    }
-
-    // 優先選取「已開賽進行中」之賽事讓大家直接看到全階段動態進度，其次已結案
+  function applyLoadedPublicDataset(rawData, preserveActiveEvent = false) {
+    Object.assign(Pub, stripToPublicData(rawData));
+    const prevEv = preserveActiveEvent ? Pub.events.find((e) => e.eventId === Pub.activeEventId) : null;
     const liveActiveEv = Pub.events.find((e) => e.status !== 'finished' && e.raceStart);
     const finEv = Pub.events.find((e) => e.status === 'finished');
-    const chosen = liveActiveEv || finEv || Pub.events[0];
+    const chosen = prevEv || liveActiveEv || finEv || Pub.events[0];
     Pub.activeEventId = chosen ? chosen.eventId : '';
     Pub.unifiedHistory = C.buildUnifiedHistoryRecords({
       events: Pub.events, categories: Pub.categories, stations: Pub.stations,
       participants: Pub.participants, timingLogs: Pub.timingLogs, historyResults: Pub.historyResults
     });
+    Pub.dirtyTabs = { live: true, history: true, warriors: true, cert: true };
     populateHistoryFilterSelects();
     renderEventSelect();
     recomputeEvent();
-    renderHistory();
-    renderWarriors();
+    renderActivePubTab();
+  }
+
+  function renderActivePubTab() {
+    const t = Pub.activeTab || 'live';
+    if (t === 'live' && Pub.dirtyTabs.live) {
+      renderAnalyticsDashboard();
+      renderLiveTable();
+      Pub.dirtyTabs.live = false;
+    } else if (t === 'history' && Pub.dirtyTabs.history) {
+      renderHistory();
+      Pub.dirtyTabs.history = false;
+    } else if (t === 'warriors' && Pub.dirtyTabs.warriors) {
+      renderWarriors();
+      Pub.dirtyTabs.warriors = false;
+    } else if (t === 'cert') {
+      C.ensureCertFonts();
+      renderCertRunnerList();
+      drawCert();
+      Pub.dirtyTabs.cert = false;
+    }
+  }
+
+  // 極速秒開策略（Stale-While-Revalidate）：先於 <50ms 顯示本機快取，再背景靜默同步雲端 GAS！
+  async function loadAll(forceDemo = false) {
+    const gasUrl = (localStorage.getItem('TUR_GAS_URL') || C.DEFAULT_GAS_URL || '').trim();
+    let localLoaded = false;
+
+    if (!forceDemo) {
+      try {
+        await C.TurDB.open();
+        const [events, categories, stations, participants, timingLogs, historyResults] = await Promise.all([
+          C.TurDB.getAll('events'), C.TurDB.getAll('categories'), C.TurDB.getAll('stations'),
+          C.TurDB.getAll('participants'), C.TurDB.getAll('timingLogs'), C.TurDB.getAll('historyResults')
+        ]);
+        const oldSeedIds = new Set(['TUR-20260001', 'TUR-20260002', 'TUR-20260003', 'TUR-20260004', 'TUR-20260005', 'TUR-FIN-001', 'TUR-FIN-002', 'TUR-FIN-003', 'TUR-F24-001']);
+        const isOldSeed = events.length > 0 && participants.length <= 9 && participants.every((p) => oldSeedIds.has(p.participantId));
+        if (events.length && !isOldSeed) {
+          applyLoadedPublicDataset({ events, categories, stations, participants, timingLogs, historyResults }, false);
+          localLoaded = true;
+        }
+      } catch (_) {}
+    }
+
+    if (!localLoaded) {
+      applyLoadedPublicDataset(C.buildFull5EventsSeed(), false);
+    }
+
+    // 背景靜默拉取雲端最新資料（不阻塞首次開頁畫面！）
+    if (!forceDemo && gasUrl && navigator.onLine) {
+      C.gasGet(gasUrl, { action: 'publicLookup' }).then((res) => {
+        if (res && res.ok && res.data && res.data.events?.length && (res.data.participants?.length || 0) > 0) {
+          applyLoadedPublicDataset(res.data, true);
+        }
+      }).catch(() => {});
+    }
   }
 
   function populateHistoryFilterSelects() {
@@ -442,10 +468,17 @@
     const eligRows = Pub.rows.filter((r) => C.isCertEligible(ev, r).ok);
     Pub.selectedRow = eligRows[0] || null;
     Pub.selectedIsExternalCert = false;
-    renderAnalyticsDashboard();
-    renderLiveTable();
-    renderCertRunnerList();
-    drawCert();
+    Pub.dirtyTabs.live = true;
+    Pub.dirtyTabs.cert = true;
+    if (Pub.activeTab === 'live') {
+      renderAnalyticsDashboard();
+      renderLiveTable();
+      Pub.dirtyTabs.live = false;
+    } else if (Pub.activeTab === 'cert') {
+      renderCertRunnerList();
+      drawCert();
+      Pub.dirtyTabs.cert = false;
+    }
   }
 
   function renderAnalyticsDashboard() {
@@ -1167,17 +1200,18 @@
   }
 
   function switchPubTab(tab) {
+    Pub.activeTab = tab;
     $$('.ptab').forEach((b) => b.classList.toggle('active', b.dataset.ptab === tab));
     $$('.ppanel').forEach((p) => p.classList.toggle('hidden', p.id !== `ptab-${tab}`));
-    if (tab === 'cert') drawCert();
+    renderActivePubTab();
   }
 
   $$('.ptab').forEach((b) => { b.onclick = () => switchPubTab(b.dataset.ptab); });
   $('#pubEventSelect').onchange = (e) => { Pub.activeEventId = e.target.value; Pub.selectedIsExternalCert = false; recomputeEvent(); };
   $('#btnPubReloadDemo').onclick = () => loadAll(true);
-  $('#liveSearch').oninput = renderLiveTable;
+  C.bindFastInput($('#liveSearch'), renderLiveTable, 140);
   $('#liveCatFilter').onchange = (e) => { Pub.catFilter = e.target.value; renderLiveTable(); };
-  $('#hisSearch').oninput = renderHistory;
+  C.bindFastInput($('#hisSearch'), renderHistory, 140);
   $('#hisYearFilter').onchange = (e) => { Pub.hisYear = e.target.value; renderHistory(); };
   $('#hisEventFilter').onchange = (e) => { Pub.hisEvent = e.target.value; renderHistory(); };
   $('#hisRunnerFilter').onchange = (e) => { Pub.hisRunner = e.target.value; renderHistory(); };
@@ -1190,10 +1224,10 @@
   };
   $('#btnHisRankRunner').onclick = () => { Pub.hisRankMode = 'runner'; renderHistory(); };
   $('#btnHisRankEvent').onclick = () => { Pub.hisRankMode = 'event'; renderHistory(); };
-  $('#warSearch').oninput = renderWarriors;
+  C.bindFastInput($('#warSearch'), renderWarriors, 140);
   $('#btnWarViewYear').onclick = () => { Pub.warView = 'year'; renderWarriors(); };
   $('#btnWarViewStars').onclick = () => { Pub.warView = 'stars'; renderWarriors(); };
-  $('#certSearch').oninput = renderCertRunnerList;
+  C.bindFastInput($('#certSearch'), renderCertRunnerList, 140);
   $('#btnPubModeOfficial').onclick = () => { Pub.certMode = 'official'; drawCert(); };
   $('#btnPubModeCustom').onclick = () => { Pub.certMode = 'custom_runner'; drawCert(); };
   $('#pubOrientPick').onchange = (e) => { Pub.overrideOrient = e.target.value; drawCert(); };
@@ -1201,7 +1235,7 @@
   $('#pubPalettePick').onchange = (e) => { Pub.overridePalette = e.target.value; drawCert(); };
   $('#pubFontPick').onchange = (e) => { Pub.overrideFont = e.target.value; drawCert(); };
   $('#pubQuoteCnt').textContent = `${Pub.quote.length} / 40`;
-  $('#pubQuoteInput').oninput = (e) => { Pub.quote = e.target.value.slice(0, 40); $('#pubQuoteCnt').textContent = `${Pub.quote.length} / 40`; drawCert(); };
+  C.bindFastInput($('#pubQuoteInput'), (e) => { Pub.quote = e.target.value.slice(0, 40); $('#pubQuoteCnt').textContent = `${Pub.quote.length} / 40`; drawCert(); }, 120);
   $('#pubZoom').oninput = (e) => { Pub.photoZoom = Number(e.target.value); $('#pubZoomTxt').textContent = `${Pub.photoZoom.toFixed(1)}x`; drawCert(); };
   $$('.frame-btn').forEach((b) => {
     b.onclick = () => {
@@ -1234,9 +1268,10 @@
     a.download = `TUR_Cert_${Pub.selectedRow?.participant.bibNumber || 'FINISHER'}.png`;
     a.href = cv.toDataURL('image/png', 1.0); a.click();
   };
-  $('#btnDlPdf').onclick = () => {
+  $('#btnDlPdf').onclick = async () => {
     const chk = C.isCertEligible(Pub.selectedRow?.event || getActiveEvent(), Pub.selectedRow);
     if (!chk.ok) return alert(`🔒 無法匯出證書：${chk.reason}`);
+    await C.ensureExternalLib('jspdf');
     const orient = cv.height > cv.width ? 'portrait' : 'landscape';
     if (window.jspdf?.jsPDF) {
       const pdf = new window.jspdf.jsPDF({ orientation: orient, unit: 'mm', format: 'a4' });
@@ -1256,7 +1291,7 @@
     b.onclick = () => syncPubFontButtons(C.applyFontScale(b.dataset.fontScale));
   });
 
-  C.onLogoReady(() => drawCert());
+  C.onLogoReady(() => { if (Pub.activeTab === 'cert') drawCert(); });
   loadAll();
 })();
 </script>

@@ -1657,6 +1657,7 @@
         b.classList.add('active');
         $$('.z1-panel').forEach((p) => p.classList.add('hidden'));
         $(`#z1-${b.dataset.z1tab}`).classList.remove('hidden');
+        if (Z.renderZone1Tab) Z.renderZone1Tab(AppBridge, b.dataset.z1tab);
       };
     });
     // 建立新活動 Modal（明確區分距離賽 vs 計時繞圈賽 ＋ 轉帳核對末五碼 vs 結合金流廠商）
@@ -1745,7 +1746,7 @@
         renderOperatorStation();
       };
     }
-    $('#writerSearch').oninput = renderWriterList;
+    C.bindFastInput($('#writerSearch'), renderWriterList, 120);
     if ($('#writerFilter')) $('#writerFilter').onchange = renderWriterList;
     $('#writerSearchList').onclick = (e) => {
       if (e.target.dataset.pickWriter) {
@@ -1774,7 +1775,7 @@
       const inp = $('#manualScanInput');
       if (inp.value.trim()) { await handleOperatorSense(inp.value.trim(), 'manual'); inp.value = ''; inp.focus(); }
     };
-    $('#opManualPickerSearch').oninput = () => {
+    C.bindFastInput($('#opManualPickerSearch'), () => {
       const ev = State.events.find((e) => e.eventId === State.opEventId);
       if (!ev) return;
       const stCode = State.opLockedStation;
@@ -1782,7 +1783,7 @@
       const stLogs = State.timingLogs.filter((l) => l.eventId === ev.eventId && l.stationCode === stCode && l.isValid !== false);
       const passedBibSet = new Set(stLogs.map((l) => String(l.bibNumber).toUpperCase()));
       renderOpFallbackPicker(ev, stCode, paid, passedBibSet, stLogs);
-    };
+    }, 120);
     $('#btnOpManualFallback').onclick = async () => {
       const bib = $('#opManualRunnerSelect').value;
       if (!bib) return toast('請先選擇本活動之已配號選手', 'warn');

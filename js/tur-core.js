@@ -1896,6 +1896,56 @@
   }
     // Re-add section 8 header right after getStationSopInfo
   /* --------------------------------------------------------------------------
+   * 6G. 前端極速效能工具：中文組字防抖輸入 (bindFastInput) + 外部大套件/字型按需延遲載入
+   * -------------------------------------------------------------------------- */
+  function bindFastInput(el, handler, delay = 150) {
+    if (!el || typeof handler !== 'function') return;
+    let timer = null;
+    let composing = false;
+    const fire = (e) => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => { timer = null; handler(e); }, delay);
+    };
+    el.addEventListener('compositionstart', () => { composing = true; });
+    el.addEventListener('compositionend', (e) => { composing = false; fire(e); });
+    el.addEventListener('input', (e) => { if (!composing) fire(e); });
+  }
+
+  const _extLibPromises = {};
+  const EXT_LIB_URLS = {
+    xlsx: { url: 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js', ready: () => Boolean(global.XLSX) },
+    jszip: { url: 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js', ready: () => Boolean(global.JSZip) },
+    jspdf: { url: 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js', ready: () => Boolean(global.jspdf?.jsPDF) }
+  };
+
+  function ensureExternalLib(name) {
+    const spec = EXT_LIB_URLS[name];
+    if (!spec) return Promise.resolve(false);
+    if (spec.ready()) return Promise.resolve(true);
+    if (_extLibPromises[name]) return _extLibPromises[name];
+    _extLibPromises[name] = new Promise((resolve) => {
+      if (!global.document) return resolve(false);
+      const s = global.document.createElement('script');
+      s.src = spec.url;
+      s.async = true;
+      s.onload = () => resolve(spec.ready());
+      s.onerror = () => { delete _extLibPromises[name]; resolve(false); };
+      global.document.head.appendChild(s);
+    });
+    return _extLibPromises[name];
+  }
+
+  let _certFontsLoaded = false;
+  function ensureCertFonts() {
+    if (_certFontsLoaded || !global.document) return;
+    _certFontsLoaded = true;
+    const l = global.document.createElement('link');
+    l.rel = 'stylesheet';
+    l.href = 'https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;800&family=Noto+Serif+TC:wght@600;900&family=Oswald:wght@600;700&family=Zen+Maru+Gothic:wght@500;700;900&display=swap';
+    global.document.head.appendChild(l);
+  }
+
+  /* --------------------------------------------------------------------------
    * 8. 全情境 5 場豐富測試資料（38 位涵蓋報名→繳費→報到→各管制站進行中→完賽→DNF→取消）
    * -------------------------------------------------------------------------- */
   function buildFull5EventsSeed() {
@@ -2269,6 +2319,7 @@
     isWarrior800Eligible, computeLeaderboard, computeEventProgressAnalytics, evaluateEventStageGates,
     isCertEligible, buildUnifiedHistoryRecords, parseExternalRosterRows,
     FONT_SCALE_MODES, applyFontScale, getSavedFontScale, getRaceTypeWorkflow, getStationSopInfo,
+    bindFastInput, ensureExternalLib, ensureCertFonts,
     CERT_LAYOUTS, CERT_PALETTES, CERT_FONTS, renderCertificateCanvas,
     buildFull5EventsSeed
   };
