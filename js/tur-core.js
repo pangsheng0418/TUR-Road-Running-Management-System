@@ -573,7 +573,14 @@
   /* --------------------------------------------------------------------------
    * 6. Dual-Mode Race Results Calculator (Distance + Lap Timed + 800 Warriors)
    * -------------------------------------------------------------------------- */
-  function isWarrior800Eligible(eventName, catName, totalDistanceKm) {
+  function isCategoryWarrior800(cat) {
+    if (!cat) return false;
+    return cat.isWarrior800 === true || cat.isWarrior800 === 1 || String(cat.isWarrior800).toLowerCase() === 'true';
+  }
+
+  function isWarrior800Eligible(eventName, catName, totalDistanceKm, catObj = null) {
+    // 若已傳入組別物件，一律嚴格依承辦人於組別設定之 isWarrior800 標示為準
+    if (catObj && typeof catObj === 'object') return isCategoryWarrior800(catObj);
     if (Number(totalDistanceKm || 0) >= 100) return true;
     const text = `${eventName || ''} ${catName || ''}`;
     return /八百壯士|800壯士|100K|100KM/i.test(text) && Number(totalDistanceKm || 0) >= 99.5;
@@ -645,7 +652,7 @@
           lapCount, overtimeCount, totalDistanceKm, elapsedSec,
           avgPace: elapsedSec && totalDistanceKm > 0 ? formatPace(elapsedSec, totalDistanceKm) : '--:--',
           splits: {}, splitDetails,
-          isWarrior800: isWarrior800Eligible(event.nameZh, cat.name, totalDistanceKm),
+          isWarrior800: status === 'finished' && isCategoryWarrior800(cat),
           status
         };
       } else {
@@ -693,7 +700,7 @@
           lapCount: 0, overtimeCount: 0, totalDistanceKm, elapsedSec,
           avgPace: elapsedSec && totalDistanceKm > 0 ? formatPace(elapsedSec, totalDistanceKm) : '--:--',
           splits, splitDetails,
-          isWarrior800: status === 'finished' && isWarrior800Eligible(event.nameZh, cat.name, totalDistanceKm),
+          isWarrior800: status === 'finished' && isCategoryWarrior800(cat),
           status
         };
       }
@@ -1090,7 +1097,8 @@
       const canCert = status === 'FINISHED' && ((sec !== null && sec >= 0) || (Number(h.lapCount || 0) > 0 && dist > 0));
       // 歷年成績僅列「已結案且有正式完賽成績」之紀錄
       if (!canCert) return;
-      const isW800 = Boolean(h.isWarrior800) || (canCert && isWarrior800Eligible(h.eventName, h.categoryName, dist));
+      // 嚴格採用匯入時手動標示之 isWarrior800，不再用距離或活動名自動猜測
+      const isW800 = h.isWarrior800 === true || h.isWarrior800 === 1 || String(h.isWarrior800).toLowerCase() === 'true';
       const key = `${dateStr}::${h.eventName}::${h.name}::${h.bibNumber || idx}`;
       if (dedup.has(key)) return;
       dedup.add(key);
@@ -1190,20 +1198,30 @@
   }
 
   /* --------------------------------------------------------------------------
-   * 6E. 外部報名名單智慧解析與預檢引擎（支援 Excel / CSV / 貼上文字，含賽事進行中補加）
+   * 6E. 外部已完成報名繳費名單 & 歷屆完賽成績標準匯入欄位順序規範
    * -------------------------------------------------------------------------- */
   const EXTERNAL_IMPORT_SPEC = [
-    { key: 'name', label: '姓名', required: true, aliases: ['姓名', '選手姓名', 'name', 'fullname', 'runner', '跑者姓名'], example: '林大為' },
-    { key: 'idCard', label: '身分證 / 護照', required: true, aliases: ['身分證', '身分證字號', '身分證/護照', '護照', 'id', 'idcard', 'passport'], example: 'A123456789' },
-    { key: 'gender', label: '性別 (M/F)', required: true, aliases: ['性別', 'gender', 'sex'], example: 'M' },
-    { key: 'category', label: '報名組別', required: true, aliases: ['組別', '報名組別', '參賽組別', 'category', 'cat', 'group'], example: '50K 超馬組' },
-    { key: 'bibNumber', label: '號碼布 (留空自動配號)', required: false, aliases: ['號碼布', '參賽編號', 'bib', 'bibnumber', '編號'], example: 'A088' },
-    { key: 'nationality', label: '國籍 (預設 TWN)', required: false, aliases: ['國籍', 'nationality', 'country', 'nat'], example: 'TWN' },
-    { key: 'birthday', label: '出生年月日', required: false, aliases: ['生日', '出生日期', '出生年月日', 'birthday', 'dob'], example: '1989-06-15' },
-    { key: 'phone', label: '手機號碼', required: false, aliases: ['手機', '手機號碼', '電話', 'phone', 'mobile', 'tel'], example: '0912345678' },
-    { key: 'email', label: 'Email', required: false, aliases: ['email', '信箱', '電子信箱', 'mail'], example: 'runner@example.com' },
-    { key: 'chipUid', label: '晶片 UID', required: false, aliases: ['晶片', '晶片uid', 'chip', 'chipuid', 'uid'], example: '' },
-    { key: 'groupName', label: '跑團 / 備註單位', required: false, aliases: ['跑團', '團報名稱', '單位', 'team', 'club', 'groupname'], example: '外場報名' }
+    { order: 1, key: 'name', label: '姓名', required: true, aliases: ['姓名', '選手姓名', 'name', 'fullname', 'runner', '跑者姓名'], example: '林大為', desc: '選手完整姓名（必填）' },
+    { order: 2, key: 'idCard', label: '身分證 / 護照', required: true, aliases: ['身分證', '身分證字號', '身分證/護照', '護照', 'id', 'idcard', 'passport'], example: 'A123456789', desc: '唯一識別碼，用於防重複與成績歸併（必填）' },
+    { order: 3, key: 'gender', label: '性別 (M/F)', required: true, aliases: ['性別', 'gender', 'sex'], example: 'M', desc: '填 M/F 或 男/女（必填）' },
+    { order: 4, key: 'category', label: '報名組別', required: true, aliases: ['組別', '報名組別', '參賽組別', 'category', 'cat', 'group'], example: '50K 超馬組', desc: '對應本活動已建立之組別名稱（必填）' },
+    { order: 5, key: 'bibNumber', label: '號碼布 (留空自動配號)', required: false, aliases: ['號碼布', '參賽編號', 'bib', 'bibnumber', '編號'], example: 'A088', desc: '留空或撞號時由系統依組別接續配號' },
+    { order: 6, key: 'nationality', label: '國籍 (預設 TWN)', required: false, aliases: ['國籍', 'nationality', 'country', 'nat'], example: 'TWN', desc: '3 碼 ISO 國碼，留空預設 TWN' },
+    { order: 7, key: 'birthday', label: '出生年月日', required: false, aliases: ['生日', '出生日期', '出生年月日', 'birthday', 'dob'], example: '1989-06-15', desc: 'YYYY-MM-DD（用於 DUV 年齡分組）' },
+    { order: 8, key: 'phone', label: '手機號碼', required: false, aliases: ['手機', '手機號碼', '電話', 'phone', 'mobile', 'tel'], example: '0912345678', desc: '緊急聯絡與查詢使用' },
+    { order: 9, key: 'email', label: 'Email', required: false, aliases: ['email', '信箱', '電子信箱', 'mail'], example: 'runner@example.com', desc: '通知與證書寄發信箱' },
+    { order: 10, key: 'chipUid', label: '晶片 UID', required: false, aliases: ['晶片', '晶片uid', 'chip', 'chipuid', 'uid'], example: '', desc: '若已預先配卡可填；否則留空由寫卡站燒錄' },
+    { order: 11, key: 'groupName', label: '跑團 / 備註單位', required: false, aliases: ['跑團', '團報名稱', '單位', 'team', 'club', 'groupname'], example: '外場報名', desc: '外部來源或所屬跑團名稱' }
+  ];
+
+  const HISTORY_IMPORT_SPEC = [
+    { order: 1, key: 'categoryName', label: '組別名稱', required: true, example: '100K八百壯士組', desc: '預覽審查時可依此組別一鍵批次標示八百壯士' },
+    { order: 2, key: 'bibNumber', label: '參賽號碼布', required: true, example: 'W001', desc: '該場次選手號碼布（留空自動編 H 序號）' },
+    { order: 3, key: 'lastName', label: '姓（或完整姓名）', required: true, example: '諸葛', desc: '支援 28 組中文複姓；若無拆格可直接填完整姓名' },
+    { order: 4, key: 'firstName', label: '名（選填）', required: false, example: '亮', desc: '與第 3 欄智慧合併；若第 3 欄已填全名請留空' },
+    { order: 5, key: 'idCard', label: '身分證 / 護照', required: false, example: 'A123456789', desc: '自動轉 SHA-256 雜湊歸併跨年度紀錄，不存明碼' },
+    { order: 6, key: 'finishTime', label: '完賽成績', required: true, example: '09:48:12', desc: 'HH:mm:ss 格式（匯入明細一律列為「已完賽」）' },
+    { order: 7, key: 'distanceKm', label: '完賽距離 (km)', required: true, example: '100', desc: '有效完賽公里數（純數字，如 100 或 132.4）' }
   ];
 
   function parseExternalRosterRows({ rawRows = [], event, categories = [], existingParticipants = [] }) {
@@ -1896,6 +1914,81 @@
   }
     // Re-add section 8 header right after getStationSopInfo
   /* --------------------------------------------------------------------------
+   * 6H. 多場活動聯合報名合併訂單引擎 (Multi-Event Bundle Engine)
+   * -------------------------------------------------------------------------- */
+  function isBundleOrderCode(code) {
+    return /^TURM-[A-Z0-9-]+$/i.test(String(code || '').trim());
+  }
+
+  function generateBundleOrderCode() {
+    const d = new Date();
+    const yy = String(d.getFullYear()).slice(-2);
+    const mm = pad2(d.getMonth() + 1);
+    const dd = pad2(d.getDate());
+    const rnd = Math.floor(1000 + Math.random() * 9000);
+    return `TURM-${yy}${mm}${dd}-${rnd}`;
+  }
+
+  function summarizeBundleOrders({ participants = [], events = [], categories = [] }) {
+    const evMap = new Map(events.map((e) => [e.eventId, e]));
+    const catMap = new Map(categories.map((c) => [c.catId, c]));
+    const map = new Map();
+
+    participants.forEach((p) => {
+      const code = String(p.merTradeNo || '').trim().toUpperCase();
+      if (!isBundleOrderCode(code)) return;
+      const st = String(p.payStatus || 'UNPAID').toUpperCase();
+      if (st === 'CANCELLED') return;
+
+      if (!map.has(code)) {
+        map.set(code, {
+          bundleCode: code,
+          runnerName: p.name || '',
+          idCard: p.idCard || '',
+          phone: p.phone || '',
+          email: p.email || '',
+          payMethod: p.payMethod || 'MANUAL_ATM',
+          remittanceLast5: p.remittanceLast5 || '',
+          createdAt: p.createdAt || '',
+          items: [],
+          eventIds: [],
+          totalAmount: 0,
+          paidCount: 0,
+          unpaidCount: 0,
+          allPaid: false
+        });
+      }
+      const b = map.get(code);
+      const ev = evMap.get(p.eventId) || null;
+      const cat = catMap.get(p.catId) || null;
+      const amt = Number(p.totalAmount || 0);
+      if (!b.remittanceLast5 && p.remittanceLast5) b.remittanceLast5 = p.remittanceLast5;
+      if (!b.eventIds.includes(p.eventId)) b.eventIds.push(p.eventId);
+      b.items.push({
+        participant: p,
+        event: ev,
+        category: cat,
+        eventId: p.eventId,
+        eventName: ev?.nameZh || p.eventId,
+        catName: cat?.name || p.catId,
+        amount: amt,
+        payStatus: st,
+        bibNumber: p.bibNumber || ''
+      });
+      b.totalAmount += amt;
+      if (st === 'PAID') b.paidCount++;
+      else b.unpaidCount++;
+    });
+
+    const list = [...map.values()].map((b) => ({
+      ...b,
+      allPaid: b.items.length > 0 && b.unpaidCount === 0
+    }));
+    list.sort((a, b) => (b.unpaidCount > 0 ? 1 : 0) - (a.unpaidCount > 0 ? 1 : 0) || String(b.createdAt).localeCompare(String(a.createdAt)));
+    return list;
+  }
+
+  /* --------------------------------------------------------------------------
    * 6G. 前端極速效能工具：中文組字防抖輸入 (bindFastInput) + 外部大套件/字型按需延遲載入
    * -------------------------------------------------------------------------- */
   function bindFastInput(el, handler, delay = 150) {
@@ -2049,18 +2142,18 @@
     ];
 
     const categories = [
-      { catId: 'CAT-50K', eventId: 'TUR-2026-50K', name: '50K 超馬組', distanceKm: 50, timeLimitHours: 8, fee: 1800, bibPrefix: 'A', bibStartNum: '001', quota: 300, customRaceStart: '' },
-      { catId: 'CAT-100K', eventId: 'TUR-2026-50K', name: '100K 八百壯士組', distanceKm: 100, timeLimitHours: 16, fee: 2600, bibPrefix: 'U', bibStartNum: '001', quota: 200, customRaceStart: '' },
-      { catId: 'CAT-12H', eventId: 'TUR-2026-12H', name: '12H 繞圈組', distanceKm: 1.0, timeLimitHours: 12, fee: 2200, bibPrefix: 'L', bibStartNum: '001', quota: 200, customRaceStart: '' },
-      { catId: 'CAT-6H', eventId: 'TUR-2026-12H', name: '6H 繞圈組', distanceKm: 1.0, timeLimitHours: 6, fee: 1500, bibPrefix: 'S', bibStartNum: '001', quota: 200, customRaceStart: '' },
-      { catId: 'CAT-W800', eventId: 'TUR-2026-W800', name: '100K 八百壯士菁英組', distanceKm: 100, timeLimitHours: 15, fee: 2500, bibPrefix: 'W', bibStartNum: '001', quota: 200, customRaceStart: '' },
-      { catId: 'CAT-W50', eventId: 'TUR-2026-W800', name: '50K 南區挑戰組', distanceKm: 50, timeLimitHours: 8, fee: 1700, bibPrefix: 'G', bibStartNum: '001', quota: 100, customRaceStart: '' },
-      { catId: 'CAT-E6H', eventId: 'TUR-2026-EARLY6H', name: '6H 海濱繞圈組', distanceKm: 0.8, timeLimitHours: 6, fee: 1400, bibPrefix: 'H', bibStartNum: '001', quota: 120, customRaceStart: '' },
-      { catId: 'CAT-E3H', eventId: 'TUR-2026-EARLY6H', name: '3H 體驗繞圈組', distanceKm: 0.8, timeLimitHours: 3, fee: 950, bibPrefix: 'C', bibStartNum: '001', quota: 80, customRaceStart: '' },
-      { catId: 'CAT-FIN100', eventId: 'TUR-2026-FIN100', name: '100K 八百壯士組', distanceKm: 100, timeLimitHours: 16, fee: 2600, bibPrefix: 'K', bibStartNum: '001', quota: 200, customRaceStart: '' },
-      { catId: 'CAT-FIN50', eventId: 'TUR-2026-FIN100', name: '50K 挑戰組', distanceKm: 50, timeLimitHours: 8, fee: 1800, bibPrefix: 'F', bibStartNum: '001', quota: 300, customRaceStart: '' },
-      { catId: 'CAT-FIN24H', eventId: 'TUR-2026-FIN24H', name: '24H 繞圈組', distanceKm: 1.0, timeLimitHours: 24, fee: 2800, bibPrefix: 'T', bibStartNum: '001', quota: 200, customRaceStart: '' },
-      { catId: 'CAT-FIN12H', eventId: 'TUR-2026-FIN24H', name: '12H 夜間組', distanceKm: 1.0, timeLimitHours: 12, fee: 2100, bibPrefix: 'N', bibStartNum: '001', quota: 100, customRaceStart: '' }
+      { catId: 'CAT-50K', eventId: 'TUR-2026-50K', name: '50K 超馬組', distanceKm: 50, timeLimitHours: 8, fee: 1800, bibPrefix: 'A', bibStartNum: '001', quota: 300, customRaceStart: '', isWarrior800: false },
+      { catId: 'CAT-100K', eventId: 'TUR-2026-50K', name: '100K 八百壯士組', distanceKm: 100, timeLimitHours: 16, fee: 2600, bibPrefix: 'U', bibStartNum: '001', quota: 200, customRaceStart: '', isWarrior800: true },
+      { catId: 'CAT-12H', eventId: 'TUR-2026-12H', name: '12H 繞圈組', distanceKm: 1.0, timeLimitHours: 12, fee: 2200, bibPrefix: 'L', bibStartNum: '001', quota: 200, customRaceStart: '', isWarrior800: false },
+      { catId: 'CAT-6H', eventId: 'TUR-2026-12H', name: '6H 繞圈組', distanceKm: 1.0, timeLimitHours: 6, fee: 1500, bibPrefix: 'S', bibStartNum: '001', quota: 200, customRaceStart: '', isWarrior800: false },
+      { catId: 'CAT-W800', eventId: 'TUR-2026-W800', name: '100K 八百壯士菁英組', distanceKm: 100, timeLimitHours: 15, fee: 2500, bibPrefix: 'W', bibStartNum: '001', quota: 200, customRaceStart: '', isWarrior800: true },
+      { catId: 'CAT-W50', eventId: 'TUR-2026-W800', name: '50K 南區挑戰組', distanceKm: 50, timeLimitHours: 8, fee: 1700, bibPrefix: 'G', bibStartNum: '001', quota: 100, customRaceStart: '', isWarrior800: false },
+      { catId: 'CAT-E6H', eventId: 'TUR-2026-EARLY6H', name: '6H 海濱繞圈組', distanceKm: 0.8, timeLimitHours: 6, fee: 1400, bibPrefix: 'H', bibStartNum: '001', quota: 120, customRaceStart: '', isWarrior800: false },
+      { catId: 'CAT-E3H', eventId: 'TUR-2026-EARLY6H', name: '3H 體驗繞圈組', distanceKm: 0.8, timeLimitHours: 3, fee: 950, bibPrefix: 'C', bibStartNum: '001', quota: 80, customRaceStart: '', isWarrior800: false },
+      { catId: 'CAT-FIN100', eventId: 'TUR-2026-FIN100', name: '100K 八百壯士組', distanceKm: 100, timeLimitHours: 16, fee: 2600, bibPrefix: 'K', bibStartNum: '001', quota: 200, customRaceStart: '', isWarrior800: true },
+      { catId: 'CAT-FIN50', eventId: 'TUR-2026-FIN100', name: '50K 挑戰組', distanceKm: 50, timeLimitHours: 8, fee: 1800, bibPrefix: 'F', bibStartNum: '001', quota: 300, customRaceStart: '', isWarrior800: false },
+      { catId: 'CAT-FIN24H', eventId: 'TUR-2026-FIN24H', name: '24H 繞圈組', distanceKm: 1.0, timeLimitHours: 24, fee: 2800, bibPrefix: 'T', bibStartNum: '001', quota: 200, customRaceStart: '', isWarrior800: false },
+      { catId: 'CAT-FIN12H', eventId: 'TUR-2026-FIN24H', name: '12H 夜間組', distanceKm: 1.0, timeLimitHours: 12, fee: 2100, bibPrefix: 'N', bibStartNum: '001', quota: 100, customRaceStart: '', isWarrior800: false }
     ];
 
     const stations = [
@@ -2313,11 +2406,12 @@
     pad2, formatDateTime, parseDateTime, formatDuration, formatPace, escapeHtml,
     COMPOUND_SURNAMES_28, splitFullName, mergeNameParts, zhToEnEventName,
     verifyTaiwanIdChecksum, inferGenderFromId, calcAge, sha256Hex,
-    CURATED_BANNERS, DEFAULT_BROCHURE_TEMPLATE, CUSTOM_FIELD_TYPES, CUSTOM_FIELD_PRESETS, EXTERNAL_IMPORT_SPEC, PAYMENT_MODES,
+    CURATED_BANNERS, DEFAULT_BROCHURE_TEMPLATE, CUSTOM_FIELD_TYPES, CUSTOM_FIELD_PRESETS, HISTORY_IMPORT_SPEC, EXTERNAL_IMPORT_SPEC, PAYMENT_MODES,
     getBannerStyle, defaultFormSchema, getEventPaymentMode, defaultCertConfig, parseJsonSafe,
     TurDB, validateGasUrl, buildGasQueryUrl, gasGet, gasPost,
-    isWarrior800Eligible, computeLeaderboard, computeEventProgressAnalytics, evaluateEventStageGates,
+    isCategoryWarrior800, isWarrior800Eligible, computeLeaderboard, computeEventProgressAnalytics, evaluateEventStageGates,
     isCertEligible, buildUnifiedHistoryRecords, parseExternalRosterRows,
+    isBundleOrderCode, generateBundleOrderCode, summarizeBundleOrders,
     FONT_SCALE_MODES, applyFontScale, getSavedFontScale, getRaceTypeWorkflow, getStationSopInfo,
     bindFastInput, ensureExternalLib, ensureCertFonts,
     CERT_LAYOUTS, CERT_PALETTES, CERT_FONTS, renderCertificateCanvas,

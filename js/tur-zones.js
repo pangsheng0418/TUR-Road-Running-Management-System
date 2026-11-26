@@ -53,6 +53,70 @@
     });
   }
 
+  async function exportPaidRoster(App, ev, format = 'xlsx') {
+    const cats = App.State.categories.filter((c) => c.eventId === ev.eventId);
+    const catById = new Map(cats.map((c) => [c.catId, c]));
+    const evSchema = C.parseJsonSafe(ev.formSchemaJson, C.defaultFormSchema());
+    const customFieldDefs = Array.isArray(evSchema.customFields) ? evSchema.customFields : [];
+    const paidParts = App.State.participants
+      .filter((p) => p.eventId === ev.eventId && String(p.payStatus || '').toUpperCase() === 'PAID')
+      .sort((a, b) => String(a.bibNumber || 'ZZZ').localeCompare(String(b.bibNumber || 'ZZZ')) || String(a.participantId).localeCompare(String(b.participantId)));
+
+    if (!paidParts.length) {
+      return App.toast('本場活動尚無「已完成報名繳費 (PAID)」選手可匯出', 'warn');
+    }
+
+    const rows = paidParts.map((p, idx) => {
+      const cat = catById.get(p.catId) || {};
+      const cfVals = C.parseJsonSafe(p.customFieldsJson, {});
+      const obj = {
+        序號: idx + 1,
+        報名序號: p.participantId || '',
+        號碼布: p.bibNumber || '',
+        組別: cat.name || p.catId || '',
+        是否八百壯士組: C.isCategoryWarrior800(cat) ? '是' : '否',
+        姓名: p.name || '',
+        '身分證/護照': p.idCard || '',
+        性別: p.gender || '',
+        出生年月日: p.birthday || '',
+        年齡: p.age || '',
+        國籍: p.nationality || 'TWN',
+        手機: p.phone || '',
+        Email: p.email || '',
+        縣市: p.city || '',
+        飲食: p.diet || '',
+        緊急聯絡人: p.emergencyName || '',
+        緊急聯絡電話: p.emergencyPhone || '',
+        團報代碼: p.groupCode || '',
+        跑團名稱: p.groupName || '',
+        實繳金額: Number(p.totalAmount || 0),
+        繳費管道: p.payMethod || '',
+        入帳時間: p.paidAt || '',
+        末五碼或單號: p.remittanceLast5 || p.merTradeNo || '',
+        備註: p.remark || ''
+      };
+      customFieldDefs.forEach((f) => {
+        const val = cfVals[f.key];
+        obj[`[自訂] ${f.label}`] = Array.isArray(val) ? val.join('、') : (val ?? '');
+      });
+      return obj;
+    });
+
+    if (format === 'xlsx') {
+      await C.ensureExternalLib('xlsx');
+      if (global.XLSX) {
+        const wb = global.XLSX.utils.book_new();
+        global.XLSX.utils.book_append_sheet(wb, global.XLSX.utils.json_to_sheet(rows), '已完成報名繳費名單');
+        global.XLSX.writeFile(wb, `${ev.nameZh}_已完成報名繳費名單_${paidParts.length}人.xlsx`);
+        return App.toast(`📋 已匯出已完成報名繳費名單 Excel（共 ${paidParts.length} 人）`, 'success');
+      }
+    }
+    const headers = Object.keys(rows[0]);
+    const csv = '\uFEFF' + [headers.join(','), ...rows.map((r) => headers.map((h) => csvCell(r[h])).join(','))].join('\r\n');
+    downloadText(`${ev.eventId}_已完成報名繳費名單_${paidParts.length}人.csv`, csv, 'text/csv;charset=utf-8');
+    App.toast(`📄 已匯出已完成報名繳費名單 CSV（共 ${paidParts.length} 人）`, 'success');
+  }
+
   /* --------------------------------------------------------------------------
    * Official 3-Sheet Excel (.xlsx), Chip CSV, DUV & 800-Warriors Export
    * -------------------------------------------------------------------------- */
@@ -577,16 +641,28 @@
         <div class="space-y-4 text-xs">
           <div class="bg-white p-4 rounded-xl border shadow-sm space-y-2.5">
             <div class="flex items-center justify-between border-b pb-2">
-              <h3 class="font-black text-sm">🏷️ 分組里程 / 限時 / 配號前綴</h3>
-              <button id="btnZ1AddCat" class="px-2.5 py-1 rounded-lg bg-sky-600 text-white font-bold">+ 新增分組</button>
+              <div>
+                <h3 class="font-black text-sm">🏷️ 分組里程 / 限時 / 配號前綴 / 八百壯士標示</h3>
+                <p class="text-[11px] text-slate-500 mt-0.5">由承辦人明確標示本活動哪些組別屬「🏅 八百壯士」參加人員，系統將依此計入八百壯士統計與英雄榜。</p>
+              </div>
+              <button id="btnZ1AddCat" class="px-2.5 py-1 rounded-lg bg-sky-600 text-white font-bold shrink-0">+ 新增分組</button>
             </div>
             <div class="space-y-1.5">
-              ${cats.map((c) => `
-                <div class="p-2 rounded-lg bg-slate-50 border flex items-center justify-between">
-                  <div><b>${C.escapeHtml(c.name)}</b> · ${c.distanceKm}km / ${c.timeLimitHours}H · NT$${c.fee} · 前綴 <code>${c.bibPrefix}${c.bibStartNum}</code> · 限額 ${c.quota}</div>
-                  <button data-del-cat="${c.catId}" class="text-rose-600 font-bold px-1.5">刪</button>
-                </div>
-              `).join('')}
+              ${cats.map((c) => {
+                const isW800 = C.isCategoryWarrior800(c);
+                return `
+                <div class="p-2 rounded-lg ${isW800 ? 'bg-amber-50/80 border-amber-300' : 'bg-slate-50 border-slate-200'} border flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <b>${C.escapeHtml(c.name)}</b>
+                    ${isW800 ? '<span class="ml-1 px-1.5 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black text-[10px]">🏅 八百壯士組</span>' : ''}
+                    <span class="text-slate-600"> · ${c.distanceKm}km / ${c.timeLimitHours}H · NT$${c.fee} · 前綴 <code>${c.bibPrefix}${c.bibStartNum}</code> · 限額 ${c.quota}</span>
+                  </div>
+                  <div class="flex items-center gap-1.5 shrink-0">
+                    <button type="button" data-toggle-cat-w800="${c.catId}" class="px-2 py-0.5 rounded-lg font-bold text-[11px] border ${isW800 ? 'bg-amber-400 border-amber-500 text-slate-950' : 'bg-white border-slate-300 text-slate-600 hover:bg-amber-50'}">${isW800 ? '🏅 已標示八百壯士 ✓' : '☆ 標示為八百壯士組'}</button>
+                    <button data-del-cat="${c.catId}" class="text-rose-600 font-bold px-1.5">刪</button>
+                  </div>
+                </div>`;
+              }).join('')}
             </div>
           </div>
 
@@ -745,24 +821,49 @@
       App.toast('✅ 活動設定、起跑時間、橫幅與簡章已儲存並同步雲端', 'success');
     };
     $('#btnZ1AddCat').onclick = async () => {
-      const name = prompt('分組名稱（如 21K 半馬組）：');
+      const name = prompt('分組名稱（如 21K 半馬組、100K 八百壯士組）：');
       if (!name) return;
       const dist = Number(prompt('距離 (km，繞圈賽請填單圈公里數)：', '21.1') || 21.1);
       const hrs = Number(prompt('限時 (小時)：', '4') || 4);
       const fee = Number(prompt('報名費 (NT$)：', '1200') || 1200);
       const prefix = (prompt('號碼布前綴 (如 B)：', 'B') || 'B').toUpperCase();
-      const cat = { catId: `CAT-${Date.now().toString().slice(-5)}`, eventId: ev.eventId, name, distanceKm: dist, timeLimitHours: hrs, fee, bibPrefix: prefix, bibStartNum: '001', quota: 300, customRaceStart: '' };
+      const isWarrior800 = confirm(`分組「${name}」是否標示為「🏅 八百壯士」參加人員？\n\n按「確定」＝標示為八百壯士組（完賽將計入英雄榜）\n按「取消」＝一般組別`);
+      const cat = { catId: `CAT-${Date.now().toString().slice(-5)}`, eventId: ev.eventId, name, distanceKm: dist, timeLimitHours: hrs, fee, bibPrefix: prefix, bibStartNum: '001', quota: 300, customRaceStart: '', isWarrior800 };
       App.State.categories.push(cat);
       await C.TurDB.put('categories', cat);
       await App.enqueueSync('saveCategory', { category: cat });
       renderZone1(App);
-      App.toast('已新增分組', 'success');
+      App.toast(`已新增分組「${name}」${isWarrior800 ? '（🏅 已標示為八百壯士組）' : ''}`, 'success');
     };
+    $$('[data-toggle-cat-w800]').forEach((b) => {
+      b.onclick = async () => {
+        const cat = App.State.categories.find((c) => c.catId === b.dataset.toggleCatW800);
+        if (!cat) return;
+        cat.isWarrior800 = !C.isCategoryWarrior800(cat);
+        await C.TurDB.put('categories', cat);
+        await App.enqueueSync('saveCategory', { category: cat });
+        renderZone1(App);
+        App.toast(cat.isWarrior800 ? `🏅 已標示「${cat.name}」為八百壯士參加組別` : `已取消「${cat.name}」的八百壯士標示`, 'info');
+      };
+    });
     $$('[data-del-cat]').forEach((b) => {
       b.onclick = async () => {
-        App.State.categories = App.State.categories.filter((c) => c.catId !== b.dataset.delCat);
-        await C.TurDB.remove('categories', b.dataset.delCat);
+        const cid = b.dataset.delCat;
+        const evCats = App.State.categories.filter((c) => c.eventId === ev.eventId);
+        if (evCats.length <= 1) {
+          return App.toast('🔒 防呆攔截：活動至少須保留 1 個報名分組，不可全部刪除！', 'error');
+        }
+        const inUseCnt = App.State.participants.filter((p) => p.eventId === ev.eventId && p.catId === cid && String(p.payStatus || '').toUpperCase() !== 'CANCELLED').length;
+        if (inUseCnt > 0) {
+          return App.toast(`🔒 防呆攔截：此分組已有 ${inUseCnt} 位報名選手，禁止刪除以免造成資料錯亂！`, 'error');
+        }
+        const target = evCats.find((c) => c.catId === cid);
+        if (!confirm(`確定要刪除分組「${target?.name || cid}」並同步雲端嗎？`)) return;
+        App.State.categories = App.State.categories.filter((c) => c.catId !== cid);
+        await C.TurDB.remove('categories', cid);
+        await App.enqueueSync('deleteCategory', { catId: cid });
         renderZone1(App);
+        App.toast(`🗑️ 已安全刪除分組「${target?.name || cid}」並同步雲端`, 'info');
       };
     });
     $('#btnZ1AddAddon').onclick = async () => {
@@ -901,10 +1002,15 @@
             <button id="btnZ1AutoBib" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white font-bold">🏷️ 依組別自動配號 (Bib)</button>
           </div>
           <div class="flex flex-wrap gap-1.5">
-            <button id="btnZ1ExportXlsx" class="px-3 py-1.5 rounded-lg bg-sky-600 text-white font-bold">📊 匯出 Excel (.xlsx)</button>
+            <button id="btnZ1ExportPaidXlsx" class="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-black">📋 匯出已完成報名繳費名單 (.xlsx)</button>
+            <button id="btnZ1ExportPaidCsv" class="px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold border border-emerald-300">📄 繳費名單 CSV</button>
+            <button id="btnZ1ExportXlsx" class="px-3 py-1.5 rounded-lg bg-sky-600 text-white font-bold">📊 全場統計 Excel</button>
             <button id="btnZ1ExportChipCsv" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-bold">📡 匯出晶片 CSV</button>
-            <button id="btnZ1ToggleExtCsv" class="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-900 font-black border border-indigo-300">📥 匯入外部名單 (Excel / CSV / 賽事進行中補加)</button>
+            <button id="btnZ1ToggleExtCsv" class="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-900 font-black border border-indigo-300">📥 匯入外部已繳費名單（供晶片紀錄管制）</button>
           </div>
+        </div>
+        <div class="p-2 rounded-lg bg-emerald-50/70 border border-emerald-200 text-[11px] text-emerald-950 flex flex-wrap items-center justify-between gap-2">
+          <span>💡 <b>免晶片活動運用說明</b>：不須執行後續晶片作業者，可直接匯出「已完成報名繳費名單 (PAID，共 <b>${paid.length}</b> 人)」供承辦人現場點名／發物資；活動結束後可至「<b>專區 4 → 歷屆成績匯入</b>」將完賽成績納入資料庫並手動標示八百壯士。</span>
         </div>
         <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t">
           <input id="z1ReconSearch" type="text" value="${C.escapeHtml(App.State.z1ReconSearch || '')}" placeholder="🔎 搜尋已報名選手（姓名 / 身分證 / 號碼布 / 手機 / 團報碼）" class="w-full sm:w-80 px-3 py-1.5 border rounded-lg text-xs" />
@@ -912,12 +1018,12 @@
         </div>
       </div>
 
-      <!-- 外部賽事名單匯入精靈：支援 Excel (.xlsx) / CSV / 貼上文字，含必要欄預檢與賽事進行中補加 -->
+      <!-- 外部賽事名單匯入精靈：支援 Excel (.xlsx) / CSV / 貼上文字，含 11 欄指定順序規範表與賽事進行中補加 -->
       <div id="z1ExtImportBox" class="hidden bg-indigo-50/90 p-4 rounded-2xl border-2 border-indigo-300 space-y-3 text-xs">
         <div class="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-200 pb-2.5">
           <div>
-            <div class="font-black text-sm text-indigo-950">📥 非本系統報名活動 — 外部選手名單匯入精靈（Excel / CSV / 賽事進行中即時補加）</div>
-            <p class="text-[11px] text-indigo-800 mt-0.5">支援從伊貝特、筆記報名、協會自收表單匯入名單；匯入後自動設為 PAID、接續配號並立即可供 NFC 寫卡與賽道感應計時！</p>
+            <div class="font-black text-sm text-indigo-950">📥 匯入外部「已完成報名繳費」名單（供後續執行晶片紀錄管制作業）</div>
+            <p class="text-[11px] text-indigo-800 mt-0.5">凡未在本系統報名及繳費之選手，請依下方指定 11 欄位順序整理 Excel / CSV 匯入；匯入後一律設為 <b>PAID（已完成報名繳費）</b>、自動接續配號，立即可進晶片寫卡、報到與賽道感應！</p>
           </div>
           <div class="flex flex-wrap gap-1.5">
             <button type="button" id="btnZ1DlExtXlsx" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold">📥 下載 Excel 範本 (.xlsx)</button>
@@ -925,19 +1031,34 @@
           </div>
         </div>
 
-        <!-- 必要欄位 vs 選填欄位規範說明 -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-          <div class="p-2.5 rounded-xl bg-white border border-rose-200">
-            <div class="font-black text-rose-800 mb-1">⭐ 4 個必要欄位（缺一不可，自動辨識中英文表頭）</div>
-            <div class="flex flex-wrap gap-1">
-              ${(C.EXTERNAL_IMPORT_SPEC || []).filter((s) => s.required).map((s) => `<span class="px-2 py-0.5 rounded bg-rose-100 text-rose-900 font-bold">${s.label}*</span>`).join('')}
-            </div>
+        <!-- 指定匯入欄位順序與明細表（欄位 1 ~ 11） -->
+        <div class="bg-white rounded-xl border border-indigo-200 overflow-hidden">
+          <div class="px-3 py-2 bg-indigo-950 text-white font-bold flex flex-wrap items-center justify-between gap-2">
+            <span>📋 外部已完成報名繳費名單 — 指定匯入欄位順序與明細（第 1～4 欄必填｜第 5～11 欄選填）</span>
+            <span class="text-[11px] text-amber-300">支援含表頭自動辨識，或無表頭直接依 1→11 順序貼上</span>
           </div>
-          <div class="p-2.5 rounded-xl bg-white border border-slate-200">
-            <div class="font-black text-slate-700 mb-1">✨ 7 個建議選填欄位（留空系統自動補預設值或接續配號）</div>
-            <div class="flex flex-wrap gap-1">
-              ${(C.EXTERNAL_IMPORT_SPEC || []).filter((s) => !s.required).map((s) => `<span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700">${s.label}</span>`).join('')}
-            </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-[11px] text-left">
+              <thead class="bg-slate-100 border-b">
+                <tr>
+                  <th class="p-1.5 text-center w-12">順序</th>
+                  <th class="p-1.5">欄位名稱</th>
+                  <th class="p-1.5 w-16">必填</th>
+                  <th class="p-1.5">範例值</th>
+                  <th class="p-1.5">明細說明</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                ${(C.EXTERNAL_IMPORT_SPEC || []).map((s, idx) => `
+                  <tr class="${s.required ? 'bg-rose-50/40' : ''}">
+                    <td class="p-1.5 text-center mono font-black text-indigo-700">${s.order || idx + 1}</td>
+                    <td class="p-1.5 font-bold">${C.escapeHtml(s.label)}</td>
+                    <td class="p-1.5">${s.required ? '<span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 font-bold">必填*</span>' : '<span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">選填</span>'}</td>
+                    <td class="p-1.5 mono text-slate-700">${C.escapeHtml(s.example || '(留空)')}</td>
+                    <td class="p-1.5 text-slate-600">${C.escapeHtml(s.desc || '')}</td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -975,6 +1096,59 @@
         <div id="z1ExtPreviewBox" class="hidden bg-white rounded-xl border border-indigo-200 p-3 space-y-2"></div>
       </div>
 
+      ${(() => {
+        const allBundles = C.summarizeBundleOrders({
+          participants: App.State.participants,
+          events: App.State.events,
+          categories: App.State.categories
+        });
+        const evBundles = allBundles.filter((b) => b.eventIds.includes(ev.eventId));
+        if (!evBundles.length) return '';
+        const u = App.State.currentUser;
+        return `
+          <div class="bg-emerald-50/90 p-4 rounded-2xl border-2 border-emerald-400 space-y-2.5 text-xs">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200 pb-2">
+              <div>
+                <div class="font-black text-sm text-emerald-950">📦 多場活動聯合報名「合併繳費訂單」對帳區（本場涉及 ${evBundles.length} 筆合併單）</div>
+                <p class="text-[11px] text-emerald-900 mt-0.5">選手一次勾選多場活動並合併匯款；核對總金額無誤後，點「💰 合併整單入帳」即可一次跨場同步 PAID 並各自自動配號。</p>
+              </div>
+              <button type="button" id="btnZ1ExportBundleXlsx" class="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-bold">📊 匯出合併對帳表 (.xlsx)</button>
+            </div>
+            <div class="space-y-2">
+              ${evBundles.map((b) => {
+                const canCrossConfirm = u?.role === 'super_admin' || b.items.every((it) => it.event?.ownerUsername === u?.username);
+                const thisEvItem = b.items.find((it) => it.eventId === ev.eventId);
+                return `
+                  <div class="p-3 rounded-xl bg-white border ${b.allPaid ? 'border-emerald-200' : 'border-amber-400'} flex flex-wrap items-center justify-between gap-3">
+                    <div class="space-y-1 min-w-0 flex-1">
+                      <div class="flex flex-wrap items-center gap-1.5">
+                        <span class="px-2 py-0.5 rounded bg-slate-900 text-amber-300 font-black mono">${b.bundleCode}</span>
+                        <span class="font-black text-slate-900">${C.escapeHtml(b.runnerName)}</span>
+                        <span class="mono text-slate-500">${C.escapeHtml(b.idCard)}</span>
+                        <span class="px-2 py-0.5 rounded-full font-bold ${b.allPaid ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">${b.allPaid ? '✅ 已全數入帳' : `待對帳 ${b.unpaidCount}/${b.items.length} 場`}</span>
+                        ${b.remittanceLast5 ? `<span class="px-2 py-0.5 rounded bg-amber-100 text-amber-950 mono font-bold">末五碼 ${C.escapeHtml(b.remittanceLast5)}</span>` : ''}
+                      </div>
+                      <div class="text-[11px] text-slate-600">
+                        包含場次：${b.items.map((it) => `<span class="inline-block mr-2">${it.eventId === ev.eventId ? '<b>★ ' : ''}${C.escapeHtml(it.eventName)} (${C.escapeHtml(it.catName)}・NT$${it.amount.toLocaleString()}${it.bibNumber ? `・${it.bibNumber}` : ''})${it.eventId === ev.eventId ? '</b>' : ''}</span>`).join('')}
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                      <div class="text-right">
+                        <div class="text-[10px] text-slate-500">本場 NT$${Number(thisEvItem?.amount || 0).toLocaleString()}</div>
+                        <div class="font-black text-sm mono text-emerald-700">合併總額 NT$${b.totalAmount.toLocaleString()}</div>
+                      </div>
+                      ${!b.allPaid
+                        ? (canCrossConfirm
+                          ? `<button type="button" data-bundle-paid="${b.bundleCode}" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow">💰 合併整單入帳 (${b.unpaidCount} 場)</button>`
+                          : `<span class="text-[10px] text-amber-800 font-bold max-w-[140px]">跨承辦人單，請由管理員整單入帳或於下方單場入帳</span>`)
+                        : ''}
+                    </div>
+                  </div>`;
+              }).join('')}
+            </div>
+          </div>`;
+      })()}
+
       <div class="bg-white rounded-xl border shadow-sm overflow-x-auto">
         <table class="w-full text-xs text-left">
           <thead class="bg-slate-100 border-b">
@@ -1008,7 +1182,10 @@
                   </td>
                   <td class="p-2">${C.escapeHtml(catMap.get(p.catId) || p.catId)}</td>
                   <td class="p-2 mono font-bold">NT$${Number(p.totalAmount).toLocaleString()}</td>
-                  <td class="p-2 mono text-[11px]">${p.remittanceLast5 || p.merTradeNo || '-'}</td>
+                  <td class="p-2 mono text-[11px]">
+                    <div>${C.escapeHtml(p.remittanceLast5 || p.merTradeNo || '-')}</div>
+                    ${C.isBundleOrderCode(p.merTradeNo) ? `<div class="mt-0.5 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 font-bold text-[10px] inline-block">📦 合併單 ${C.escapeHtml(p.merTradeNo)}</div>` : ''}
+                  </td>
                   <td class="p-2 whitespace-nowrap">
                     <div class="flex flex-wrap gap-1">
                       ${isUn ? `<button data-mark-paid="${p.participantId}" class="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold">入帳</button>` : ''}
@@ -1030,6 +1207,16 @@
       if (inp) { inp.focus(); inp.setSelectionRange(pos, pos); }
     };
     $('#z1CheckAll').onchange = (e) => $$('.z1-cb:not(:disabled)').forEach((c) => { c.checked = e.target.checked; });
+    $$('[data-bundle-paid]').forEach((b) => {
+      b.onclick = () => markBundlePaid(App, b.dataset.bundlePaid);
+    });
+    const expBundleBtn = document.getElementById('btnZ1ExportBundleXlsx');
+    if (expBundleBtn) {
+      expBundleBtn.onclick = () => {
+        const allB = C.summarizeBundleOrders({ participants: App.State.participants, events: App.State.events, categories: App.State.categories });
+        exportBundleReconExcel(App, ev, allB.filter((x) => x.eventIds.includes(ev.eventId)));
+      };
+    }
     $$('[data-mark-paid]').forEach((b) => {
       b.onclick = () => markParticipantsPaid(App, [b.dataset.markPaid]);
     });
@@ -1070,6 +1257,8 @@
       };
     });
     $('#btnZ1AutoBib').onclick = () => App.autoAssignBibsForEvent(ev.eventId);
+    $('#btnZ1ExportPaidXlsx').onclick = () => exportPaidRoster(App, ev, 'xlsx');
+    $('#btnZ1ExportPaidCsv').onclick = () => exportPaidRoster(App, ev, 'csv');
     $('#btnZ1ExportXlsx').onclick = () => export3SheetExcel(App, ev, false);
     $('#btnZ1ExportChipCsv').onclick = () => exportChipCsv(App, ev);
     $('#btnZ1ToggleExtCsv').onclick = () => $('#z1ExtImportBox').classList.toggle('hidden');
@@ -1378,6 +1567,69 @@
     $('#editParticipantModal').classList.remove('hidden');
   }
 
+  async function exportBundleReconExcel(App, ev, bundles) {
+    if (!bundles || !bundles.length) return App.toast('目前尚無多場合併訂單可匯出', 'warn');
+    const rows = bundles.map((b, i) => ({
+      序號: i + 1,
+      合併單號: b.bundleCode,
+      選手姓名: b.runnerName,
+      '身分證/護照': b.idCard,
+      手機: b.phone,
+      Email: b.email,
+      付款管道: b.payMethod,
+      匯款末五碼: b.remittanceLast5 || '',
+      合併場次數: b.items.length,
+      合併總金額: b.totalAmount,
+      狀態: b.allPaid ? '已全數入帳' : `待對帳 (${b.unpaidCount}/${b.items.length}場)`,
+      包含場次與各場明細: b.items.map((it) => `${it.eventName}[${it.catName}] NT$${it.amount}(${it.payStatus}${it.bibNumber ? '/' + it.bibNumber : ''})`).join('；')
+    }));
+    await C.ensureExternalLib('xlsx');
+    if (global.XLSX) {
+      const wb = global.XLSX.utils.book_new();
+      global.XLSX.utils.book_append_sheet(wb, global.XLSX.utils.json_to_sheet(rows), '多場合併繳費對帳總表');
+      global.XLSX.writeFile(wb, `TUR_合併繳費對帳總表_${ev.eventId}.xlsx`);
+      return App.toast(`📊 已匯出合併繳費對帳總表 Excel（共 ${rows.length} 筆合併單）`, 'success');
+    }
+    const headers = Object.keys(rows[0]);
+    const csv = '\uFEFF' + [headers.join(','), ...rows.map((r) => headers.map((h) => csvCell(r[h])).join(','))].join('\r\n');
+    downloadText(`TUR_合併繳費對帳總表_${ev.eventId}.csv`, csv, 'text/csv;charset=utf-8');
+  }
+
+  async function markBundlePaid(App, bundleCode) {
+    const code = String(bundleCode || '').trim().toUpperCase();
+    const targets = App.State.participants.filter((p) => {
+      const st = String(p.payStatus || '').toUpperCase();
+      return String(p.merTradeNo || '').toUpperCase() === code && st !== 'PAID' && st !== 'CANCELLED';
+    });
+    if (!targets.length) return App.toast(`合併單 ${code} 已無待入帳場次`, 'info');
+    const now = C.formatDateTime();
+    const byEvent = new Map();
+    const bibMap = {};
+    for (const p of targets) {
+      p.payStatus = 'PAID';
+      p.paidAt = now;
+      if (!p.bibNumber) {
+        const usedBibs = new Set(App.State.participants.filter((x) => x.eventId === p.eventId && x.bibNumber).map((x) => String(x.bibNumber).toUpperCase()));
+        const cat = App.State.categories.find((c) => c.catId === p.catId);
+        const prefix = String(cat?.bibPrefix || 'R').toUpperCase();
+        const startStr = String(cat?.bibStartNum || '001');
+        const width = Math.max(3, startStr.length);
+        let num = parseInt(startStr, 10) || 1;
+        let bib = `${prefix}${String(num).padStart(width, '0')}`;
+        while (usedBibs.has(bib)) { num++; bib = `${prefix}${String(num).padStart(width, '0')}`; }
+        p.bibNumber = bib;
+      }
+      bibMap[p.participantId] = p.bibNumber;
+      await C.TurDB.put('participants', p);
+      if (!byEvent.has(p.eventId)) byEvent.set(p.eventId, []);
+      byEvent.get(p.eventId).push(p.participantId);
+    }
+    await App.enqueueSync('markBundlePaid', { bundleCode: code, paidAt: now, bibMap });
+    App.rebuildIndices();
+    App.renderAll();
+    App.toast(`✅ 合併單 ${code} 已整單跨場入帳（共 ${targets.length} 場同步 PAID＋各自自動配號）並寄發確認信！`, 'success');
+  }
+
   async function markParticipantsPaid(App, ids, label = '') {
     const now = C.formatDateTime();
     let targetEventId = '';
@@ -1636,9 +1888,19 @@
     };
     $$('[data-del-st]').forEach((b) => {
       b.onclick = async () => {
-        App.State.stations = App.State.stations.filter((s) => s.stationId !== b.dataset.delSt);
-        await C.TurDB.remove('stations', b.dataset.delSt);
+        const sid = b.dataset.delSt;
+        const stObj = App.State.stations.find((s) => s.stationId === sid);
+        if (!stObj) return;
+        const logCnt = App.State.timingLogs.filter((l) => l.eventId === ev.eventId && l.stationCode === stObj.stationCode).length;
+        if (logCnt > 0) {
+          return App.toast(`🔒 防呆攔截：站點「${stObj.stationCode}」已有 ${logCnt} 筆感應紀錄，禁止刪除以免影響成績！`, 'error');
+        }
+        if (!confirm(`確定要刪除站點「${stObj.stationCode} ${stObj.name}」並同步雲端嗎？`)) return;
+        App.State.stations = App.State.stations.filter((s) => s.stationId !== sid);
+        await C.TurDB.remove('stations', sid);
+        await App.enqueueSync('deleteStation', { stationId: sid });
         renderZone1(App);
+        App.toast(`🗑️ 已安全刪除站點「${stObj.stationCode}」並同步雲端`, 'info');
       };
     });
   }
@@ -2300,7 +2562,7 @@
   }
 
   /* --------------------------------------------------------------------------
-   * 專區 4：📚 歷屆成績智慧清洗（金框預覽 + 28複姓 + SHA-256 + 八百壯士英雄榜）
+   * 專區 4：📚 歷屆完賽成績匯入與手動標示八百壯士（7 欄標準順序 + 金框預覽選組/選員標示）
    * -------------------------------------------------------------------------- */
   let pendingHistoryPreview = [];
 
@@ -2311,43 +2573,134 @@
       return;
     }
     const warriors = App.State.historyResults.filter((h) => h.isWarrior800);
+    const prevW800Cnt = pendingHistoryPreview.filter((r) => r.isWarrior800).length;
+    const prevGroupMap = new Map();
+    pendingHistoryPreview.forEach((r) => {
+      const g = r.categoryName || '未分組';
+      if (!prevGroupMap.has(g)) prevGroupMap.set(g, { total: 0, marked: 0 });
+      const info = prevGroupMap.get(g);
+      info.total++;
+      if (r.isWarrior800) info.marked++;
+    });
 
     box.innerHTML = `
       <div class="bg-white p-4 rounded-2xl border shadow-sm space-y-3 text-xs">
-        <div class="border-b pb-2">
-          <h2 class="font-black text-base">📚 專區 4：歷屆成績智慧清洗匯入（28 組中文複姓合併 ＋ SHA-256 歸併 ＋ 八百壯士 100K+ 自動分流）</h2>
-          <p class="text-slate-500">採用「先金框預覽審查、確認後寫入」機制；支援檔名偵測、姓與名拆格合併與 100km+ 自動標記。</p>
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b pb-2.5">
+          <div>
+            <h2 class="font-black text-base">📚 專區 4：歷屆完賽成績匯入與「八百壯士」手動標示</h2>
+            <p class="text-slate-500 mt-0.5">匯入之歷屆明細一律列為「<b>✅ 已完賽</b>」；預覽時可依組別或個別跑者手動勾選標示八百壯士，確認無誤再存檔納入統計與英雄榜。</p>
+          </div>
+          <div class="flex flex-wrap gap-1.5">
+            <button type="button" id="btnHisDlXlsx" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold">📥 下載 Excel 範本 (.xlsx)</button>
+            <button type="button" id="btnHisDlCsv" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 border font-bold text-slate-800">📄 下載 CSV 範本</button>
+          </div>
+        </div>
+
+        <!-- 同頁顯示：歷屆成績匯入範例欄位順序表（第 1～7 欄） -->
+        <div class="rounded-xl border border-amber-300 overflow-hidden">
+          <div class="px-3 py-2 bg-slate-900 text-white font-bold flex flex-wrap items-center justify-between gap-2">
+            <span>📋 歷屆成績匯入 — 標準範例欄位順序（第 1～7 欄，均列為 ✅ 已完賽）</span>
+            <span class="text-[11px] text-amber-300">支援 Excel (.xlsx) / CSV / TSV 直接上傳或複製貼上</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-[11px] text-left bg-white">
+              <thead class="bg-amber-50 border-b">
+                <tr>
+                  <th class="p-1.5 text-center w-12">順序</th>
+                  <th class="p-1.5">欄位名稱</th>
+                  <th class="p-1.5 w-16">必填</th>
+                  <th class="p-1.5">範例值</th>
+                  <th class="p-1.5">說明</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                ${(C.HISTORY_IMPORT_SPEC || []).map((s) => `
+                  <tr>
+                    <td class="p-1.5 text-center mono font-black text-amber-700">${s.order}</td>
+                    <td class="p-1.5 font-bold">${C.escapeHtml(s.label)}</td>
+                    <td class="p-1.5">${s.required ? '<span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 font-bold">必填*</span>' : '<span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">選填</span>'}</td>
+                    <td class="p-1.5 mono text-slate-800">${C.escapeHtml(s.example)}</td>
+                    <td class="p-1.5 text-slate-600">${C.escapeHtml(s.desc)}</td>
+                  </tr>`).join('')}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-          <input id="hisEventDate" value="2025-11-15" placeholder="賽事日期 YYYY-MM-DD" class="px-2.5 py-1.5 border rounded-lg mono" />
-          <input id="hisEventName" value="2025 TUR 冬季八百壯士 100K 邀請賽" placeholder="賽事名稱" class="px-2.5 py-1.5 border rounded-lg sm:col-span-2" />
+          <div>
+            <label class="font-bold text-[11px] text-slate-600">賽事日期</label>
+            <input id="hisEventDate" value="2025-11-15" placeholder="YYYY-MM-DD" class="w-full px-2.5 py-1.5 border rounded-lg mono mt-0.5" />
+          </div>
+          <div class="sm:col-span-2">
+            <label class="font-bold text-[11px] text-slate-600">賽事名稱</label>
+            <input id="hisEventName" value="2025 TUR 冬季八百壯士 100K 邀請賽" placeholder="賽事名稱" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5" />
+          </div>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <input id="hisFileInput" type="file" accept=".csv,.txt" />
-          <button id="btnHisSample" class="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-bold">✨ 載入含複姓與100K+清洗範例</button>
+          <input id="hisFileInput" type="file" accept=".xlsx,.xls,.csv,.txt" class="text-[11px]" />
+          <button type="button" id="btnHisSample" class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold border border-indigo-200">✨ 載入 7 欄標準範例（含複姓與多組別）</button>
         </div>
-        <textarea id="hisRawInput" rows="4" placeholder="貼上歷屆 CSV/TSV（如：組別,號碼布,姓,名,身分證,成績,距離km）" class="w-full p-2.5 border rounded-lg mono bg-slate-50"></textarea>
-        <button id="btnHisAnalyze" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black">🔍 執行智慧清洗並產生金框預覽</button>
+        <textarea id="hisRawInput" rows="4" placeholder="請依上方 1～7 欄順序貼上（逗號或 Tab 分隔）：組別名稱,參賽號碼布,姓,名,身分證,完賽成績,完賽距離km" class="w-full p-2.5 border rounded-lg mono bg-slate-50"></textarea>
+        <button type="button" id="btnHisAnalyze" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black">🔍 步驟 1：解析並預覽跑者明細（手動標示八百壯士）</button>
 
-        <!-- 金框預覽審查區 -->
+        <!-- 金框預覽審查區（可按組別批次標示或逐筆勾選八百壯士，確認後才寫入） -->
         <div id="hisGoldenBox" class="${pendingHistoryPreview.length ? '' : 'hidden'} p-4 rounded-2xl border-4 border-amber-400 bg-amber-50/70 space-y-3">
-          <div class="flex items-center justify-between">
-            <span class="font-black text-amber-950 text-sm">🛡️ 金框預覽審查（共 ${pendingHistoryPreview.length} 筆，尚未寫入資料庫）</span>
-            <button id="btnHisConfirmCommit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow">✅ 確認審查無誤並寫入 HistoryResults</button>
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div class="font-black text-amber-950 text-sm">🛡️ 步驟 2：金框預覽與手動標示八百壯士（共 ${pendingHistoryPreview.length} 筆，均列為 ✅ 已完賽，尚未寫入）</div>
+              <div class="text-[11px] text-amber-900 mt-0.5">目前手動標示八百壯士：<b class="text-rose-700 mono">${prevW800Cnt} / ${pendingHistoryPreview.length}</b> 人（系統不再自動猜測，請點選組別按鈕或下方核取方塊）</div>
+            </div>
+            <button type="button" id="btnHisConfirmCommit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow">✅ 步驟 3：確認標示無誤並存檔匯入</button>
           </div>
-          <div class="overflow-x-auto max-h-60">
+
+          <!-- 依組別快速批次標示工具列 -->
+          <div class="p-2.5 rounded-xl bg-white border border-amber-300 space-y-1.5">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <span class="font-black text-slate-800">🏷️ 依組別快速標示 / 取消八百壯士：</span>
+              <div class="flex gap-1.5">
+                <button type="button" id="btnHisW800All" class="px-2 py-0.5 rounded bg-rose-600 text-white font-bold text-[11px]">全選八百壯士</button>
+                <button type="button" id="btnHisW800None" class="px-2 py-0.5 rounded bg-slate-200 text-slate-700 font-bold text-[11px]">全部取消</button>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+              ${[...prevGroupMap.entries()].map(([grpName, info]) => {
+                const allOn = info.marked === info.total && info.total > 0;
+                return `<button type="button" data-his-grp-w800="${C.escapeHtml(grpName)}" class="px-2.5 py-1 rounded-lg font-bold text-[11px] border ${allOn ? 'bg-rose-600 border-rose-700 text-white' : (info.marked > 0 ? 'bg-amber-200 border-amber-400 text-amber-950' : 'bg-slate-50 border-slate-300 text-slate-700 hover:bg-amber-50')}">
+                  ${allOn ? '🏅 ' : '☆ '}${C.escapeHtml(grpName)}（${info.marked}/${info.total}）
+                </button>`;
+              }).join('')}
+            </div>
+          </div>
+
+          <div class="overflow-x-auto max-h-64">
             <table class="w-full text-left bg-white rounded-lg overflow-hidden">
-              <thead class="bg-amber-200/70"><tr><th class="p-2">合併姓名</th><th class="p-2">組別/號碼布</th><th class="p-2">成績</th><th class="p-2">距離</th><th class="p-2">SHA-256 歸併碼</th><th class="p-2">八百壯士</th></tr></thead>
+              <thead class="bg-amber-200/70">
+                <tr>
+                  <th class="p-2">八百壯士</th>
+                  <th class="p-2">合併姓名</th>
+                  <th class="p-2">組別 / 號碼布</th>
+                  <th class="p-2">成績</th>
+                  <th class="p-2">距離</th>
+                  <th class="p-2">完賽狀態</th>
+                  <th class="p-2">SHA-256 歸併碼</th>
+                </tr>
+              </thead>
               <tbody class="divide-y">
-                ${pendingHistoryPreview.map((r) => `
-                  <tr>
+                ${pendingHistoryPreview.map((r, idx) => `
+                  <tr class="${r.isWarrior800 ? 'bg-amber-50/70' : ''}">
+                    <td class="p-2 whitespace-nowrap">
+                      <label class="inline-flex items-center gap-1.5 cursor-pointer font-bold">
+                        <input type="checkbox" data-his-prev-w800="${idx}" ${r.isWarrior800 ? 'checked' : ''} class="accent-rose-600" />
+                        ${r.isWarrior800 ? '<span class="px-1.5 py-0.5 rounded-full bg-rose-600 text-white text-[10px]">🏅 八百壯士</span>' : '<span class="text-slate-400 text-[10px]">一般</span>'}
+                      </label>
+                    </td>
                     <td class="p-2 font-bold">${C.escapeHtml(r.name)}</td>
-                    <td class="p-2">${C.escapeHtml(r.categoryName)} / <span class="mono">${r.bibNumber}</span></td>
-                    <td class="p-2 mono">${r.finishTime}</td>
+                    <td class="p-2">${C.escapeHtml(r.categoryName)} / <span class="mono">${C.escapeHtml(r.bibNumber)}</span></td>
+                    <td class="p-2 mono">${C.escapeHtml(r.finishTime)}</td>
                     <td class="p-2 mono font-bold">${r.distanceKm} km</td>
+                    <td class="p-2"><span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">✅ 已完賽</span></td>
                     <td class="p-2 mono text-[10px] text-slate-500">${String(r.idCardHash).slice(0, 14)}...</td>
-                    <td class="p-2">${r.isWarrior800 ? '<span class="px-2 py-0.5 rounded-full bg-rose-600 text-white font-bold">🏅 100K+ 壯士</span>' : '-'}</td>
                   </tr>`).join('')}
               </tbody>
             </table>
@@ -2355,90 +2708,175 @@
         </div>
       </div>
 
-      <!-- 八百壯士英雄榜 + 歷屆資料庫總覽 -->
+      <!-- 八百壯士英雄榜 + 歷屆資料庫總覽（支援事後補改標示） -->
       <div class="bg-white p-4 rounded-2xl border shadow-sm space-y-2 text-xs">
-        <h3 class="font-black text-sm text-rose-900">🏅 八百壯士 100K+ 英雄榜（累計 ${warriors.length} 筆紀錄 / 全歷屆 ${App.State.historyResults.length} 筆）</h3>
-        <div class="overflow-x-auto max-h-72">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h3 class="font-black text-sm text-rose-900">🏅 歷屆資料庫總覽（已標示八百壯士 ${warriors.length} 筆 / 全歷屆已完賽 ${App.State.historyResults.length} 筆）</h3>
+          <span class="text-[11px] text-slate-500">點擊右側標註鈕可直接切換已存檔紀錄之八百壯士資格並同步雲端</span>
+        </div>
+        <div class="overflow-x-auto max-h-80">
           <table class="w-full text-left">
-            <thead class="bg-slate-900 text-white"><tr><th class="p-2">日期</th><th class="p-2">賽事名稱</th><th class="p-2">姓名</th><th class="p-2">組別</th><th class="p-2">距離</th><th class="p-2">成績</th><th class="p-2">標註</th></tr></thead>
+            <thead class="bg-slate-900 text-white sticky top-0">
+              <tr><th class="p-2">日期</th><th class="p-2">賽事名稱</th><th class="p-2">姓名</th><th class="p-2">組別</th><th class="p-2">距離</th><th class="p-2">成績</th><th class="p-2">狀態</th><th class="p-2">八百壯士標註</th></tr>
+            </thead>
             <tbody class="divide-y">
               ${App.State.historyResults.map((h) => `
                 <tr class="${h.isWarrior800 ? 'bg-amber-50/60' : ''}">
-                  <td class="p-2 mono">${h.eventDate}</td>
+                  <td class="p-2 mono whitespace-nowrap">${C.escapeHtml(h.eventDate)}</td>
                   <td class="p-2 font-semibold">${C.escapeHtml(h.eventName)}</td>
-                  <td class="p-2 font-black">${C.escapeHtml(h.name)}</td>
-                  <td class="p-2">${C.escapeHtml(h.categoryName)}</td>
-                  <td class="p-2 mono font-bold">${h.distanceKm} km</td>
-                  <td class="p-2 mono">${h.finishTime}</td>
-                  <td class="p-2">${h.isWarrior800 ? '<span class="px-2 py-0.5 rounded-full bg-rose-600 text-white font-bold">八百壯士</span>' : '-'}</td>
+                  <td class="p-2 font-black whitespace-nowrap">${C.escapeHtml(h.name)}</td>
+                  <td class="p-2 whitespace-nowrap">${C.escapeHtml(h.categoryName)}</td>
+                  <td class="p-2 mono font-bold whitespace-nowrap">${h.distanceKm} km</td>
+                  <td class="p-2 mono whitespace-nowrap">${C.escapeHtml(h.finishTime)}</td>
+                  <td class="p-2 whitespace-nowrap"><span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">已完賽</span></td>
+                  <td class="p-2 whitespace-nowrap">
+                    <button type="button" data-his-saved-w800="${C.escapeHtml(h.historyId)}" class="px-2 py-0.5 rounded-full font-bold text-[11px] border ${h.isWarrior800 ? 'bg-rose-600 border-rose-700 text-white' : 'bg-white border-slate-300 text-slate-500 hover:bg-amber-50'}">${h.isWarrior800 ? '🏅 八百壯士 ✓' : '☆ 標示壯士'}</button>
+                  </td>
                 </tr>`).join('')}
             </tbody>
           </table>
         </div>
       </div>`;
 
+    const buildHisSampleRows = () => [
+      ['組別名稱', '參賽號碼布', '姓', '名', '身分證', '完賽成績', '完賽距離km'],
+      ['100K八百壯士組', 'W001', '諸葛', '亮', 'A123456789', '09:48:12', '100'],
+      ['100K八百壯士組', 'W002', 'Smith', 'John', 'US88776655', '10:32:05', '100'],
+      ['50K挑戰組', 'B023', '上官', '婉兒', 'F223456786', '05:12:40', '50']
+    ];
+
+    $('#btnHisDlXlsx').onclick = async () => {
+      const rows = buildHisSampleRows();
+      await C.ensureExternalLib('xlsx');
+      if (global.XLSX) {
+        const wb = global.XLSX.utils.book_new();
+        global.XLSX.utils.book_append_sheet(wb, global.XLSX.utils.aoa_to_sheet(rows), '歷屆完賽成績範本');
+        global.XLSX.writeFile(wb, 'TUR_歷屆完賽成績匯入範本.xlsx');
+        App.toast('📥 已下載歷屆成績 Excel 範本 (.xlsx)', 'success');
+      } else {
+        $('#btnHisDlCsv').click();
+      }
+    };
+    $('#btnHisDlCsv').onclick = () => {
+      const rows = buildHisSampleRows();
+      const csv = '\uFEFF' + rows.map((r) => r.map(csvCell).join(',')).join('\r\n');
+      downloadText('TUR_歷屆完賽成績匯入範本.csv', csv, 'text/csv;charset=utf-8');
+      App.toast('📄 已下載歷屆成績 CSV 範本 (.csv)', 'success');
+    };
+
     $('#hisFileInput').onchange = async (e) => {
       const f = e.target.files?.[0];
       if (!f) return;
       const dateMatch = f.name.match(/(20\d{2}[-_]?\d{2}[-_]?\d{2})/);
       if (dateMatch) $('#hisEventDate').value = dateMatch[1].replace(/_/g, '-');
-      $('#hisEventName').value = f.name.replace(/\.(csv|txt)$/i, '');
+      $('#hisEventName').value = f.name.replace(/\.(xlsx|xls|csv|txt)$/i, '');
+      if (/\.(xlsx|xls)$/i.test(f.name)) {
+        await C.ensureExternalLib('xlsx');
+        if (global.XLSX) {
+          const buf = await f.arrayBuffer();
+          const wb = global.XLSX.read(buf, { type: 'array' });
+          const sheet = wb.Sheets[wb.SheetNames[0]];
+          const mat = global.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+          $('#hisRawInput').value = mat.map((r) => r.join(',')).join('\n');
+          return App.toast(`已載入 Excel 檔案（${mat.length} 列），請按「步驟 1」產生預覽`, 'info');
+        }
+      }
       $('#hisRawInput').value = await f.text();
     };
 
     $('#btnHisSample').onclick = () => {
-      $('#hisRawInput').value = [
-        '組別,號碼布,姓,名,身分證,成績,距離',
-        '100K八百壯士組,W001,諸葛,亮,A123456789,09:48:12,100',
-        '24H繞圈組,T012,Smith,John,US88776655,23:50:00,132.4',
-        '50K挑戰組,B023,上官,婉兒,F223456786,05:12:40,50'
-      ].join('\n');
+      $('#hisRawInput').value = buildHisSampleRows().map((r) => r.join(',')).join('\n');
     };
 
     $('#btnHisAnalyze').onclick = async () => {
       const raw = $('#hisRawInput').value.trim();
-      if (!raw) return App.toast('請先貼上或上傳歷屆成績文字', 'warn');
+      if (!raw) return App.toast('請先貼上或上傳歷屆成績檔案', 'warn');
       const evDate = $('#hisEventDate').value.trim() || C.formatDateTime().slice(0, 10);
       const evName = $('#hisEventName').value.trim() || '歷屆賽事';
       const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
       const out = [];
       for (let i = 0; i < lines.length; i++) {
         const cols = lines[i].split(/,|\t/).map((s) => s.trim());
-        if (i === 0 && /組別|姓名|bib|name/i.test(lines[i])) continue;
+        if (i === 0 && /組別|姓名|號碼布|bib|name/i.test(lines[i])) continue;
         const cat = cols[0] || '超馬組';
-        const bib = cols[1] || `H${i}`;
+        const bib = cols[1] || `H${out.length + 1}`;
         const mergedName = C.mergeNameParts(cols[2], cols[3]);
         const idCard = cols[4] || `${mergedName}-${bib}`;
         const finishTime = (cols[5] || '00:00:00').split('.')[0];
         const dist = Number(cols[6] || 0);
         const hash = await C.sha256Hex(idCard);
         out.push({
-          historyId: `HIS-${Date.now()}-${i}`,
+          historyId: `HIS-${Date.now()}-${out.length}`,
           eventDate: evDate, eventName: evName, categoryName: cat, bibNumber: bib,
           name: mergedName, idCardHash: hash, finishTime, distanceKm: dist,
-          lapCount: 0, overallRank: i + 1, catRank: 1, status: 'FINISHED',
-          isWarrior800: C.isWarrior800Eligible(evName, cat, dist), remark: '智慧清洗匯入'
+          lapCount: 0, overallRank: out.length + 1, catRank: 1, status: 'FINISHED',
+          isWarrior800: false, remark: '歷屆完賽匯入'
         });
       }
       pendingHistoryPreview = out;
       renderZone4(App);
-      App.toast(`已解析 ${out.length} 筆，請審查金框內容後按確認寫入`, 'info');
+      App.toast(`已解析 ${out.length} 筆已完賽明細！請於金框手動選取組別或跑者標示八百壯士後再存檔`, 'info');
     };
+
+    if ($('#btnHisW800All')) {
+      $('#btnHisW800All').onclick = () => {
+        pendingHistoryPreview.forEach((r) => { r.isWarrior800 = true; });
+        renderZone4(App);
+      };
+    }
+    if ($('#btnHisW800None')) {
+      $('#btnHisW800None').onclick = () => {
+        pendingHistoryPreview.forEach((r) => { r.isWarrior800 = false; });
+        renderZone4(App);
+      };
+    }
+    $$('[data-his-grp-w800]').forEach((b) => {
+      b.onclick = () => {
+        const grp = b.dataset.hisGrpW800;
+        const targets = pendingHistoryPreview.filter((r) => (r.categoryName || '未分組') === grp);
+        const allOn = targets.length > 0 && targets.every((r) => r.isWarrior800);
+        targets.forEach((r) => { r.isWarrior800 = !allOn; });
+        renderZone4(App);
+      };
+    });
+    $$('[data-his-prev-w800]').forEach((cb) => {
+      cb.onchange = () => {
+        const idx = Number(cb.dataset.hisPrevW800);
+        if (pendingHistoryPreview[idx]) {
+          pendingHistoryPreview[idx].isWarrior800 = cb.checked;
+          renderZone4(App);
+        }
+      };
+    });
 
     if ($('#btnHisConfirmCommit')) {
       $('#btnHisConfirmCommit').onclick = async () => {
         if (!pendingHistoryPreview.length) return;
-        for (const r of pendingHistoryPreview) {
+        const rowsToSave = pendingHistoryPreview.map((r) => ({ ...r, status: 'FINISHED', isWarrior800: Boolean(r.isWarrior800) }));
+        for (const r of rowsToSave) {
           App.State.historyResults.push(r);
           await C.TurDB.put('historyResults', r);
         }
-        await App.enqueueSync('batchImportHistory', { rows: pendingHistoryPreview });
-        const cnt = pendingHistoryPreview.length;
+        await App.enqueueSync('batchImportHistory', { rows: rowsToSave });
+        const cnt = rowsToSave.length;
+        const wCnt = rowsToSave.filter((r) => r.isWarrior800).length;
         pendingHistoryPreview = [];
         renderZone4(App);
-        App.toast(`✅ 已正式寫入 ${cnt} 筆歷屆成績並同步雲端！`, 'success');
+        App.toast(`✅ 已存檔匯入 ${cnt} 筆歷屆已完賽成績（含手動標示八百壯士 ${wCnt} 人）並同步雲端！`, 'success');
       };
     }
+
+    $$('[data-his-saved-w800]').forEach((b) => {
+      b.onclick = async () => {
+        const h = App.State.historyResults.find((x) => x.historyId === b.dataset.hisSavedW800);
+        if (!h) return;
+        h.isWarrior800 = !Boolean(h.isWarrior800);
+        await C.TurDB.put('historyResults', h);
+        await App.enqueueSync('saveHistory', { history: h });
+        renderZone4(App);
+        App.toast(h.isWarrior800 ? `🏅 已標示「${h.name}」為八百壯士` : `已取消「${h.name}」的八百壯士標示`, 'info');
+      };
+    });
   }
 
   /* --------------------------------------------------------------------------

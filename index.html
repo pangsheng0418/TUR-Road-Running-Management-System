@@ -91,10 +91,11 @@
         </div>
         <div>
           <h1 class="text-xl sm:text-2xl font-black">開放報名賽事總覽</h1>
-          <p class="text-sm text-slate-300 mt-1">支援個人與團體報名，選擇活動即可開始填寫。</p>
+          <p class="text-sm text-slate-300 mt-1">支援單場個人／團體報名，以及「多場活動聯合報名」一次填表合併繳費。</p>
         </div>
       </div>
       <div class="flex flex-wrap gap-2.5 text-sm">
+        <button id="btnGoMultiFromHome" class="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black shadow">🛒 多場活動聯合報名</button>
         <button id="btnGoLookupFromHome" class="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 font-bold">🔍 報名查詢與修改</button>
         <a href="public.html" target="_blank" class="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black">🏆 成績與證書查詢</a>
       </div>
@@ -363,6 +364,159 @@
     </div>
   </section>
 
+  <!-- ==================== 視圖 B2：多場活動聯合報名（一次填表・合併繳費） ==================== -->
+  <section id="view-public-multi" class="app-view hidden space-y-5">
+    <div class="bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 text-white rounded-2xl p-5 flex flex-wrap items-center justify-between gap-3 shadow">
+      <div>
+        <button type="button" id="btnBackFromMulti" class="mb-2 px-3 py-1 rounded-lg bg-black/35 hover:bg-black/55 text-white text-xs font-bold">← 返回賽事列表</button>
+        <h1 class="text-xl sm:text-2xl font-black">🛒 多場活動聯合報名（一次填表・合併繳費記帳）</h1>
+        <p class="text-xs sm:text-sm text-emerald-100/90 mt-1">勾選多場同金流活動與組別 → 只填寫 1 次基本資料 → 合併 1 筆總額匯款或線上付款，省去重複報名與多次匯款手續！</p>
+      </div>
+      <button type="button" id="btnFillSampleMulti" class="text-xs sm:text-sm px-3.5 py-2 rounded-xl bg-white/95 hover:bg-white text-slate-900 font-black shadow">✨ 帶入測試範例</button>
+    </div>
+
+    <!-- 同金流防呆篩選列 -->
+    <div id="multiPayModeBar" class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-2"></div>
+
+    <!-- 合併報名完成確認卡（送出成功後顯示） -->
+    <div id="multiReceiptBox" class="hidden bg-emerald-50 border-2 border-emerald-500 rounded-2xl p-5 shadow-md space-y-3 text-sm"></div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+      <!-- 左 2 欄：步驟 1 選多場活動組別 + 步驟 2 填一次基本資料 -->
+      <div class="lg:col-span-2 space-y-4">
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b pb-2.5">
+            <div>
+              <h2 class="font-black text-base text-slate-900">步驟 1：勾選要報名的多場活動、組別與加購</h2>
+              <p class="text-xs text-slate-500 mt-0.5">每場活動獨立選擇組別、加購服務與該場專屬自訂欄位；系統將自動檢查名額與重複報名。</p>
+            </div>
+          </div>
+          <div id="multiEventsList" class="space-y-3"></div>
+        </div>
+
+        <form id="multiRegForm" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3" novalidate>
+          <div class="border-b pb-2.5">
+            <h2 class="font-black text-base text-slate-900">步驟 2：填寫選手基本資料（只需填寫一次，自動套用至全部勾選場次）</h2>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">國籍 (三碼國際碼) *</label>
+              <div class="flex gap-2">
+                <select id="mNationality" class="flex-1 px-3 py-2 border rounded-lg text-sm">
+                  <option value="TWN" selected>TWN - 台灣</option>
+                  <option value="JPN">JPN - 日本</option>
+                  <option value="USA">USA - 美國</option>
+                  <option value="HKG">HKG - 香港</option>
+                  <option value="SGP">SGP - 新加坡</option>
+                  <option value="MYS">MYS - 馬來西亞</option>
+                  <option value="OTHER">其他 (自填3碼)</option>
+                </select>
+                <input id="mNationalityCustom" type="text" maxlength="3" placeholder="3碼" class="hidden w-20 px-2 py-2 border rounded-lg text-sm uppercase mono" />
+              </div>
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">選手姓名 *</label>
+              <input id="mName" type="text" placeholder="請填寫真實姓名" class="w-full px-3 py-2 border rounded-lg text-sm" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">身分證字號 / 護照號碼 *</label>
+              <input id="mIdCard" type="text" placeholder="自動檢核所有已選活動是否重複報名" class="w-full px-3 py-2 border rounded-lg text-sm uppercase mono" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">性別 *</label>
+              <select id="mGender" class="w-full px-3 py-2 border rounded-lg text-sm">
+                <option value="">請選擇</option>
+                <option value="M">M - 男</option>
+                <option value="F">F - 女</option>
+              </select>
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">出生年月日 (10～80 歲) *</label>
+              <div class="flex gap-2 items-center">
+                <input id="mBirthday" type="date" class="flex-1 px-3 py-2 border rounded-lg text-sm" />
+                <span id="mAgeDisplay" class="px-2.5 py-2 rounded-lg bg-slate-100 text-xs font-bold min-w-[62px] text-center">-- 歲</span>
+              </div>
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">手機號碼 (09 開頭 10 碼) *</label>
+              <input id="mPhone" type="tel" maxlength="10" placeholder="0912345678" class="w-full px-3 py-2 border rounded-lg text-sm mono" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">電子信箱 Email *</label>
+              <input id="mEmail" type="email" placeholder="runner@example.com" class="w-full px-3 py-2 border rounded-lg text-sm" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">居住縣市 *</label>
+              <select id="mCity" class="w-full px-3 py-2 border rounded-lg text-sm">
+                <option value="">請選擇縣市</option>
+                <option>台北市</option><option>新北市</option><option>桃園市</option><option>台中市</option>
+                <option>台南市</option><option>高雄市</option><option>基隆市</option><option>新竹市</option>
+                <option>新竹縣</option><option>苗栗縣</option><option>彰化縣</option><option>南投縣</option>
+                <option>雲林縣</option><option>嘉義市</option><option>嘉義縣</option><option>屏東縣</option>
+                <option>宜蘭縣</option><option>花蓮縣</option><option>台東縣</option><option>離島 / 海外</option>
+              </select>
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">飲食習慣 *</label>
+              <select id="mDiet" class="w-full px-3 py-2 border rounded-lg text-sm"><option value="葷">葷食</option><option value="素">素食</option></select>
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">備註 / 跑團名稱（選填）</label>
+              <input id="mRemark" type="text" placeholder="選填" class="w-full px-3 py-2 border rounded-lg text-sm" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">緊急聯絡人姓名 (不可同本人) *</label>
+              <input id="mEmergName" type="text" class="w-full px-3 py-2 border rounded-lg text-sm" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">緊急聯絡人電話 (不可同本人) *</label>
+              <input id="mEmergPhone" type="tel" maxlength="10" class="w-full px-3 py-2 border rounded-lg text-sm mono" />
+            </div>
+          </div>
+
+          <!-- 合併付款欄位（依目前選擇之金流模式顯示） -->
+          <div id="mLast5Wrap" class="p-3 rounded-xl bg-amber-50 border border-amber-300 space-y-1.5 text-xs">
+            <label class="block font-black text-amber-950">🏦 統一合併匯款帳號末五碼（選填；先送出報名後再一次匯款補填亦可）</label>
+            <input id="mLast5" type="text" maxlength="5" placeholder="例如 12345（將套用至本合併單全部場次）" class="w-full sm:w-80 px-3 py-2 border rounded-lg text-sm mono bg-white" />
+          </div>
+
+          <div id="mPayuniWrap" class="hidden p-3 rounded-xl bg-emerald-50 border border-emerald-300 space-y-1.5 text-xs">
+            <label class="block font-black text-emerald-950">💳 PAYUNi 統一金流一次合併結帳方式</label>
+            <select id="mPayuniType" class="w-full sm:w-80 px-3 py-2 border rounded-lg text-sm bg-white font-semibold">
+              <option value="CREDIT">信用卡一次付清（合併即時銷帳＋全場自動配號）</option>
+              <option value="ATM">PAYUNi 虛擬帳號 ATM（合併即時銷帳）</option>
+              <option value="CVS">超商代碼繳費（合併單筆結帳）</option>
+            </select>
+          </div>
+
+          <label class="flex items-start gap-2 text-xs text-slate-700 cursor-pointer pt-1">
+            <input id="mConsent" type="checkbox" class="mt-0.5 accent-emerald-600" />
+            <span>我已詳閱本次所勾選全部活動之簡章與風險告知，確認健康狀況適合參賽，並同意由大會合併計費與各場獨立建檔管理。*</span>
+          </label>
+        </form>
+      </div>
+
+      <!-- 右 1 欄：步驟 3 黏貼式合併結帳摘要卡 -->
+      <div class="space-y-4 lg:sticky lg:top-24">
+        <div class="bg-white rounded-2xl border-2 border-emerald-500 shadow-md p-4 space-y-3 text-xs">
+          <div class="flex items-center justify-between border-b pb-2">
+            <h3 class="font-black text-sm text-emerald-950">🧾 步驟 3：合併結帳明細</h3>
+            <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold">一次匯款・跨場記帳</span>
+          </div>
+          <div id="multiCartSummary" class="space-y-2 max-h-72 overflow-y-auto"></div>
+          <div class="border-t pt-3 flex items-baseline justify-between">
+            <span class="font-bold text-slate-600">合併應繳總金額</span>
+            <span id="multiGrandTotal" class="text-2xl font-black mono text-emerald-700">NT$ 0</span>
+          </div>
+          <div id="multiBankInfoBox" class="p-2.5 rounded-xl bg-slate-50 border text-[11px] text-slate-700 leading-relaxed"></div>
+          <div id="multiValidationHint" class="text-[11px] font-bold text-rose-600 space-y-0.5"></div>
+          <button type="button" id="btnSubmitMulti" class="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-200 disabled:text-slate-400 text-white font-black text-sm shadow transition">✅ 確認送出多場聯合報名</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ==================== 視圖 C：雙因子查改 (/lookup) ==================== -->
   <section id="view-public-lookup" class="app-view hidden bg-white rounded-2xl border shadow-sm p-5 space-y-4">
     <div class="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
@@ -378,8 +532,8 @@
         <input id="lookupIdCard" type="text" autocomplete="off" placeholder="例如 A123456789" class="w-full px-3 py-2 border rounded-lg text-sm uppercase mono" />
       </div>
       <div>
-        <label class="block text-xs font-bold mb-1">報名序號 或 Email</label>
-        <input id="lookupCred" type="text" autocomplete="off" placeholder="TUR-2026... 或 Email" class="w-full px-3 py-2 border rounded-lg text-sm" />
+        <label class="block text-xs font-bold mb-1">報名序號、合併單號 (TURM-...) 或 Email</label>
+        <input id="lookupCred" type="text" autocomplete="off" placeholder="TUR-2026... / TURM-... / Email" class="w-full px-3 py-2 border rounded-lg text-sm" />
       </div>
       <button id="btnLookupVerify" class="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold">驗證查詢</button>
     </div>
@@ -805,6 +959,17 @@
         <div class="col-span-3 text-[11px] text-indigo-900">📍 將自動建立繞圈賽標準站點：<b>CHECKIN（報到）→ LAP（主會場繞圈門，含超時圈自動過濾）</b></div>
       </div>
 
+      <!-- 八百壯士活動組別明確標示 -->
+      <div class="p-3 rounded-xl bg-amber-50 border border-amber-300">
+        <label class="flex items-start gap-2 cursor-pointer">
+          <input id="newEvCatWarrior800" type="checkbox" class="mt-0.5 accent-amber-600" />
+          <div>
+            <div class="font-black text-amber-950">🏅 標示此預設組別為「八百壯士」參加人員</div>
+            <div class="text-[11px] text-amber-900 mt-0.5">勾選後，本組別完賽選手將正式計入八百壯士統計與英雄榜（建立後仍可於「專區 1 → 活動表單」逐組新增或調整標示）。</div>
+          </div>
+        </label>
+      </div>
+
       <div class="flex justify-end gap-2 pt-2 border-t">
         <button type="button" id="btnCancelNewEvent" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold">取消</button>
         <button type="submit" class="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black shadow">✅ 建立活動並進入設定</button>
@@ -813,9 +978,9 @@
   </div>
 </div>
 
-<script src="js/tur-logo.js?v=4.8"></script>
-<script src="js/tur-core.js?v=4.8"></script>
-<script src="js/tur-zones.js?v=4.8"></script>
-<script src="js/tur-app.js?v=4.8"></script>
+<script src="js/tur-logo.js?v=5.1"></script>
+<script src="js/tur-core.js?v=5.1"></script>
+<script src="js/tur-zones.js?v=5.1"></script>
+<script src="js/tur-app.js?v=5.1"></script>
 </body>
 </html>
