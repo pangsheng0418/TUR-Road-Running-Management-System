@@ -388,7 +388,10 @@
               <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col hover:shadow-md transition">
                 <div class="h-32 p-4 flex flex-col justify-between text-white" style="${C.getBannerStyle(ev.bannerUrl)}">
                   <div class="flex justify-between items-start text-[11px]">
-                    <span class="px-2 py-0.5 rounded-full bg-black/45 font-bold">${ev.raceType === 'lap_timed' ? '🔁 繞圈計時賽' : '🏃 距離挑戰賽'}</span>
+                    <div class="flex flex-wrap gap-1">
+                      <span class="px-2 py-0.5 rounded-full bg-black/45 font-bold">${ev.raceType === 'lap_timed' ? '🔁 繞圈計時賽' : '🏃 距離挑戰賽'}</span>
+                      ${C.isTestSuiteId(ev.eventId) ? '<span class="px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black">🧪 測試情境</span>' : ''}
+                    </div>
                     <span class="px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-black">開放報名中</span>
                   </div>
                   <div>
@@ -402,7 +405,13 @@
                     <div class="flex justify-between text-slate-600"><span>🏁 起跑時間</span><b class="mono text-indigo-800">${ev.raceStart ? ev.raceStart.slice(0, 16) : '待公告'}</b></div>
                     <div class="flex justify-between text-slate-600"><span>已報名 / 限額</span><b class="mono text-slate-900">${quotaTxt}</b></div>
                     <div class="flex flex-wrap gap-1 pt-1">
-                      ${cats.map((c) => `<span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold">${C.escapeHtml(c.name)} $${c.fee}</span>`).join('')}
+                      ${C.isEarlyBirdActive(ev) ? `<span class="w-full px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-900 font-black text-[11px]">🐤 早鳥優惠至 ${C.getEventEarlyBirdConfig(ev).endTime.slice(0, 16)}</span>` : ''}
+                      ${cats.map((c) => {
+                        const pr = C.getEffectiveCategoryPrice(ev, c);
+                        return pr.isEarlyBird
+                          ? `<span class="px-2 py-0.5 rounded bg-emerald-50 border border-emerald-300 text-emerald-900 font-bold">${C.escapeHtml(c.name)} <b>$${pr.fee}</b> <span class="line-through text-slate-400 font-normal">$${pr.regularFee}</span></span>`
+                          : `<span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold">${C.escapeHtml(c.name)} $${pr.fee}</span>`;
+                      }).join('')}
                     </div>
                   </div>
                   <div class="grid grid-cols-2 gap-2">
@@ -485,9 +494,16 @@
 
     const cats = State.categories.filter((c) => c.eventId === ev.eventId);
     const prevCat = $('#regCatId').value;
+    const ebActive = C.isEarlyBirdActive(ev);
+    const ebCfg = C.getEventEarlyBirdConfig(ev);
+    if (rtBox && ebActive) {
+      rtBox.innerHTML += `<div class="mt-2 pt-2 border-t border-current/15 flex flex-wrap items-center justify-between gap-2 text-emerald-800 font-black"><span>🐤 本活動早鳥優惠進行中！報名送出即鎖定早鳥價</span><span class="mono">早鳥截止：${C.escapeHtml(ebCfg.endTime)}</span></div>`;
+    }
     $('#regCatId').innerHTML = cats.map((c) => {
       const used = State.participants.filter((p) => p.eventId === ev.eventId && p.catId === c.catId && String(p.payStatus).toUpperCase() !== 'CANCELLED').length;
-      return `<option value="${c.catId}">${C.escapeHtml(c.name)} — NT$${c.fee} (剩 ${Math.max(0, Number(c.quota) - used)}/${c.quota})</option>`;
+      const pr = C.getEffectiveCategoryPrice(ev, c);
+      const priceTxt = pr.isEarlyBird ? `🐤 早鳥 NT$${pr.fee}（原價 NT$${pr.regularFee}）` : `NT$${pr.fee}`;
+      return `<option value="${c.catId}">${C.escapeHtml(c.name)} — ${priceTxt} (剩 ${Math.max(0, Number(c.quota) - used)}/${c.quota})</option>`;
     }).join('');
     if (cats.some((c) => c.catId === prevCat)) $('#regCatId').value = prevCat;
 
@@ -548,7 +564,8 @@
       }
     }
 
-    $('#regAddonsContainer').innerHTML = (schema.addons || []).map((a) => `
+    const enabledAddons = (schema.addons || []).filter((a) => a && a.enabled !== false);
+    $('#regAddonsContainer').innerHTML = enabledAddons.map((a) => `
       <label class="flex items-center gap-2 p-2 bg-white border rounded-lg cursor-pointer hover:border-amber-400">
         <input type="checkbox" class="reg-addon" data-name="${C.escapeHtml(a.name)}" data-price="${a.price}" />
         <span>${C.escapeHtml(a.name)} <b>+$${a.price}</b></span>
@@ -665,12 +682,15 @@
     });
     $('#err-regConsent').textContent = checks.consent;
 
+    const evObj = State.events.find((e) => e.eventId === evId);
+    const priceInfo = C.getEffectiveCategoryPrice(evObj, cat);
     const addons = $$('.reg-addon:checked').map((cb) => ({ name: cb.dataset.name, price: Number(cb.dataset.price) }));
-    const totalAmount = (cat ? Number(cat.fee) : 0) + addons.reduce((s, a) => s + a.price, 0);
-    $('#regSingleTotal').textContent = `NT$ ${totalAmount.toLocaleString()}`;
+    const totalAmount = priceInfo.fee + addons.reduce((s, a) => s + a.price, 0);
+    $('#regSingleTotal').textContent = priceInfo.isEarlyBird
+      ? `NT$ ${totalAmount.toLocaleString()} (🐤 早鳥省 $${(priceInfo.regularFee - priceInfo.fee).toLocaleString()})`
+      : `NT$ ${totalAmount.toLocaleString()}`;
 
     // 承辦人自訂擴充欄位取值與即時防呆檢核
-    const evObj = State.events.find((e) => e.eventId === evId);
     const evSchema = C.parseJsonSafe(evObj?.formSchemaJson, C.defaultFormSchema());
     const customFieldDefs = Array.isArray(evSchema.customFields) ? evSchema.customFields : [];
     const customValues = {};
@@ -713,6 +733,8 @@
     }).join('');
 
     const split = C.splitFullName(name);
+    const rawRemark = $('#regRemark').value.trim();
+    const finalRemark = priceInfo.isEarlyBird ? ['[早鳥價]', rawRemark].filter(Boolean).join(' ') : rawRemark;
     const isValid = Object.values(checks).every((e) => e === '') && !grpErr;
     return {
       isValid,
@@ -720,7 +742,7 @@
         participantId: `TUR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(10000 + Math.random() * 90000)}`,
         eventId: evId, catId, bibNumber: '', groupCode: '', groupName: isGroupMode ? grpName : '',
         name, lastName: split.lastName, firstName: split.firstName, idCard, gender, birthday, age, nationality: nat,
-        phone, email, city, emergencyName: emergName, emergencyPhone: emergPhone, diet, remark: $('#regRemark').value.trim(),
+        phone, email, city, emergencyName: emergName, emergencyPhone: emergPhone, diet, remark: finalRemark,
         totalAmount, addonsDetail: JSON.stringify(addons.map((a) => a.name)),
         customFieldsJson: JSON.stringify(customValues),
         payMethod, remittanceLast5: payMethod === 'MANUAL_ATM' ? last5 : '',
@@ -892,7 +914,7 @@
         : `<div class="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-950">✅ 承辦人「<b>${C.escapeHtml(activeOrg.displayName)}</b>」目前共有 <b>${evs.length} 場</b>同金流活動開放中，勾選 2 場以上即可合併 1 筆匯款記帳！</div>`) + evs.map((ev) => {
         const cats = State.categories.filter((c) => c.eventId === ev.eventId);
         const schema = C.parseJsonSafe(ev.formSchemaJson, C.defaultFormSchema());
-        const addons = Array.isArray(schema.addons) ? schema.addons : [];
+        const addons = (Array.isArray(schema.addons) ? schema.addons : []).filter((a) => a && a.enabled !== false);
         const customFields = Array.isArray(schema.customFields) ? schema.customFields : [];
         if (!State.multiSelected[ev.eventId]) {
           State.multiSelected[ev.eventId] = {
@@ -905,11 +927,12 @@
         const st = State.multiSelected[ev.eventId];
         if (!cats.some((c) => c.catId === st.catId) && cats[0]) st.catId = cats[0].catId;
         const pickedCat = cats.find((c) => c.catId === st.catId) || cats[0];
+        const pickedPr = C.getEffectiveCategoryPrice(ev, pickedCat);
         const evAddonSum = (st.addons || []).reduce((s, nm) => {
           const def = addons.find((a) => a.name === nm);
           return s + (def ? Number(def.price || 0) : 0);
         }, 0);
-        const evSub = (pickedCat ? Number(pickedCat.fee || 0) : 0) + evAddonSum;
+        const evSub = pickedPr.fee + evAddonSum;
         const regCnt = State.participants.filter((p) => p.eventId === ev.eventId && String(p.payStatus).toUpperCase() !== 'CANCELLED').length;
         const evFull = Number(ev.maxQuota) > 0 && regCnt >= Number(ev.maxQuota);
 
@@ -921,6 +944,7 @@
                 <div>
                   <div class="flex flex-wrap items-center gap-1.5">
                     <span class="font-black text-sm text-slate-900">${C.escapeHtml(ev.nameZh)}</span>
+                    ${C.isTestSuiteId(ev.eventId) ? '<span class="px-2 py-0.5 rounded-full bg-amber-300 text-slate-950 text-[10px] font-black">🧪 測試</span>' : ''}
                     <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${ev.raceType === 'lap_timed' ? 'bg-indigo-100 text-indigo-800' : 'bg-sky-100 text-sky-800'}">${ev.raceType === 'lap_timed' ? '🔁 繞圈賽' : '🏃 距離賽'}</span>
                     ${evFull ? '<span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-bold">已額滿</span>' : ''}
                   </div>
@@ -941,7 +965,9 @@
                     const used = State.participants.filter((p) => p.eventId === ev.eventId && p.catId === c.catId && String(p.payStatus).toUpperCase() !== 'CANCELLED').length;
                     const rem = Math.max(0, Number(c.quota) - used);
                     const wTag = C.isCategoryWarrior800(c) ? ' [🏅八百壯士組]' : '';
-                    return `<option value="${c.catId}" ${c.catId === st.catId ? 'selected' : ''}>${C.escapeHtml(c.name)}${wTag} — NT$${c.fee}（剩 ${rem}/${c.quota}）</option>`;
+                    const cPr = C.getEffectiveCategoryPrice(ev, c);
+                    const cPriceTxt = cPr.isEarlyBird ? `🐤早鳥 NT$${cPr.fee} (原$${cPr.regularFee})` : `NT$${cPr.fee}`;
+                    return `<option value="${c.catId}" ${c.catId === st.catId ? 'selected' : ''}>${C.escapeHtml(c.name)}${wTag} — ${cPriceTxt}（剩 ${rem}/${c.quota}）</option>`;
                   }).join('')}
                 </select>
               </div>
@@ -1099,11 +1125,12 @@
       const cat = cats.find((c) => c.catId === st.catId) || cats[0];
       if (!cat) return;
       const schema = C.parseJsonSafe(ev.formSchemaJson, C.defaultFormSchema());
-      const addonDefs = Array.isArray(schema.addons) ? schema.addons : [];
+      const addonDefs = (Array.isArray(schema.addons) ? schema.addons : []).filter((a) => a && a.enabled !== false);
       const cfDefs = Array.isArray(schema.customFields) ? schema.customFields : [];
       const addonObjs = (st.addons || []).map((nm) => addonDefs.find((a) => a.name === nm)).filter(Boolean);
-      const subtotal = Number(cat.fee || 0) + addonObjs.reduce((s, a) => s + Number(a.price || 0), 0);
-      picked.push({ ev, cat, addonObjs, cfDefs, customFields: st.customFields || {}, subtotal });
+      const pr = C.getEffectiveCategoryPrice(ev, cat);
+      const subtotal = pr.fee + addonObjs.reduce((s, a) => s + Number(a.price || 0), 0);
+      picked.push({ ev, cat, priceInfo: pr, addonObjs, cfDefs, customFields: st.customFields || {}, subtotal });
     });
 
     const grandTotal = picked.reduce((s, x) => s + x.subtotal, 0);
@@ -1237,7 +1264,8 @@
       }
 
       const bundleTag = isBundle ? `[合併單 ${bundleCode}｜共${picked.length}場 總額NT$${grandTotal}]` : '';
-      const finalRemark = [bundleTag, profile.remark].filter(Boolean).join(' ');
+      const ebTag = it.priceInfo?.isEarlyBird ? '[早鳥價]' : '';
+      const finalRemark = [bundleTag, ebTag, profile.remark].filter(Boolean).join(' ');
       const pid = `TUR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(10000 + Math.random() * 90000)}`;
       const rec = {
         participantId: pid,
@@ -1333,6 +1361,21 @@
     if (Number(evObj.maxQuota) > 0 && curActiveCnt + runners.length > Number(evObj.maxQuota)) {
       toast(`🔒 階段 1 名額管制：本場總限額 ${evObj.maxQuota} 人，目前剩餘名額不足！`, 'error');
       return;
+    }
+    const batchByCat = new Map();
+    for (const r of runners) {
+      batchByCat.set(r.catId, (batchByCat.get(r.catId) || 0) + 1);
+    }
+    for (const [cid, addCnt] of batchByCat.entries()) {
+      const catObj = State.categories.find((c) => c.catId === cid);
+      const catQ = Number(catObj?.quota || 0);
+      if (catQ > 0) {
+        const usedCat = State.participants.filter((p) => p.eventId === evId && p.catId === cid && String(p.payStatus).toUpperCase() !== 'CANCELLED').length;
+        if (usedCat + addCnt > catQ) {
+          toast(`🔒 階段 1 分組名額管制：「${catObj?.name || cid}」限額 ${catQ} 人，剩餘名額不足！`, 'error');
+          return;
+        }
+      }
     }
 
     const isGroup = State.regMode === 'group' || runners.length > 1 || Boolean(runners[0].groupName);
@@ -1830,7 +1873,11 @@
       } else {
         note = reasonPrefix + `第 ${lapCount} 圈有效｜累計 ${(lapCount * Number(ev.lapDistanceKm || cat?.distanceKm || 1)).toFixed(1)} km`;
       }
-      if (p.raceStatus === 'dns') { p.raceStatus = 'on_track'; await C.TurDB.put('participants', p); }
+      if (p.raceStatus === 'dns') {
+        p.raceStatus = 'on_track';
+        await C.TurDB.put('participants', p);
+        await enqueueSync('updateParticipant', { participantId: p.participantId, raceStatus: 'on_track' });
+      }
     } else if (stCode === 'FINISH') {
       p.raceStatus = 'finished';
       await C.TurDB.put('participants', p);
@@ -1839,7 +1886,11 @@
       const sec = startDt ? Math.round((senseMs - startDt.getTime()) / 1000) + Number(p.penaltySeconds || 0) : null;
       note = reasonPrefix + `🏁 衝線完賽！整數秒成績 ${C.formatDuration(sec)}`;
     } else {
-      if (p.raceStatus === 'dns') { p.raceStatus = 'on_track'; await C.TurDB.put('participants', p); }
+      if (p.raceStatus === 'dns') {
+        p.raceStatus = 'on_track';
+        await C.TurDB.put('participants', p);
+        await enqueueSync('updateParticipant', { participantId: p.participantId, raceStatus: 'on_track' });
+      }
       note = reasonPrefix + `通過 ${stCode} 檢查站`;
     }
 
@@ -2112,15 +2163,16 @@
       const ev = State.events.find((e) => e.eventId === p.eventId);
       const cats = State.categories.filter((c) => c.eventId === p.eventId);
       const schema = C.parseJsonSafe(ev?.formSchemaJson, C.defaultFormSchema());
-      const addonDefs = Array.isArray(schema.addons) ? schema.addons : [];
-      const cfDefs = Array.isArray(schema.customFields) ? schema.customFields : [];
       const curAddons = C.parseJsonSafe(p.addonsDetail, []);
+      const addonDefs = (Array.isArray(schema.addons) ? schema.addons : []).filter((a) => a && (a.enabled !== false || (Array.isArray(curAddons) && curAddons.includes(a.name))));
+      const cfDefs = Array.isArray(schema.customFields) ? schema.customFields : [];
       const curCf = C.parseJsonSafe(p.customFieldsJson, {});
       const paySt = String(p.payStatus || 'UNPAID').toUpperCase();
       const isPaid = paySt === 'PAID';
       const isCancelled = paySt === 'CANCELLED';
-      const isClosedLock = isCancelled || ev?.status === 'finished' || p.raceStatus === 'finished';
-      const feeLocked = isPaid || isClosedLock;
+      const isEventClosed = String(ev?.status || '').toLowerCase() === 'closed';
+      const isClosedLock = isCancelled || String(ev?.status || '').toLowerCase() === 'finished' || p.raceStatus === 'finished';
+      const feeLocked = isPaid || isClosedLock || isEventClosed;
       const evPayMode = C.getEventPaymentMode(ev);
       const isPayuniEv = evPayMode === 'ONLINE_PAYUNi';
 
@@ -2184,7 +2236,13 @@
             <div><label class="font-bold">序號 / 號碼布 / 狀態</label><input disabled value="${p.participantId}｜${p.bibNumber || '待配號'}｜${paySt}" class="w-full px-2.5 py-2 border rounded-lg bg-slate-200/70 mono mt-0.5" /></div>
             <div><label class="font-bold">報名組別 ${feeLocked ? '🔒' : ''}</label>
               <select id="lkCat" ${feeLocked ? 'disabled' : ''} class="w-full px-2.5 py-2 border rounded-lg mt-0.5 ${feeLocked ? 'bg-slate-200/70 cursor-not-allowed' : 'bg-white'}">
-                ${cats.map((c) => `<option value="${c.catId}" data-fee="${c.fee}" ${c.catId === p.catId ? 'selected' : ''}>${C.escapeHtml(c.name)} (NT$${c.fee})</option>`).join('')}
+                ${cats.map((c) => {
+                  const usedC = State.participants.filter((x) => x.eventId === p.eventId && x.catId === c.catId && x.participantId !== p.participantId && String(x.payStatus).toUpperCase() !== 'CANCELLED').length;
+                  const cFull = Number(c.quota) > 0 && usedC >= Number(c.quota);
+                  const pr = C.getEffectiveCategoryPrice(ev, c);
+                  const pTxt = pr.isEarlyBird ? `🐤早鳥 NT$${pr.fee} / 原$${pr.regularFee}` : `NT$${pr.fee}`;
+                  return `<option value="${c.catId}" data-fee="${pr.fee}" ${c.catId === p.catId ? 'selected' : ''}>${C.escapeHtml(c.name)} (${pTxt}${cFull && c.catId !== p.catId ? '・已額滿' : ''})</option>`;
+                }).join('')}
               </select>
             </div>
             <div><label class="font-bold">${isPayuniEv ? '金流單號 / 付款別 🔒' : `匯款末五碼 ${feeLocked ? '🔒' : ''}`}</label>
@@ -2266,10 +2324,19 @@
 
       const recalcLookupTotal = () => {
         if (feeLocked) return Number(p.totalAmount || 0);
-        const nc = cats.find((c) => c.catId === document.getElementById('lkCat').value);
+        const selCatId = document.getElementById('lkCat').value;
+        const nc = cats.find((c) => c.catId === selCatId);
+        const curAddonsSorted = [...(Array.isArray(curAddons) ? curAddons : [])].sort().join('|');
+        const nextAddonsSorted = $$('.lk-addon:checked').map((cb) => cb.dataset.name).sort().join('|');
+        // 選項 A：若未更換組別且未改加購，保留原報名鎖定之早鳥價！若更換組別則依修改當下時間重算
+        if (selCatId === p.catId && curAddonsSorted === nextAddonsSorted) {
+          document.getElementById('lkTotalDisplay').textContent = `本場應繳：NT$ ${Number(p.totalAmount || 0).toLocaleString()}`;
+          return Number(p.totalAmount || 0);
+        }
         const addonSum = $$('.lk-addon:checked').reduce((s, cb) => s + Number(cb.dataset.price || 0), 0);
-        const total = (nc ? Number(nc.fee) : 0) + addonSum;
-        document.getElementById('lkTotalDisplay').textContent = `本場應繳：NT$ ${total.toLocaleString()}`;
+        const pr = C.getEffectiveCategoryPrice(ev, nc);
+        const total = pr.fee + addonSum;
+        document.getElementById('lkTotalDisplay').textContent = `本場應繳：NT$ ${total.toLocaleString()}${pr.isEarlyBird ? ' (🐤 早鳥價)' : ''}`;
         return total;
       };
       if (!feeLocked) {
@@ -2314,8 +2381,18 @@
           if (!feeLocked) {
             const l5 = document.getElementById('lkLast5').value.trim();
             if (l5 && !/^\d{5}$/.test(l5)) return toast('匯款末五碼限 5 位純數字', 'error');
+            const nextCatId = document.getElementById('lkCat').value;
+            if (nextCatId !== p.catId) {
+              const targetCat = cats.find((c) => c.catId === nextCatId);
+              const tq = Number(targetCat?.quota || 0);
+              const usedTarget = State.participants.filter((x) => x.eventId === p.eventId && x.catId === nextCatId && x.participantId !== p.participantId && String(x.payStatus).toUpperCase() !== 'CANCELLED').length;
+              if (tq > 0 && usedTarget >= tq) return toast(`分組「${targetCat?.name || nextCatId}」名額已滿 (${tq} 人)，無法更換！`, 'error');
+              const nextPr = C.getEffectiveCategoryPrice(ev, targetCat);
+              const cleanedRem = String(patch.remark || '').replace(/\[早鳥價\]\s*/g, '').trim();
+              patch.remark = nextPr.isEarlyBird ? ['[早鳥價]', cleanedRem].filter(Boolean).join(' ') : cleanedRem;
+            }
             const addons = $$('.lk-addon:checked').map((cb) => cb.dataset.name);
-            patch.catId = document.getElementById('lkCat').value;
+            patch.catId = nextCatId;
             patch.addonsDetail = JSON.stringify(addons);
             patch.totalAmount = recalcLookupTotal();
             patch.remittanceLast5 = l5;
@@ -2372,10 +2449,20 @@
     $('#btnNewEvLap').onclick = () => setNewEventRaceType('lap_timed');
     $('#btnNewEvPayManual').onclick = () => setNewEventPayMode('MANUAL_ATM');
     $('#btnNewEvPayPayuni').onclick = () => setNewEventPayMode('ONLINE_PAYUNi');
+    $('#newEvEarlyBird').onchange = (e) => $('#newEvEarlyBirdFields').classList.toggle('hidden', !e.target.checked);
     $('#btnCloseNewEvent').onclick = () => $('#newEventModal').classList.add('hidden');
     $('#btnCancelNewEvent').onclick = () => $('#newEventModal').classList.add('hidden');
     $('#btnZ1NewEvent').onclick = () => {
       $('#newEvNameZh').value = '';
+      $('#newEvEarlyBird').checked = true;
+      $('#newEvEarlyBirdFields').classList.remove('hidden');
+      $('#newEvAddonChip').checked = true;
+      $('#newEvAddonChipPrice').value = '300';
+      $('#newEvAddonLodging').checked = true;
+      $('#newEvAddonLodgingPrice').value = '1500';
+      $('#newEvAddonGear').checked = true;
+      $('#newEvAddonGearPrice').value = '680';
+      $('#newEvAddonNote').checked = true;
       setNewEventRaceType('distance');
       setNewEventPayMode('MANUAL_ATM');
       $('#newEventModal').classList.remove('hidden');
@@ -2391,6 +2478,18 @@
       if (!rawStart) return toast('請設定活動起跑日期與時間', 'warn');
       const raceStartNorm = rawStart.replace('T', ' ') + (rawStart.length === 16 ? ':00' : '');
       const isLap = raceType === 'lap_timed';
+      const ebOn = Boolean($('#newEvEarlyBird')?.checked);
+      const ebEndNorm = ebOn ? C.normalizeEarlyBirdEnd($('#newEvEarlyBirdEnd')?.value || '') : '';
+      if (ebOn && !ebEndNorm) return toast('啟用早鳥優惠價時，請設定早鳥截止日期與時間', 'warn');
+      const newSchema = C.defaultFormSchema(payMode);
+      newSchema.earlyBirdEnabled = ebOn;
+      newSchema.earlyBirdEnd = ebEndNorm;
+      newSchema.addons = [
+        { code: 'chip_buy', name: '晶片採購', price: Math.max(0, Number($('#newEvAddonChipPrice')?.value || 300)), enabled: Boolean($('#newEvAddonChip')?.checked) },
+        { code: 'lodging', name: '住宿預訂價', price: Math.max(0, Number($('#newEvAddonLodgingPrice')?.value || 1500)), enabled: Boolean($('#newEvAddonLodging')?.checked) },
+        { code: 'sport_gear', name: '運動用品加購價', price: Math.max(0, Number($('#newEvAddonGearPrice')?.value || 680)), enabled: Boolean($('#newEvAddonGear')?.checked) }
+      ];
+      newSchema.customFields = $('#newEvAddonNote')?.checked ? [{ ...C.DEFAULT_ADDONS_NOTE_FIELD }] : [];
       const evId = `TUR-${Date.now().toString().slice(-6)}`;
       const lapDist = isLap ? Math.max(0.1, Number($('#newEvLapKm').value || 1.0)) : 0;
       const ev = {
@@ -2403,12 +2502,15 @@
         brochureText: isLap
           ? `【計時繞圈賽制】單圈 ${lapDist} km，於限時內通過主拱門累計有效圈數與總里程；逾限時圈次留存紀錄不計入有效里程。\n${C.DEFAULT_BROCHURE_TEMPLATE}`
           : C.DEFAULT_BROCHURE_TEMPLATE,
-        formSchemaJson: JSON.stringify(C.defaultFormSchema(payMode)), certConfigJson: JSON.stringify(C.defaultCertConfig())
+        formSchemaJson: JSON.stringify(newSchema), certConfigJson: JSON.stringify(C.defaultCertConfig())
       };
       const isW800Cat = Boolean($('#newEvCatWarrior800')?.checked);
+      const baseFee = isLap ? 2200 : 1800;
+      const rawEbFee = ebOn ? Math.max(0, Number($('#newEvEarlyBirdFee')?.value || 0)) : 0;
+      const validEbFee = (rawEbFee > 0 && rawEbFee < baseFee) ? rawEbFee : 0;
       const cat = isLap
-        ? { catId: `CAT-${evId}`, eventId: evId, name: $('#newEvLapCatName').value.trim() || '12H 繞圈組', distanceKm: lapDist, timeLimitHours: Number($('#newEvLapHrs').value || 12), fee: 2200, bibPrefix: 'L', bibStartNum: '001', quota: 300, customRaceStart: '', isWarrior800: isW800Cat }
-        : { catId: `CAT-${evId}`, eventId: evId, name: $('#newEvDistCatName').value.trim() || '50K 超馬組', distanceKm: Number($('#newEvDistKm').value || 50), timeLimitHours: Number($('#newEvDistHrs').value || 8), fee: 1800, bibPrefix: 'A', bibStartNum: '001', quota: 300, customRaceStart: '', isWarrior800: isW800Cat };
+        ? { catId: `CAT-${evId}`, eventId: evId, name: $('#newEvLapCatName').value.trim() || '12H 繞圈組', distanceKm: lapDist, timeLimitHours: Number($('#newEvLapHrs').value || 12), fee: baseFee, earlyBirdFee: validEbFee, bibPrefix: 'L', bibStartNum: '001', quota: 300, customRaceStart: '', isWarrior800: isW800Cat }
+        : { catId: `CAT-${evId}`, eventId: evId, name: $('#newEvDistCatName').value.trim() || '50K 超馬組', distanceKm: Number($('#newEvDistKm').value || 50), timeLimitHours: Number($('#newEvDistHrs').value || 8), fee: baseFee, earlyBirdFee: validEbFee, bibPrefix: 'A', bibStartNum: '001', quota: 300, customRaceStart: '', isWarrior800: isW800Cat };
       const distKm = Number(cat.distanceKm || 50);
       const sts = isLap
         ? [
@@ -2423,6 +2525,7 @@
       State.events.push(ev); State.categories.push(cat); State.stations.push(...sts);
       await C.TurDB.put('events', ev); await C.TurDB.put('categories', cat); await C.TurDB.bulkPut('stations', sts);
       await enqueueSync('saveEvent', { event: ev }); await enqueueSync('saveCategory', { category: cat });
+      for (const st of sts) await enqueueSync('saveStation', { station: st });
       State.z1EventId = evId;
       $('#newEventModal').classList.add('hidden');
       renderAll();
@@ -2541,10 +2644,12 @@
     const oldSeedIds = new Set(['TUR-20260001', 'TUR-20260002', 'TUR-20260003', 'TUR-20260004', 'TUR-20260005', 'TUR-FIN-001', 'TUR-FIN-002', 'TUR-FIN-003', 'TUR-F24-001']);
     const isUntouchedOldSeed = State.events.length > 0 && State.participants.length <= 9 && State.participants.every((p) => oldSeedIds.has(p.participantId));
     if (!State.events.length || isUntouchedOldSeed) {
-      const seed = C.buildFull5EventsSeed();
-      for (const k of Object.keys(seed)) {
-        State[k] = seed[k];
-        await C.TurDB.clearAndFill(k, seed[k]);
+      const baseSeed = C.buildFull5EventsSeed();
+      const { merged } = C.mergeTestSuiteIntoState(baseSeed);
+      const fullInit = { ...baseSeed, ...merged };
+      for (const k of Object.keys(fullInit)) {
+        State[k] = fullInit[k];
+        await C.TurDB.clearAndFill(k, fullInit[k]);
       }
     }
 

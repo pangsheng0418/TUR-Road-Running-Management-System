@@ -290,7 +290,23 @@
     { id: 'url', label: '網址連結 (url)', needsOptions: false, desc: '適合貼上成績證明網址、雲端證書連結' }
   ];
 
+  const DEFAULT_TUR_ADDONS = [
+    { code: 'chip_buy', name: '晶片採購', price: 300, enabled: true },
+    { code: 'lodging', name: '住宿預訂價', price: 1500, enabled: true },
+    { code: 'sport_gear', name: '運動用品加購價', price: 680, enabled: true }
+  ];
+
+  const DEFAULT_ADDONS_NOTE_FIELD = {
+    key: 'addons_note',
+    label: '加購項目補充說明／備註',
+    type: 'textarea',
+    required: false,
+    options: [],
+    placeholder: '請補充晶片採購、住宿預訂（房型／同住人）或運動用品（尺寸／款式）等說明，無加購可留空'
+  };
+
   const CUSTOM_FIELD_PRESETS = [
+    { ...DEFAULT_ADDONS_NOTE_FIELD },
     { key: 'shirt_size', label: '紀念衣尺寸', type: 'select', required: true, options: ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'], placeholder: '請選擇紀念衣尺寸' },
     { key: 'shuttle_wave', label: '接駁車搭乘梯次', type: 'radio', required: false, options: ['不需接駁', '04:00 台北車站東三門', '04:30 捷運新店站'], placeholder: '' },
     { key: 'past_formats', label: '曾參與賽制經驗（可複選）', type: 'checkbox', required: false, options: ['全馬 42K', '50K 超馬', '100K 八百壯士', '12H/24H 繞圈', '山徑越野'], placeholder: '' },
@@ -322,12 +338,52 @@
   function defaultFormSchema(paymentMode = 'MANUAL_ATM') {
     return {
       paymentMode: paymentMode === 'ONLINE_PAYUNi' ? 'ONLINE_PAYUNi' : 'MANUAL_ATM',
-      addons: [
-        { code: 'jacket', name: '紀念防風外套', price: 680 },
-        { code: 'laser', name: '獎牌雷射刻字', price: 150 },
-        { code: 'shuttle', name: '會場接駁專車', price: 250 }
-      ],
-      customFields: []
+      earlyBirdEnabled: true,
+      earlyBirdEnd: '2026-12-31 23:59:59', // YYYY-MM-DD HH:mm:ss（含此時間點前適用早鳥價，可隨時核取關閉或改期）
+      addons: DEFAULT_TUR_ADDONS.map((a) => ({ ...a })),
+      customFields: [{ ...DEFAULT_ADDONS_NOTE_FIELD }]
+    };
+  }
+
+  function normalizeEarlyBirdEnd(raw) {
+    const s = String(raw || '').trim().replace('T', ' ');
+    if (!s) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return `${s} 23:59:59`;
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(s)) return `${s}:59`;
+    return s;
+  }
+
+  function getEventEarlyBirdConfig(ev) {
+    const sc = parseJsonSafe(ev?.formSchemaJson, defaultFormSchema());
+    return {
+      enabled: Boolean(sc?.earlyBirdEnabled),
+      endTime: normalizeEarlyBirdEnd(sc?.earlyBirdEnd || '')
+    };
+  }
+
+  function isEarlyBirdActive(ev, nowDate = new Date()) {
+    const cfg = getEventEarlyBirdConfig(ev);
+    if (!cfg.enabled || !cfg.endTime) return false;
+    const endDt = parseDateTime(cfg.endTime);
+    if (!endDt) return false;
+    const refMs = nowDate instanceof Date ? nowDate.getTime() : Number(nowDate || Date.now());
+    return refMs <= endDt.getTime();
+  }
+
+  function getEffectiveCategoryPrice(ev, cat, nowDate = new Date()) {
+    const regularFee = Number(cat?.fee || 0);
+    const earlyBirdFee = Number(cat?.earlyBirdFee || 0);
+    const ebCfg = getEventEarlyBirdConfig(ev);
+    const active = isEarlyBirdActive(ev, nowDate);
+    const useEarlyBird = Boolean(active && earlyBirdFee > 0 && earlyBirdFee < regularFee);
+    return {
+      regularFee,
+      earlyBirdFee,
+      fee: useEarlyBird ? earlyBirdFee : regularFee,
+      isEarlyBird: useEarlyBird,
+      earlyBirdEnabled: ebCfg.enabled,
+      earlyBirdActive: active,
+      endTime: ebCfg.endTime
     };
   }
 
@@ -2237,6 +2293,8 @@
 
     const formJsonW800 = JSON.stringify({
       paymentMode: 'MANUAL_ATM',
+      earlyBirdEnabled: true,
+      earlyBirdEnd: '2026-12-31 23:59:59',
       addons: defaultFormSchema('MANUAL_ATM').addons,
       customFields: [
         { key: 'shirt_size', label: '百K 專屬紀念衣尺寸', type: 'select', required: true, options: ['XS', 'S', 'M', 'L', 'XL', '2XL'], placeholder: '請選擇尺寸' },
@@ -2301,8 +2359,8 @@
       { catId: 'CAT-100K', eventId: 'TUR-2026-50K', name: '100K 八百壯士組', distanceKm: 100, timeLimitHours: 16, fee: 2600, bibPrefix: 'U', bibStartNum: '001', quota: 200, customRaceStart: '', isWarrior800: true },
       { catId: 'CAT-12H', eventId: 'TUR-2026-12H', name: '12H 繞圈組', distanceKm: 1.0, timeLimitHours: 12, fee: 2200, bibPrefix: 'L', bibStartNum: '001', quota: 200, customRaceStart: '', isWarrior800: false },
       { catId: 'CAT-6H', eventId: 'TUR-2026-12H', name: '6H 繞圈組', distanceKm: 1.0, timeLimitHours: 6, fee: 1500, bibPrefix: 'S', bibStartNum: '001', quota: 200, customRaceStart: '', isWarrior800: false },
-      { catId: 'CAT-W800', eventId: 'TUR-2026-W800', name: '100K 八百壯士菁英組', distanceKm: 100, timeLimitHours: 15, fee: 2500, bibPrefix: 'W', bibStartNum: '001', quota: 200, customRaceStart: '', isWarrior800: true },
-      { catId: 'CAT-W50', eventId: 'TUR-2026-W800', name: '50K 南區挑戰組', distanceKm: 50, timeLimitHours: 8, fee: 1700, bibPrefix: 'G', bibStartNum: '001', quota: 100, customRaceStart: '', isWarrior800: false },
+      { catId: 'CAT-W800', eventId: 'TUR-2026-W800', name: '100K 八百壯士菁英組', distanceKm: 100, timeLimitHours: 15, fee: 2500, earlyBirdFee: 2100, bibPrefix: 'W', bibStartNum: '001', quota: 200, customRaceStart: '', isWarrior800: true },
+      { catId: 'CAT-W50', eventId: 'TUR-2026-W800', name: '50K 南區挑戰組', distanceKm: 50, timeLimitHours: 8, fee: 1700, earlyBirdFee: 1400, bibPrefix: 'G', bibStartNum: '001', quota: 100, customRaceStart: '', isWarrior800: false },
       { catId: 'CAT-E6H', eventId: 'TUR-2026-EARLY6H', name: '6H 海濱繞圈組', distanceKm: 0.8, timeLimitHours: 6, fee: 1400, bibPrefix: 'H', bibStartNum: '001', quota: 120, customRaceStart: '', isWarrior800: false },
       { catId: 'CAT-E3H', eventId: 'TUR-2026-EARLY6H', name: '3H 體驗繞圈組', distanceKm: 0.8, timeLimitHours: 3, fee: 950, bibPrefix: 'C', bibStartNum: '001', quota: 80, customRaceStart: '', isWarrior800: false },
       { catId: 'CAT-FIN100', eventId: 'TUR-2026-FIN100', name: '100K 八百壯士組', distanceKm: 100, timeLimitHours: 16, fee: 2600, bibPrefix: 'K', bibStartNum: '001', quota: 200, customRaceStart: '', isWarrior800: true },
@@ -2555,14 +2613,396 @@
     return { users, globalConfig, events, categories, stations, participants, timingLogs, historyResults };
   }
 
+  /* --------------------------------------------------------------------------
+   * 8B. 10 大全情境獨立測試資料包（TEST-* 隔離前綴，可留存測試並一鍵單獨清除不影響正式資料）
+   * -------------------------------------------------------------------------- */
+  const TEST_SUITE_PREFIX = 'TEST-';
+
+  function isTestSuiteId(val) {
+    return /^TEST-/i.test(String(val || '').trim());
+  }
+
+  function isTestSuiteRecord(storeName, rec) {
+    if (!rec || typeof rec !== 'object') return false;
+    if (storeName === 'events') return isTestSuiteId(rec.eventId);
+    if (storeName === 'categories') return isTestSuiteId(rec.catId) || isTestSuiteId(rec.eventId);
+    if (storeName === 'stations') return isTestSuiteId(rec.stationId) || isTestSuiteId(rec.eventId);
+    if (storeName === 'participants') return isTestSuiteId(rec.participantId) || isTestSuiteId(rec.eventId) || /^TURM-TEST-/i.test(String(rec.merTradeNo || ''));
+    if (storeName === 'timingLogs') return isTestSuiteId(rec.logId) || isTestSuiteId(rec.eventId);
+    if (storeName === 'historyResults') return isTestSuiteId(rec.historyId);
+    if (storeName === 'users') return /^test_/i.test(String(rec.username || '')) || isTestSuiteId(rec.allowedEventId);
+    return false;
+  }
+
+  function countTestSuiteStats(state) {
+    const stores = ['events', 'categories', 'stations', 'participants', 'timingLogs', 'historyResults', 'users'];
+    const counts = {};
+    let total = 0;
+    stores.forEach((s) => {
+      const c = (state[s] || []).filter((r) => isTestSuiteRecord(s, r)).length;
+      counts[s] = c;
+      total += c;
+    });
+    return { ...counts, total };
+  }
+
+  function buildTestSuite10Scenarios() {
+    const mkCert = (director, extra = {}) => JSON.stringify({ ...defaultCertConfig(), raceDirectorName: director, ...extra });
+    const sampleCustomBgSvg = svgUri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1131"><defs><linearGradient id="tbg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#0f172a"/><stop offset="50%" stop-color="#1e3a5f"/><stop offset="100%" stop-color="#0f766e"/></linearGradient></defs><rect width="1600" height="1131" fill="url(#tbg)"/><rect x="38" y="38" width="1524" height="1055" fill="none" stroke="#f59e0b" stroke-width="8"/><rect x="56" y="56" width="1488" height="1019" fill="none" stroke="#fde68a" stroke-width="2" stroke-opacity="0.6"/><path d="M0 900 Q400 780 800 880 T1600 820 L1600 1131 L0 1131 Z" fill="#020617" fill-opacity="0.35"/></svg>`);
+    const certWithCustomBg = mkCert('林測試總監', {
+      customBgDataUrl: sampleCustomBgSvg,
+      customBgElements: defaultCustomBgElements('landscape')
+    });
+
+    const mkSchema = (paymentMode, opts = {}) => JSON.stringify({
+      ...defaultFormSchema(paymentMode),
+      earlyBirdEnabled: opts.ebOn !== undefined ? Boolean(opts.ebOn) : true,
+      earlyBirdEnd: opts.ebEnd !== undefined ? opts.ebEnd : '2026-12-31 23:59:59',
+      customFields: [{ ...DEFAULT_ADDONS_NOTE_FIELD }, ...(opts.cf || [])]
+    });
+
+    const users = [
+      { username: 'test_org_a', passwordHash: 'test1234', displayName: '🧪 測試承辦人 A（北區）', role: 'organizer', parentOrganizer: '', allowedEventId: 'ALL', allowedStation: 'ALL', enabled: 1 },
+      { username: 'test_org_b', passwordHash: 'test1234', displayName: '🧪 測試承辦人 B（南區獨立收款）', role: 'organizer', parentOrganizer: '', allowedEventId: 'ALL', allowedStation: 'ALL', enabled: 1 },
+      { username: 'test_op_writer', passwordHash: '1234', displayName: '🧪 測試晶片寫卡員', role: 'operator', parentOrganizer: 'test_org_a', allowedEventId: 'TEST-S07-CHIP', allowedStation: 'WRITER', enabled: 1 },
+      { username: 'test_op_cp1', passwordHash: '1234', displayName: '🧪 測試 CP1 站長', role: 'operator', parentOrganizer: 'test_org_a', allowedEventId: 'TEST-S07-CHIP', allowedStation: 'CP1', enabled: 1 },
+      { username: 'test_op_lap', passwordHash: '1234', displayName: '🧪 測試繞圈主拱門', role: 'operator', parentOrganizer: 'test_org_a', allowedEventId: 'TEST-S08-LAPRUN', allowedStation: 'LAP', enabled: 1 },
+      { username: 'test_op_finish', passwordHash: '1234', displayName: '🧪 測試終點衝線站', role: 'operator', parentOrganizer: 'test_org_b', allowedEventId: 'TEST-S09-NOCHIP', allowedStation: 'FINISH', enabled: 1 }
+    ];
+
+    const events = [
+      {
+        eventId: 'TEST-S01-EBOPEN', ownerUsername: 'test_org_a',
+        nameZh: '【測試01】早鳥開放中＋自訂欄位超馬賽', nameEn: 'TEST01 Early Bird Open Ultra',
+        organizerZh: 'TUR 測試A協會', organizerEn: 'TUR Test A', location: '新北市坪林區',
+        raceType: 'distance', lapDistanceKm: 0, debounceSeconds: 15, status: 'open',
+        regStart: '2026-11-01 00:00:00', regEnd: '2026-12-31 23:59:59', raceStart: '2027-01-17 05:00:00',
+        maxQuota: 300, bannerUrl: 'dyn-road',
+        brochureText: '【測試情境 01】驗證早鳥價進行中、自訂擴充欄位、加購與各繳費狀態（未繳／已繳／取消）。\n' + DEFAULT_BROCHURE_TEMPLATE,
+        formSchemaJson: mkSchema('MANUAL_ATM', {
+          ebOn: true, ebEnd: '2026-12-31 23:59:59',
+          cf: [
+            { key: 'shirt_size', label: '紀念衣尺寸', type: 'select', required: true, options: ['S', 'M', 'L', 'XL', '2XL'], placeholder: '請選尺寸' },
+            { key: 'shuttle_wave', label: '接駁車梯次', type: 'radio', required: false, options: ['自行前往', '04:00 台北車站'], placeholder: '' }
+          ]
+        }),
+        certConfigJson: mkCert('林測試總監')
+      },
+      {
+        eventId: 'TEST-S02-EBEXP', ownerUsername: 'test_org_a',
+        nameZh: '【測試02】早鳥已截止切一般價＋額滿防呆賽', nameEn: 'TEST02 Early Bird Expired Quota Guard',
+        organizerZh: 'TUR 測試A協會', organizerEn: 'TUR Test A', location: '台北市大佳河濱',
+        raceType: 'distance', lapDistanceKm: 0, debounceSeconds: 15, status: 'open',
+        regStart: '2026-11-02 00:00:00', regEnd: '2026-12-31 23:59:59', raceStart: '2027-01-24 06:00:00',
+        maxQuota: 50, bannerUrl: 'dyn-trail',
+        brochureText: '【測試情境 02】早鳥截止設為過去驗證自動切回一般價；50K 組設限額 2 人且已滿額，測試額滿防呆攔截，21K 仍可報名。',
+        formSchemaJson: mkSchema('MANUAL_ATM', { ebOn: true, ebEnd: '2026-01-01 23:59:59' }),
+        certConfigJson: mkCert('林測試總監')
+      },
+      {
+        eventId: 'TEST-S03-UNIA', ownerUsername: 'test_org_a',
+        nameZh: '【測試03】同承辦人統報 A 場・山徑挑戰賽', nameEn: 'TEST03 Unified Reg A Trail',
+        organizerZh: 'TUR 測試A協會', organizerEn: 'TUR Test A', location: '陽明山冷水坑',
+        raceType: 'distance', lapDistanceKm: 0, debounceSeconds: 15, status: 'open',
+        regStart: '2026-11-03 00:00:00', regEnd: '2026-12-31 23:59:59', raceStart: '2027-02-07 05:30:00',
+        maxQuota: 200, bannerUrl: 'dyn-coast',
+        brochureText: '【測試情境 03】與【測試04】同屬承辦人 test_org_a 且同為轉帳，內含跨場統報合併單 TURM-TEST-001（待對帳）與 TURM-TEST-002（已入帳）。',
+        formSchemaJson: mkSchema('MANUAL_ATM', { ebOn: false }),
+        certConfigJson: mkCert('林測試總監')
+      },
+      {
+        eventId: 'TEST-S04-UNIB', ownerUsername: 'test_org_a',
+        nameZh: '【測試04】同承辦人統報 B 場・早鳥繞圈賽', nameEn: 'TEST04 Unified Reg B Lap EarlyBird',
+        organizerZh: 'TUR 測試A協會', organizerEn: 'TUR Test A', location: '板橋第一運動場',
+        raceType: 'lap_timed', lapDistanceKm: 1.0, debounceSeconds: 15, status: 'open',
+        regStart: '2026-11-04 00:00:00', regEnd: '2026-12-31 23:59:59', raceStart: '2027-02-21 06:00:00',
+        maxQuota: 200, bannerUrl: 'dyn-track',
+        brochureText: '【測試情境 04】與【測試03】同承辦人且享早鳥價，可於多場統報勾選兩場一次結帳並於專區 1 合併整單入帳。',
+        formSchemaJson: mkSchema('MANUAL_ATM', { ebOn: true, ebEnd: '2026-12-31 23:59:59' }),
+        certConfigJson: mkCert('林測試總監')
+      },
+      {
+        eventId: 'TEST-S05-ORGB', ownerUsername: 'test_org_b',
+        nameZh: '【測試05】承辦人 B 獨立收款＋團報含取消防呆', nameEn: 'TEST05 Organizer B Isolated Group',
+        organizerZh: '南區測試B聯盟', organizerEn: 'South Test B', location: '高雄市澄清湖',
+        raceType: 'distance', lapDistanceKm: 0, debounceSeconds: 15, status: 'open',
+        regStart: '2026-11-05 00:00:00', regEnd: '2026-12-31 23:59:59', raceStart: '2027-03-07 05:00:00',
+        maxQuota: 200, bannerUrl: 'dyn-warrior',
+        brochureText: '【測試情境 05】由承辦人 test_org_b 獨立承辦，驗證統報跨承辦人自動隔離，並內含團報 GRP26-T01（2待繳＋1已取消）驗證整團入帳不復活取消者。',
+        formSchemaJson: mkSchema('MANUAL_ATM', { ebOn: false }),
+        certConfigJson: mkCert('陳南區總監')
+      },
+      {
+        eventId: 'TEST-S06-PAYUNI', ownerUsername: 'test_org_a',
+        nameZh: '【測試06】PAYUNi 統一金流秒級配號賽', nameEn: 'TEST06 PAYUNi Auto Checkout',
+        organizerZh: 'TUR 測試A協會', organizerEn: 'TUR Test A', location: '桃園石門水庫',
+        raceType: 'distance', lapDistanceKm: 0, debounceSeconds: 15, status: 'open',
+        regStart: '2026-11-06 00:00:00', regEnd: '2026-12-31 23:59:59', raceStart: '2027-03-14 05:30:00',
+        maxQuota: 200, bannerUrl: 'banner-2',
+        brochureText: '【測試情境 06】採 PAYUNi 線上金流管制，送出即自動轉 PAID 與秒級配號，且禁止與轉帳活動混單統報。',
+        formSchemaJson: mkSchema('ONLINE_PAYUNi', { ebOn: true, ebEnd: '2026-12-31 23:59:59' }),
+        certConfigJson: mkCert('林測試總監')
+      },
+      {
+        eventId: 'TEST-S07-CHIP', ownerUsername: 'test_org_a',
+        nameZh: '【測試07】賽前晶片寫卡・檢錄報到整備場', nameEn: 'TEST07 PreRace Chip Checkin Prep',
+        organizerZh: 'TUR 測試A協會', organizerEn: 'TUR Test A', location: '宜蘭冬山河親水公園',
+        raceType: 'distance', lapDistanceKm: 0, debounceSeconds: 15, status: 'closed',
+        regStart: '2026-09-01 00:00:00', regEnd: '2026-11-20 23:59:59', raceStart: '2026-12-12 05:00:00',
+        maxQuota: 150, bannerUrl: 'banner-5',
+        brochureText: '【測試情境 07】報名已截止（驗證 /lookup 鎖定費用但可改聯絡資料），專供測試晶片寫入、讀取查看、報到檢錄與鳴槍開跑。',
+        formSchemaJson: mkSchema('MANUAL_ATM', { ebOn: false }),
+        certConfigJson: mkCert('林測試總監')
+      },
+      {
+        eventId: 'TEST-S08-LAPRUN', ownerUsername: 'test_org_a',
+        nameZh: '【測試08】12H 計時繞圈賽進行中（晶片刷圈）', nameEn: 'TEST08 Live 12H Lap Timed Race',
+        organizerZh: 'TUR 測試A協會', organizerEn: 'TUR Test A', location: '台北田徑場暖身區',
+        raceType: 'lap_timed', lapDistanceKm: 1.0, debounceSeconds: 15, status: 'closed',
+        regStart: '2026-09-10 00:00:00', regEnd: '2026-11-15 23:59:59', raceStart: '2026-11-27 05:00:00',
+        maxQuota: 120, bannerUrl: 'dyn-night',
+        brochureText: '【測試情境 08】繞圈限時賽已鳴槍進行中，內含多圈有效感應、手動補圈與 1 筆逾限時超時無效圈，可立即測試 LAP 刷圈與排行榜。',
+        formSchemaJson: mkSchema('ONLINE_PAYUNi', { ebOn: false }),
+        certConfigJson: mkCert('林測試總監')
+      },
+      {
+        eventId: 'TEST-S09-NOCHIP', ownerUsername: 'test_org_b',
+        nameZh: '【測試09】外部已繳名單匯入＆無晶片手動計時場', nameEn: 'TEST09 External Roster & Manual Timing',
+        organizerZh: '南區測試B聯盟', organizerEn: 'South Test B', location: '台南安平海濱',
+        raceType: 'distance', lapDistanceKm: 0, debounceSeconds: 15, status: 'closed',
+        regStart: '2026-09-15 00:00:00', regEnd: '2026-11-18 23:59:59', raceStart: '2026-11-27 06:00:00',
+        maxQuota: 150, bannerUrl: 'banner-4',
+        brochureText: '【測試情境 09】涵蓋外部已繳名單 (EXTERNAL_IMPORT)、手動補登成績與匯出已完成報名繳費名單 (PAID Excel/CSV) 功能。',
+        formSchemaJson: mkSchema('MANUAL_ATM', { ebOn: false }),
+        certConfigJson: mkCert('陳南區總監')
+      },
+      {
+        eventId: 'TEST-S10-CLOSED', ownerUsername: 'test_org_a',
+        nameZh: '【測試10】已結案封存・八百壯士＋自訂底圖證書', nameEn: 'TEST10 Closed 800 Warriors Custom Cert',
+        organizerZh: 'TUR 測試A協會', organizerEn: 'TUR Test A', location: '花蓮太魯閣峽谷',
+        raceType: 'distance', lapDistanceKm: 0, debounceSeconds: 15, status: 'finished',
+        regStart: '2026-01-10 00:00:00', regEnd: '2026-03-20 23:59:59', raceStart: '2026-04-12 05:00:00',
+        maxQuota: 200, bannerUrl: 'banner-6',
+        brochureText: '【測試情境 10】已通過 5 階段結案封存於專區 2，含 4 位完賽（2 位八百壯士 100K）、1 DNF、1 DNS，並預設套用官方自訂底圖與 10 圖層排版。',
+        formSchemaJson: mkSchema('MANUAL_ATM', { ebOn: false }),
+        certConfigJson: certWithCustomBg
+      }
+    ];
+
+    const categories = [
+      { catId: 'TEST-CAT-01A', eventId: 'TEST-S01-EBOPEN', name: '100K 八百壯士組', distanceKm: 100, timeLimitHours: 16, fee: 2600, earlyBirdFee: 2200, bibPrefix: 'W', bibStartNum: '001', quota: 150, customRaceStart: '', isWarrior800: true },
+      { catId: 'TEST-CAT-01B', eventId: 'TEST-S01-EBOPEN', name: '50K 早鳥挑戰組', distanceKm: 50, timeLimitHours: 8, fee: 1800, earlyBirdFee: 1400, bibPrefix: 'A', bibStartNum: '001', quota: 150, customRaceStart: '', isWarrior800: false },
+      { catId: 'TEST-CAT-02A', eventId: 'TEST-S02-EBEXP', name: '50K 限量滿額組', distanceKm: 50, timeLimitHours: 8, fee: 1800, earlyBirdFee: 1400, bibPrefix: 'M', bibStartNum: '001', quota: 2, customRaceStart: '', isWarrior800: false },
+      { catId: 'TEST-CAT-02B', eventId: 'TEST-S02-EBEXP', name: '21K 一般開放組', distanceKm: 21.1, timeLimitHours: 4, fee: 1200, earlyBirdFee: 950, bibPrefix: 'N', bibStartNum: '001', quota: 40, customRaceStart: '', isWarrior800: false },
+      { catId: 'TEST-CAT-03A', eventId: 'TEST-S03-UNIA', name: '50K 山徑統報組', distanceKm: 50, timeLimitHours: 9, fee: 1900, earlyBirdFee: 0, bibPrefix: 'U', bibStartNum: '001', quota: 100, customRaceStart: '', isWarrior800: false },
+      { catId: 'TEST-CAT-03B', eventId: 'TEST-S03-UNIA', name: '30K 體驗統報組', distanceKm: 30, timeLimitHours: 6, fee: 1300, earlyBirdFee: 0, bibPrefix: 'V', bibStartNum: '001', quota: 100, customRaceStart: '', isWarrior800: false },
+      { catId: 'TEST-CAT-04A', eventId: 'TEST-S04-UNIB', name: '6H 繞圈早鳥組', distanceKm: 1.0, timeLimitHours: 6, fee: 1600, earlyBirdFee: 1250, bibPrefix: 'R', bibStartNum: '001', quota: 100, customRaceStart: '', isWarrior800: false },
+      { catId: 'TEST-CAT-04B', eventId: 'TEST-S04-UNIB', name: '12H 繞圈早鳥組', distanceKm: 1.0, timeLimitHours: 12, fee: 2200, earlyBirdFee: 1850, bibPrefix: 'Q', bibStartNum: '001', quota: 100, customRaceStart: '', isWarrior800: false },
+      { catId: 'TEST-CAT-05A', eventId: 'TEST-S05-ORGB', name: '50K 南區挑戰組', distanceKm: 50, timeLimitHours: 8, fee: 1700, earlyBirdFee: 0, bibPrefix: 'S', bibStartNum: '001', quota: 120, customRaceStart: '', isWarrior800: false },
+      { catId: 'TEST-CAT-05B', eventId: 'TEST-S05-ORGB', name: '100K 南區壯士組', distanceKm: 100, timeLimitHours: 16, fee: 2500, earlyBirdFee: 0, bibPrefix: 'K', bibStartNum: '001', quota: 80, customRaceStart: '', isWarrior800: true },
+      { catId: 'TEST-CAT-06A', eventId: 'TEST-S06-PAYUNI', name: '50K 金流極速組', distanceKm: 50, timeLimitHours: 8, fee: 1800, earlyBirdFee: 1500, bibPrefix: 'P', bibStartNum: '001', quota: 120, customRaceStart: '', isWarrior800: false },
+      { catId: 'TEST-CAT-06B', eventId: 'TEST-S06-PAYUNI', name: '25K 金流體驗組', distanceKm: 25, timeLimitHours: 5, fee: 1100, earlyBirdFee: 900, bibPrefix: 'J', bibStartNum: '001', quota: 80, customRaceStart: '', isWarrior800: false },
+      { catId: 'TEST-CAT-07A', eventId: 'TEST-S07-CHIP', name: '50K 晶片測試組', distanceKm: 50, timeLimitHours: 8, fee: 1800, earlyBirdFee: 0, bibPrefix: 'C', bibStartNum: '001', quota: 150, customRaceStart: '', isWarrior800: false },
+      { catId: 'TEST-CAT-08A', eventId: 'TEST-S08-LAPRUN', name: '12H 繞圈組', distanceKm: 1.0, timeLimitHours: 12, fee: 2200, earlyBirdFee: 0, bibPrefix: 'L', bibStartNum: '001', quota: 60, customRaceStart: '', isWarrior800: false },
+      { catId: 'TEST-CAT-08B', eventId: 'TEST-S08-LAPRUN', name: '6H 繞圈組', distanceKm: 1.0, timeLimitHours: 6, fee: 1500, earlyBirdFee: 0, bibPrefix: 'H', bibStartNum: '001', quota: 60, customRaceStart: '', isWarrior800: false },
+      { catId: 'TEST-CAT-09A', eventId: 'TEST-S09-NOCHIP', name: '42K 外部匯入組', distanceKm: 42.2, timeLimitHours: 7, fee: 1600, earlyBirdFee: 0, bibPrefix: 'E', bibStartNum: '001', quota: 150, customRaceStart: '', isWarrior800: false },
+      { catId: 'TEST-CAT-10A', eventId: 'TEST-S10-CLOSED', name: '100K 八百壯士結案組', distanceKm: 100, timeLimitHours: 16, fee: 2600, earlyBirdFee: 0, bibPrefix: 'Z', bibStartNum: '001', quota: 100, customRaceStart: '', isWarrior800: true },
+      { catId: 'TEST-CAT-10B', eventId: 'TEST-S10-CLOSED', name: '50K 峽谷結案組', distanceKm: 50, timeLimitHours: 8, fee: 1800, earlyBirdFee: 0, bibPrefix: 'Y', bibStartNum: '001', quota: 100, customRaceStart: '', isWarrior800: false }
+    ];
+
+    const stations = [
+      { stationId: 'TEST-ST-01-0', eventId: 'TEST-S01-EBOPEN', stationCode: 'CHECKIN', name: '起點報到檢錄', distanceKm: 0, stationType: 'checkin', orderIndex: 0 },
+      { stationId: 'TEST-ST-01-1', eventId: 'TEST-S01-EBOPEN', stationCode: 'CP1', name: 'CP1 茶鄉折返', distanceKm: 50, stationType: 'checkpoint', orderIndex: 1 },
+      { stationId: 'TEST-ST-01-2', eventId: 'TEST-S01-EBOPEN', stationCode: 'FINISH', name: '終點拱門', distanceKm: 100, stationType: 'finish', orderIndex: 2 },
+      { stationId: 'TEST-ST-02-0', eventId: 'TEST-S02-EBEXP', stationCode: 'CHECKIN', name: '起點報到', distanceKm: 0, stationType: 'checkin', orderIndex: 0 },
+      { stationId: 'TEST-ST-02-1', eventId: 'TEST-S02-EBEXP', stationCode: 'FINISH', name: '終點拱門', distanceKm: 50, stationType: 'finish', orderIndex: 1 },
+      { stationId: 'TEST-ST-03-0', eventId: 'TEST-S03-UNIA', stationCode: 'CHECKIN', name: '起點報到', distanceKm: 0, stationType: 'checkin', orderIndex: 0 },
+      { stationId: 'TEST-ST-03-1', eventId: 'TEST-S03-UNIA', stationCode: 'CP1', name: 'CP1 擎天崗', distanceKm: 25, stationType: 'checkpoint', orderIndex: 1 },
+      { stationId: 'TEST-ST-03-2', eventId: 'TEST-S03-UNIA', stationCode: 'FINISH', name: '終點拱門', distanceKm: 50, stationType: 'finish', orderIndex: 2 },
+      { stationId: 'TEST-ST-04-0', eventId: 'TEST-S04-UNIB', stationCode: 'CHECKIN', name: '起點報到', distanceKm: 0, stationType: 'checkin', orderIndex: 0 },
+      { stationId: 'TEST-ST-04-1', eventId: 'TEST-S04-UNIB', stationCode: 'LAP', name: '繞圈主拱門', distanceKm: 1.0, stationType: 'lap', orderIndex: 1 },
+      { stationId: 'TEST-ST-05-0', eventId: 'TEST-S05-ORGB', stationCode: 'CHECKIN', name: '起點報到', distanceKm: 0, stationType: 'checkin', orderIndex: 0 },
+      { stationId: 'TEST-ST-05-1', eventId: 'TEST-S05-ORGB', stationCode: 'CP1', name: 'CP1 湖濱站', distanceKm: 50, stationType: 'checkpoint', orderIndex: 1 },
+      { stationId: 'TEST-ST-05-2', eventId: 'TEST-S05-ORGB', stationCode: 'FINISH', name: '終點拱門', distanceKm: 100, stationType: 'finish', orderIndex: 2 },
+      { stationId: 'TEST-ST-06-0', eventId: 'TEST-S06-PAYUNI', stationCode: 'CHECKIN', name: '起點報到', distanceKm: 0, stationType: 'checkin', orderIndex: 0 },
+      { stationId: 'TEST-ST-06-1', eventId: 'TEST-S06-PAYUNI', stationCode: 'FINISH', name: '終點拱門', distanceKm: 50, stationType: 'finish', orderIndex: 1 },
+      { stationId: 'TEST-ST-07-0', eventId: 'TEST-S07-CHIP', stationCode: 'CHECKIN', name: '起點晶片檢錄', distanceKm: 0, stationType: 'checkin', orderIndex: 0 },
+      { stationId: 'TEST-ST-07-1', eventId: 'TEST-S07-CHIP', stationCode: 'CP1', name: 'CP1 河岸折返', distanceKm: 25, stationType: 'checkpoint', orderIndex: 1 },
+      { stationId: 'TEST-ST-07-2', eventId: 'TEST-S07-CHIP', stationCode: 'FINISH', name: '終點拱門', distanceKm: 50, stationType: 'finish', orderIndex: 2 },
+      { stationId: 'TEST-ST-08-0', eventId: 'TEST-S08-LAPRUN', stationCode: 'CHECKIN', name: '起點報到', distanceKm: 0, stationType: 'checkin', orderIndex: 0 },
+      { stationId: 'TEST-ST-08-1', eventId: 'TEST-S08-LAPRUN', stationCode: 'LAP', name: '主會場繞圈計時門', distanceKm: 1.0, stationType: 'lap', orderIndex: 1 },
+      { stationId: 'TEST-ST-09-0', eventId: 'TEST-S09-NOCHIP', stationCode: 'CHECKIN', name: '人工檢錄桌', distanceKm: 0, stationType: 'checkin', orderIndex: 0 },
+      { stationId: 'TEST-ST-09-1', eventId: 'TEST-S09-NOCHIP', stationCode: 'CP1', name: 'CP1 手動檢查站', distanceKm: 21, stationType: 'checkpoint', orderIndex: 1 },
+      { stationId: 'TEST-ST-09-2', eventId: 'TEST-S09-NOCHIP', stationCode: 'FINISH', name: '人工終點線', distanceKm: 42.2, stationType: 'finish', orderIndex: 2 },
+      { stationId: 'TEST-ST-10-0', eventId: 'TEST-S10-CLOSED', stationCode: 'CHECKIN', name: '報到檢錄', distanceKm: 0, stationType: 'checkin', orderIndex: 0 },
+      { stationId: 'TEST-ST-10-1', eventId: 'TEST-S10-CLOSED', stationCode: 'CP1', name: 'CP1 長春祠', distanceKm: 35, stationType: 'checkpoint', orderIndex: 1 },
+      { stationId: 'TEST-ST-10-2', eventId: 'TEST-S10-CLOSED', stationCode: 'CP2', name: 'CP2 天祥折返', distanceKm: 70, stationType: 'checkpoint', orderIndex: 2 },
+      { stationId: 'TEST-ST-10-3', eventId: 'TEST-S10-CLOSED', stationCode: 'FINISH', name: '太魯閣終點拱門', distanceKm: 100, stationType: 'finish', orderIndex: 3 }
+    ];
+
+    const mkTP = (o) => {
+      const sp = splitFullName(o.name);
+      return {
+        participantId: o.pid, eventId: o.ev, catId: o.cat, bibNumber: o.bib || '',
+        groupCode: o.gc || '', groupName: o.gn || '',
+        name: o.name, lastName: sp.lastName, firstName: sp.firstName,
+        idCard: o.id, gender: o.g || 'M', birthday: o.dob || '1989-05-15', age: calcAge(o.dob || '1989-05-15') || 37,
+        nationality: o.nat || 'TWN', phone: o.ph || '0912000111', email: o.em || 'test@tur.tw',
+        city: o.city || '台北市', emergencyName: o.eName || '測試家屬', emergencyPhone: o.ePh || '0988000222',
+        diet: o.diet || '葷', remark: o.rem || '', totalAmount: Number(o.amt ?? 1800), addonsDetail: o.addons || '[]',
+        customFieldsJson: o.cf ? JSON.stringify(o.cf) : '{}',
+        payMethod: o.pm || 'MANUAL_ATM', remittanceLast5: o.l5 || '', merTradeNo: o.mtn || '',
+        payStatus: o.ps || 'PAID', paymentType: o.pt || (o.pm === 'ONLINE_PAYUNi' ? 'CREDIT' : 'MANUAL'),
+        tradeNo: o.tn || '', payInfo: o.pi || '', paidAt: o.ps === 'PAID' ? (o.paidAt || '2026-11-10 10:00:00') : '',
+        chipUid: o.uid || '', checkinStatus: o.chk || 'pending', raceStatus: o.rs || 'dns',
+        penaltySeconds: o.pen || 0, createdAt: o.ca || '2026-11-05 09:00:00'
+      };
+    };
+
+    const participants = [
+      // 情境 01：早鳥開放中（UNPAID 未填末五碼 / UNPAID 已報末五碼 / PAID 鎖早鳥 / CANCELLED）
+      mkTP({ pid: 'TEST-P-0101', ev: 'TEST-S01-EBOPEN', cat: 'TEST-CAT-01A', bib: 'W001', name: '測試早鳥一', id: 'A123456789', g: 'M', amt: 3180, addons: '["晶片採購","運動用品加購價"]', l5: '11223', ps: 'PAID', rem: '[早鳥價] 100K 早鳥含晶片與用品', cf: { addons_note: '運動用品請給 L 號深藍', shirt_size: 'L', shuttle_wave: '04:00 台北車站' } }),
+      mkTP({ pid: 'TEST-P-0102', ev: 'TEST-S01-EBOPEN', cat: 'TEST-CAT-01B', bib: '', name: '測試待對帳', id: 'F223456786', g: 'F', amt: 1400, l5: '44556', ps: 'UNPAID', rem: '[早鳥價] 已匯款待核對', cf: { addons_note: '', shirt_size: 'M', shuttle_wave: '自行前往' } }),
+      mkTP({ pid: 'TEST-P-0103', ev: 'TEST-S01-EBOPEN', cat: 'TEST-CAT-01B', bib: '', name: '測試未填碼', id: 'B120123453', g: 'M', amt: 2900, addons: '["住宿預訂價"]', l5: '', ps: 'UNPAID', rem: '[早鳥價] 尚未回報末五碼', cf: { addons_note: '雙人房一大床，與家人同住', shirt_size: 'XL', shuttle_wave: '自行前往' } }),
+      mkTP({ pid: 'TEST-P-0104', ev: 'TEST-S01-EBOPEN', cat: 'TEST-CAT-01A', bib: '', name: '測試已取消', id: 'A223456781', g: 'F', amt: 2200, ps: 'CANCELLED', rem: '[早鳥價] 取消報名不佔名額' }),
+
+      // 情境 02：早鳥已截止＋50K 限量滿額 (2/2 滿額，1位早鳥鎖價 / 1位截止後一般價)
+      mkTP({ pid: 'TEST-P-0201', ev: 'TEST-S02-EBEXP', cat: 'TEST-CAT-02A', bib: 'M001', name: '早鳥期鎖價者', id: 'A123456789', g: 'M', amt: 1400, l5: '20001', ps: 'PAID', rem: '[早鳥價] 截止前報名維持早鳥價' }),
+      mkTP({ pid: 'TEST-P-0202', ev: 'TEST-S02-EBEXP', cat: 'TEST-CAT-02A', bib: '', name: '截止後一般價', id: 'F223456786', g: 'F', amt: 1800, l5: '20002', ps: 'UNPAID', rem: '早鳥截止後依一般價收費（本組已滿2/2）' }),
+      mkTP({ pid: 'TEST-P-0203', ev: 'TEST-S02-EBEXP', cat: 'TEST-CAT-02B', bib: 'N001', name: '半馬測試者', id: 'E121234565', g: 'M', amt: 1200, l5: '20003', ps: 'PAID' }),
+
+      // 情境 03 & 04：同承辦人多場統報合併單 TURM-TEST-001 (待對帳) & TURM-TEST-002 (已整單入帳)
+      mkTP({ pid: 'TEST-P-0301', ev: 'TEST-S03-UNIA', cat: 'TEST-CAT-03A', bib: '', name: '統報待核對', id: 'A123456789', g: 'M', em: 'bundle1@tur.tw', amt: 1900, l5: '55678', mtn: 'TURM-TEST-001', ps: 'UNPAID', rem: '[合併單 TURM-TEST-001｜共2場 總額NT$3150]' }),
+      mkTP({ pid: 'TEST-P-0401', ev: 'TEST-S04-UNIB', cat: 'TEST-CAT-04A', bib: '', name: '統報待核對', id: 'A123456789', g: 'M', em: 'bundle1@tur.tw', amt: 1250, l5: '55678', mtn: 'TURM-TEST-001', ps: 'UNPAID', rem: '[合併單 TURM-TEST-001｜共2場 總額NT$3150] [早鳥價]' }),
+      mkTP({ pid: 'TEST-P-0302', ev: 'TEST-S03-UNIA', cat: 'TEST-CAT-03B', bib: 'V001', name: '統報已入帳', id: 'F223456786', g: 'F', em: 'bundle2@tur.tw', amt: 1300, l5: '66789', mtn: 'TURM-TEST-002', ps: 'PAID', rem: '[合併單 TURM-TEST-002｜共2場 總額NT$3150]' }),
+      mkTP({ pid: 'TEST-P-0402', ev: 'TEST-S04-UNIB', cat: 'TEST-CAT-04B', bib: 'Q001', name: '統報已入帳', id: 'F223456786', g: 'F', em: 'bundle2@tur.tw', amt: 1850, l5: '66789', mtn: 'TURM-TEST-002', ps: 'PAID', rem: '[合併單 TURM-TEST-002｜共2場 總額NT$3150] [早鳥價]' }),
+
+      // 情境 05：承辦人 B 獨立收款＋團報 GRP26-T01（2待繳＋1已取消，測試整團入帳防誤復活）
+      mkTP({ pid: 'TEST-P-0501', ev: 'TEST-S05-ORGB', cat: 'TEST-CAT-05A', bib: '', gc: 'GRP26-T01', gn: '南區測試跑團', name: '團員甲待繳', id: 'E121234565', g: 'M', amt: 1700, l5: '77001', ps: 'UNPAID' }),
+      mkTP({ pid: 'TEST-P-0502', ev: 'TEST-S05-ORGB', cat: 'TEST-CAT-05A', bib: '', gc: 'GRP26-T01', gn: '南區測試跑團', name: '團員乙待繳', id: 'B120123453', g: 'M', amt: 1700, l5: '77001', ps: 'UNPAID' }),
+      mkTP({ pid: 'TEST-P-0503', ev: 'TEST-S05-ORGB', cat: 'TEST-CAT-05A', bib: '', gc: 'GRP26-T01', gn: '南區測試跑團', name: '團員丙已取消', id: 'A223456781', g: 'F', amt: 1700, ps: 'CANCELLED', rem: '測試整團入帳不可復活此筆' }),
+      mkTP({ pid: 'TEST-P-0504', ev: 'TEST-S05-ORGB', cat: 'TEST-CAT-05B', bib: 'K001', name: '南區壯士已繳', id: 'A123456789', g: 'M', amt: 2500, l5: '77009', ps: 'PAID' }),
+
+      // 情境 06：PAYUNi 統一金流秒級配號
+      mkTP({ pid: 'TEST-P-0601', ev: 'TEST-S06-PAYUNI', cat: 'TEST-CAT-06A', bib: 'P001', name: '金流秒配一', id: 'A123456789', g: 'M', amt: 1500, pm: 'ONLINE_PAYUNi', mtn: 'PU2026110601', tn: 'TR88001101', ps: 'PAID', rem: '[早鳥價]' }),
+      mkTP({ pid: 'TEST-P-0602', ev: 'TEST-S06-PAYUNI', cat: 'TEST-CAT-06A', bib: 'P002', name: '金流秒配二', id: 'F223456786', g: 'F', amt: 1500, pm: 'ONLINE_PAYUNi', mtn: 'PU2026110602', tn: 'TR88001102', ps: 'PAID', rem: '[早鳥價]' }),
+      mkTP({ pid: 'TEST-P-0603', ev: 'TEST-S06-PAYUNI', cat: 'TEST-CAT-06B', bib: 'J001', name: '金流體驗三', id: 'E121234565', g: 'M', amt: 900, pm: 'ONLINE_PAYUNi', mtn: 'PU2026110603', tn: 'TR88001103', ps: 'PAID', rem: '[早鳥價]' }),
+
+      // 情境 07：賽前晶片寫卡・讀取・報到檢錄整備
+      mkTP({ pid: 'TEST-P-0701', ev: 'TEST-S07-CHIP', cat: 'TEST-CAT-07A', bib: 'C001', name: '晶片完成一', id: 'A123456789', g: 'M', amt: 1800, ps: 'PAID', uid: '04:TE:57:01:01', chk: 'checked_in', rs: 'dns' }),
+      mkTP({ pid: 'TEST-P-0702', ev: 'TEST-S07-CHIP', cat: 'TEST-CAT-07A', bib: 'C002', name: '晶片完成二', id: 'F223456786', g: 'F', amt: 1800, ps: 'PAID', uid: '04:TE:57:01:02', chk: 'checked_in', rs: 'dns' }),
+      mkTP({ pid: 'TEST-P-0703', ev: 'TEST-S07-CHIP', cat: 'TEST-CAT-07A', bib: 'C003', name: '綁卡未報到', id: 'E121234565', g: 'M', amt: 1800, ps: 'PAID', uid: '04:TE:57:01:03', chk: 'pending', rs: 'dns' }),
+      mkTP({ pid: 'TEST-P-0704', ev: 'TEST-S07-CHIP', cat: 'TEST-CAT-07A', bib: 'C004', name: '待寫卡選手', id: 'B120123453', g: 'M', amt: 1800, ps: 'PAID', uid: '', chk: 'pending', rs: 'dns' }),
+      mkTP({ pid: 'TEST-P-0705', ev: 'TEST-S07-CHIP', cat: 'TEST-CAT-07A', bib: '', name: '逾期未繳費', id: 'A223456781', g: 'F', amt: 1800, ps: 'UNPAID', uid: '', chk: 'pending', rs: 'dns', rem: '測試鎖定費用仍可改手機' }),
+
+      // 情境 08：12H/6H 計時繞圈賽進行中（晶片刷圈＋手動補圈＋超時無效圈）
+      mkTP({ pid: 'TEST-P-0801', ev: 'TEST-S08-LAPRUN', cat: 'TEST-CAT-08A', bib: 'L001', name: '繞圈領先者', id: 'A123456789', g: 'M', amt: 2200, pm: 'ONLINE_PAYUNi', ps: 'PAID', uid: '04:TE:58:01:01', chk: 'checked_in', rs: 'on_track' }),
+      mkTP({ pid: 'TEST-P-0802', ev: 'TEST-S08-LAPRUN', cat: 'TEST-CAT-08A', bib: 'L002', name: '繞圈追趕者', id: 'F223456786', g: 'F', amt: 2200, pm: 'ONLINE_PAYUNi', ps: 'PAID', uid: '04:TE:58:01:02', chk: 'checked_in', rs: 'on_track' }),
+      mkTP({ pid: 'TEST-P-0803', ev: 'TEST-S08-LAPRUN', cat: 'TEST-CAT-08B', bib: 'H001', name: '六小完賽含超時圈', id: 'E121234565', g: 'M', amt: 1500, pm: 'ONLINE_PAYUNi', ps: 'PAID', uid: '04:TE:58:01:03', chk: 'checked_in', rs: 'finished' }),
+      mkTP({ pid: 'TEST-P-0804', ev: 'TEST-S08-LAPRUN', cat: 'TEST-CAT-08A', bib: 'L003', name: '繞圈中途退賽', id: 'B120123453', g: 'M', amt: 2200, pm: 'ONLINE_PAYUNi', ps: 'PAID', uid: '04:TE:58:01:04', chk: 'checked_in', rs: 'dnf' }),
+
+      // 情境 09：外部已繳名單匯入＆無晶片手動計時
+      mkTP({ pid: 'TEST-P-0901', ev: 'TEST-S09-NOCHIP', cat: 'TEST-CAT-09A', bib: 'E001', name: '外場匯入一', id: 'A123456789', g: 'M', amt: 0, pm: 'EXTERNAL_IMPORT', pt: 'EXTERNAL', ps: 'PAID', chk: 'checked_in', rs: 'finished', gn: '外部平台名單' }),
+      mkTP({ pid: 'TEST-P-0902', ev: 'TEST-S09-NOCHIP', cat: 'TEST-CAT-09A', bib: 'E002', name: '外場匯入二', id: 'F223456786', g: 'F', amt: 0, pm: 'EXTERNAL_IMPORT', pt: 'EXTERNAL', ps: 'PAID', chk: 'checked_in', rs: 'on_track', gn: '外部平台名單' }),
+      mkTP({ pid: 'TEST-P-0903', ev: 'TEST-S09-NOCHIP', cat: 'TEST-CAT-09A', bib: 'E003', name: '站內已繳三', id: 'E121234565', g: 'M', amt: 1600, l5: '90003', ps: 'PAID', chk: 'pending', rs: 'dns' }),
+
+      // 情境 10：已結案封存・八百壯士＋官方自訂底圖證書
+      mkTP({ pid: 'TEST-P-1001', ev: 'TEST-S10-CLOSED', cat: 'TEST-CAT-10A', bib: 'Z001', name: '諸葛測試冠軍', id: 'A123456789', g: 'M', amt: 2600, l5: '10001', ps: 'PAID', uid: '04:TE:10:00:01', chk: 'checked_in', rs: 'finished' }),
+      mkTP({ pid: 'TEST-P-1002', ev: 'TEST-S10-CLOSED', cat: 'TEST-CAT-10A', bib: 'Z002', name: '歐陽百K亞軍', id: 'F223456786', g: 'F', amt: 2600, l5: '10002', ps: 'PAID', uid: '04:TE:10:00:02', chk: 'checked_in', rs: 'finished', pen: 60 }),
+      mkTP({ pid: 'TEST-P-1003', ev: 'TEST-S10-CLOSED', cat: 'TEST-CAT-10B', bib: 'Y001', name: '司馬峽谷完賽', id: 'E121234565', g: 'M', amt: 1800, l5: '10003', ps: 'PAID', uid: '04:TE:10:00:03', chk: 'checked_in', rs: 'finished' }),
+      mkTP({ pid: 'TEST-P-1004', ev: 'TEST-S10-CLOSED', cat: 'TEST-CAT-10B', bib: 'Y002', name: '上官五十完賽', id: 'A223456781', g: 'F', amt: 1800, l5: '10004', ps: 'PAID', uid: '04:TE:10:00:04', chk: 'checked_in', rs: 'finished' }),
+      mkTP({ pid: 'TEST-P-1005', ev: 'TEST-S10-CLOSED', cat: 'TEST-CAT-10A', bib: 'Z003', name: '測試退賽DNF', id: 'B120123453', g: 'M', amt: 2600, l5: '10005', ps: 'PAID', uid: '04:TE:10:00:05', chk: 'checked_in', rs: 'dnf' }),
+      mkTP({ pid: 'TEST-P-1006', ev: 'TEST-S10-CLOSED', cat: 'TEST-CAT-10B', bib: 'Y003', name: '測試缺席DNS', id: 'C123456788', g: 'M', amt: 1800, l5: '10006', ps: 'PAID', uid: '', chk: 'pending', rs: 'dns' })
+    ];
+
+    const timingLogs = [
+      // 情境 08：繞圈進行中（有效圈、手動補圈與 1 筆逾 6H 超時無效圈）
+      { logId: 'TEST-LOG-0801', eventId: 'TEST-S08-LAPRUN', stationCode: 'LAP', bibNumber: 'L001', idCardHash: '', sensedTime: '2026-11-27 05:06:10', lapCount: 1, operator: 'test_op_lap', source: 'nfc', isValid: true, note: '' },
+      { logId: 'TEST-LOG-0802', eventId: 'TEST-S08-LAPRUN', stationCode: 'LAP', bibNumber: 'L001', idCardHash: '', sensedTime: '2026-11-27 05:12:25', lapCount: 2, operator: 'test_op_lap', source: 'nfc', isValid: true, note: '' },
+      { logId: 'TEST-LOG-0803', eventId: 'TEST-S08-LAPRUN', stationCode: 'LAP', bibNumber: 'L001', idCardHash: '', sensedTime: '2026-11-27 05:18:40', lapCount: 3, operator: 'test_op_lap', source: 'manual', isValid: true, note: '測試手動補圈' },
+      { logId: 'TEST-LOG-0804', eventId: 'TEST-S08-LAPRUN', stationCode: 'LAP', bibNumber: 'L001', idCardHash: '', sensedTime: '2026-11-27 05:25:00', lapCount: 4, operator: 'test_op_lap', source: 'nfc', isValid: true, note: '' },
+      { logId: 'TEST-LOG-0805', eventId: 'TEST-S08-LAPRUN', stationCode: 'LAP', bibNumber: 'L002', idCardHash: '', sensedTime: '2026-11-27 05:06:55', lapCount: 1, operator: 'test_op_lap', source: 'nfc', isValid: true, note: '' },
+      { logId: 'TEST-LOG-0806', eventId: 'TEST-S08-LAPRUN', stationCode: 'LAP', bibNumber: 'L002', idCardHash: '', sensedTime: '2026-11-27 05:13:50', lapCount: 2, operator: 'test_op_lap', source: 'nfc', isValid: true, note: '' },
+      { logId: 'TEST-LOG-0807', eventId: 'TEST-S08-LAPRUN', stationCode: 'LAP', bibNumber: 'H001', idCardHash: '', sensedTime: '2026-11-27 05:05:50', lapCount: 1, operator: 'test_op_lap', source: 'nfc', isValid: true, note: '' },
+      { logId: 'TEST-LOG-0808', eventId: 'TEST-S08-LAPRUN', stationCode: 'LAP', bibNumber: 'H001', idCardHash: '', sensedTime: '2026-11-27 10:52:10', lapCount: 2, operator: 'test_op_lap', source: 'nfc', isValid: true, note: '' },
+      { logId: 'TEST-LOG-0809', eventId: 'TEST-S08-LAPRUN', stationCode: 'LAP', bibNumber: 'H001', idCardHash: '', sensedTime: '2026-11-27 11:05:30', lapCount: 3, operator: 'test_op_lap', source: 'nfc', isValid: false, note: '逾 6H 限時之超時無效圈' },
+      { logId: 'TEST-LOG-0810', eventId: 'TEST-S08-LAPRUN', stationCode: 'LAP', bibNumber: 'L003', idCardHash: '', sensedTime: '2026-11-27 05:08:20', lapCount: 1, operator: 'test_op_lap', source: 'nfc', isValid: true, note: '一圈後棄賽' },
+
+      // 情境 09：手動補登成績
+      { logId: 'TEST-LOG-0901', eventId: 'TEST-S09-NOCHIP', stationCode: 'CP1', bibNumber: 'E001', idCardHash: '', sensedTime: '2026-11-27 08:05:12', lapCount: 0, operator: 'test_op_finish', source: 'manual', isValid: true, note: '人工記錄' },
+      { logId: 'TEST-LOG-0902', eventId: 'TEST-S09-NOCHIP', stationCode: 'FINISH', bibNumber: 'E001', idCardHash: '', sensedTime: '2026-11-27 10:18:45', lapCount: 0, operator: 'test_op_finish', source: 'manual', isValid: true, note: '人工終點補登' },
+      { logId: 'TEST-LOG-0903', eventId: 'TEST-S09-NOCHIP', stationCode: 'CP1', bibNumber: 'E002', idCardHash: '', sensedTime: '2026-11-27 08:22:30', lapCount: 0, operator: 'test_op_finish', source: 'manual', isValid: true, note: '在途中' },
+
+      // 情境 10：已結案封存完整分段成績
+      { logId: 'TEST-LOG-1001', eventId: 'TEST-S10-CLOSED', stationCode: 'CP1', bibNumber: 'Z001', idCardHash: '', sensedTime: '2026-04-12 08:10:00', lapCount: 0, operator: 'test_op_cp1', source: 'nfc', isValid: true, note: '' },
+      { logId: 'TEST-LOG-1002', eventId: 'TEST-S10-CLOSED', stationCode: 'CP2', bibNumber: 'Z001', idCardHash: '', sensedTime: '2026-04-12 11:32:15', lapCount: 0, operator: 'test_op_cp1', source: 'nfc', isValid: true, note: '' },
+      { logId: 'TEST-LOG-1003', eventId: 'TEST-S10-CLOSED', stationCode: 'FINISH', bibNumber: 'Z001', idCardHash: '', sensedTime: '2026-04-12 14:48:20', lapCount: 0, operator: 'test_op_finish', source: 'nfc', isValid: true, note: '' },
+      { logId: 'TEST-LOG-1004', eventId: 'TEST-S10-CLOSED', stationCode: 'CP1', bibNumber: 'Z002', idCardHash: '', sensedTime: '2026-04-12 08:22:10', lapCount: 0, operator: 'test_op_cp1', source: 'nfc', isValid: true, note: '' },
+      { logId: 'TEST-LOG-1005', eventId: 'TEST-S10-CLOSED', stationCode: 'CP2', bibNumber: 'Z002', idCardHash: '', sensedTime: '2026-04-12 12:05:40', lapCount: 0, operator: 'test_op_cp1', source: 'nfc', isValid: true, note: '' },
+      { logId: 'TEST-LOG-1006', eventId: 'TEST-S10-CLOSED', stationCode: 'FINISH', bibNumber: 'Z002', idCardHash: '', sensedTime: '2026-04-12 15:40:10', lapCount: 0, operator: 'test_op_finish', source: 'nfc', isValid: true, note: '' },
+      { logId: 'TEST-LOG-1007', eventId: 'TEST-S10-CLOSED', stationCode: 'CP1', bibNumber: 'Y001', idCardHash: '', sensedTime: '2026-04-12 08:15:30', lapCount: 0, operator: 'test_op_cp1', source: 'nfc', isValid: true, note: '' },
+      { logId: 'TEST-LOG-1008', eventId: 'TEST-S10-CLOSED', stationCode: 'FINISH', bibNumber: 'Y001', idCardHash: '', sensedTime: '2026-04-12 09:56:12', lapCount: 0, operator: 'test_op_finish', source: 'nfc', isValid: true, note: '' },
+      { logId: 'TEST-LOG-1009', eventId: 'TEST-S10-CLOSED', stationCode: 'CP1', bibNumber: 'Y002', idCardHash: '', sensedTime: '2026-04-12 08:30:05', lapCount: 0, operator: 'test_op_cp1', source: 'nfc', isValid: true, note: '' },
+      { logId: 'TEST-LOG-1010', eventId: 'TEST-S10-CLOSED', stationCode: 'FINISH', bibNumber: 'Y002', idCardHash: '', sensedTime: '2026-04-12 10:25:44', lapCount: 0, operator: 'test_op_finish', source: 'nfc', isValid: true, note: '' },
+      { logId: 'TEST-LOG-1011', eventId: 'TEST-S10-CLOSED', stationCode: 'CP1', bibNumber: 'Z003', idCardHash: '', sensedTime: '2026-04-12 08:50:00', lapCount: 0, operator: 'test_op_cp1', source: 'nfc', isValid: true, note: '抽筋退賽' }
+    ];
+
+    const historyResults = [
+      { historyId: 'TEST-HIS-01', eventDate: '2025-11-08', eventName: '【測試歷屆】2025 八百壯士測試邀請賽', categoryName: '100K 八百壯士組', bibNumber: 'TW01', name: '諸葛測試冠軍', nationality: 'TWN', idCardHash: 'test-hash-01', finishTime: '09:55:10', distanceKm: 100, lapCount: 0, overallRank: 1, catRank: 1, status: 'FINISHED', isWarrior800: true, remark: '測試歷屆資料（一鍵可清）' },
+      { historyId: 'TEST-HIS-02', eventDate: '2025-11-08', eventName: '【測試歷屆】2025 八百壯士測試邀請賽', categoryName: '100K 八百壯士組', bibNumber: 'TW02', name: '歐陽百K亞軍', nationality: 'TWN', idCardHash: 'test-hash-02', finishTime: '10:38:22', distanceKm: 100, lapCount: 0, overallRank: 2, catRank: 1, status: 'FINISHED', isWarrior800: true, remark: '測試歷屆資料（一鍵可清）' },
+      { historyId: 'TEST-HIS-03', eventDate: '2025-11-08', eventName: '【測試歷屆】2025 八百壯士測試邀請賽', categoryName: '50K 測試組', bibNumber: 'TB01', name: '司馬峽谷完賽', nationality: 'TWN', idCardHash: 'test-hash-03', finishTime: '05:10:05', distanceKm: 50, lapCount: 0, overallRank: 3, catRank: 1, status: 'FINISHED', isWarrior800: false, remark: '測試歷屆資料（一鍵可清）' }
+    ];
+
+    return { users, events, categories, stations, participants, timingLogs, historyResults };
+  }
+
+  function mergeTestSuiteIntoState(state) {
+    const suite = buildTestSuite10Scenarios();
+    const kfMap = {
+      events: 'eventId', categories: 'catId', stations: 'stationId',
+      participants: 'participantId', timingLogs: 'logId', historyResults: 'historyId', users: 'username'
+    };
+    const merged = {};
+    Object.keys(kfMap).forEach((store) => {
+      const kf = kfMap[store];
+      // 先保留全部非測試資料，再以最新的 TEST-* 測試套件覆寫對應鍵，確保不重複也不影響正式資料
+      const map = new Map();
+      (state[store] || []).forEach((item) => {
+        if (!isTestSuiteRecord(store, item) && item && item[kf]) {
+          map.set(String(item[kf]), item);
+        }
+      });
+      (suite[store] || []).forEach((item) => {
+        if (item && item[kf]) map.set(String(item[kf]), item);
+      });
+      merged[store] = [...map.values()];
+    });
+    return { suite, merged };
+  }
+
+  function stripTestSuiteFromState(state) {
+    const stores = ['events', 'categories', 'stations', 'participants', 'timingLogs', 'historyResults', 'users'];
+    const cleaned = {};
+    const removedCounts = {};
+    let totalRemoved = 0;
+    stores.forEach((store) => {
+      const before = Array.isArray(state[store]) ? state[store] : [];
+      const after = before.filter((item) => !isTestSuiteRecord(store, item));
+      cleaned[store] = after;
+      removedCounts[store] = before.length - after.length;
+      totalRemoved += removedCounts[store];
+    });
+    return { cleaned, removedCounts, totalRemoved };
+  }
+
   global.TurCore = {
     DEFAULT_GAS_URL,
     onLogoReady,
     pad2, formatDateTime, parseDateTime, formatDuration, formatPace, escapeHtml,
     COMPOUND_SURNAMES_28, splitFullName, mergeNameParts, zhToEnEventName,
     verifyTaiwanIdChecksum, inferGenderFromId, calcAge, sha256Hex,
-    CURATED_BANNERS, DEFAULT_BROCHURE_TEMPLATE, CUSTOM_FIELD_TYPES, CUSTOM_FIELD_PRESETS, HISTORY_IMPORT_SPEC, EXTERNAL_IMPORT_SPEC, PAYMENT_MODES,
-    getBannerStyle, defaultFormSchema, getEventPaymentMode, defaultCertConfig, parseJsonSafe,
+    CURATED_BANNERS, DEFAULT_BROCHURE_TEMPLATE, DEFAULT_TUR_ADDONS, DEFAULT_ADDONS_NOTE_FIELD, CUSTOM_FIELD_TYPES, CUSTOM_FIELD_PRESETS, HISTORY_IMPORT_SPEC, EXTERNAL_IMPORT_SPEC, PAYMENT_MODES,
+    getBannerStyle, defaultFormSchema, getEventPaymentMode, normalizeEarlyBirdEnd, getEventEarlyBirdConfig, isEarlyBirdActive, getEffectiveCategoryPrice, defaultCertConfig, parseJsonSafe,
     TurDB, validateGasUrl, buildGasQueryUrl, gasGet, gasPost,
     isCategoryWarrior800, isWarrior800Eligible, computeLeaderboard, computeEventProgressAnalytics, evaluateEventStageGates,
     isCertEligible, buildUnifiedHistoryRecords, parseExternalRosterRows,
@@ -2570,6 +3010,7 @@
     FONT_SCALE_MODES, applyFontScale, getSavedFontScale, getRaceTypeWorkflow, getStationSopInfo,
     bindFastInput, ensureExternalLib, ensureCertFonts,
     CERT_LAYOUTS, CERT_PALETTES, CERT_FONTS, CERT_CUSTOM_ELEMENTS, defaultCustomBgElements, getMergedCustomBgElements, compressCustomBgImage, renderCertificateCanvas,
-    buildFull5EventsSeed
+    buildFull5EventsSeed,
+    TEST_SUITE_PREFIX, isTestSuiteId, isTestSuiteRecord, countTestSuiteStats, buildTestSuite10Scenarios, mergeTestSuiteIntoState, stripTestSuiteFromState
   };
 })(window);

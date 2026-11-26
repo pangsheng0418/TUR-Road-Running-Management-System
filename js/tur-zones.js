@@ -435,7 +435,7 @@
     if (!managed.some((e) => e.eventId === App.State.z1EventId)) {
       App.State.z1EventId = managed[0].eventId;
     }
-    sel.innerHTML = managed.map((e) => `<option value="${e.eventId}" ${e.eventId === App.State.z1EventId ? 'selected' : ''}>${C.escapeHtml(e.nameZh)} (${e.ownerUsername})</option>`).join('');
+    sel.innerHTML = managed.map((e) => `<option value="${e.eventId}" ${e.eventId === App.State.z1EventId ? 'selected' : ''}>${C.isTestSuiteId(e.eventId) ? '🧪 ' : ''}${C.escapeHtml(e.nameZh)} (${e.ownerUsername})</option>`).join('');
     const ev = managed.find((e) => e.eventId === App.State.z1EventId);
 
     z1DirtyTabs = new Set(['setup', 'recon', 'chip', 'gun', 'score', 'ops']);
@@ -572,6 +572,24 @@
               <label class="font-black text-amber-950 block">🏁 活動起跑日期與時間 *（YYYY-MM-DD HH:mm:ss，建立報名表即設定好以利計時）</label>
               <input id="z1RaceStart" value="${C.escapeHtml(ev.raceStart || '')}" placeholder="例如：2026-12-20 05:00:00" class="w-full px-2.5 py-1.5 border border-amber-400 rounded-lg mt-1 bg-white mono font-bold" />
             </div>
+            ${(() => {
+              const ebCfg = C.getEventEarlyBirdConfig(ev);
+              const ebAct = C.isEarlyBirdActive(ev);
+              return `
+                <div class="col-span-2 p-2.5 rounded-xl bg-emerald-50 border border-emerald-300 space-y-1.5">
+                  <div class="flex flex-wrap items-center justify-between gap-1">
+                    <label class="inline-flex items-center gap-1.5 font-black text-emerald-950 cursor-pointer">
+                      <input id="z1EarlyBirdEnabled" type="checkbox" ${ebCfg.enabled ? 'checked' : ''} class="accent-emerald-600" />
+                      <span>🐤 啟用本活動早鳥優惠價（修改截止日期即時變動生效）</span>
+                    </label>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-black ${!ebCfg.enabled ? 'bg-slate-200 text-slate-600' : (ebAct ? 'bg-emerald-600 text-white' : 'bg-amber-200 text-amber-950')}">${!ebCfg.enabled ? '未啟用' : (ebAct ? '🟢 早鳥優惠進行中' : '⏰ 早鳥已截止（改收一般價）')}</span>
+                  </div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <input id="z1EarlyBirdEnd" value="${C.escapeHtml(ebCfg.endTime || '')}" placeholder="YYYY-MM-DD HH:mm:ss（例如 2026-12-15 23:59:59）" class="flex-1 min-w-[200px] px-2.5 py-1.5 border border-emerald-400 rounded-lg bg-white mono font-bold" />
+                    <span class="text-[10px] text-emerald-900">僅填 YYYY-MM-DD 會自動補 <code>23:59:59</code>；各組別早鳥價請於右側分組點「✏️ 調價」設定。</span>
+                  </div>
+                </div>`;
+            })()}
             <div>
               <label class="font-bold">活動狀態</label>
               <select id="z1Status" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5">
@@ -650,14 +668,22 @@
             <div class="space-y-1.5">
               ${cats.map((c) => {
                 const isW800 = C.isCategoryWarrior800(c);
+                const pr = C.getEffectiveCategoryPrice(ev, c);
+                const ebTag = Number(c.earlyBirdFee || 0) > 0
+                  ? (pr.isEarlyBird
+                    ? `<span class="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-600 text-white font-black text-[10px]">🐤 早鳥中 NT$${c.earlyBirdFee}</span>`
+                    : `<span class="ml-1 px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-600 font-bold text-[10px]">🐤 早鳥價 NT$${c.earlyBirdFee}</span>`)
+                  : '';
                 return `
                 <div class="p-2 rounded-lg ${isW800 ? 'bg-amber-50/80 border-amber-300' : 'bg-slate-50 border-slate-200'} border flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <b>${C.escapeHtml(c.name)}</b>
                     ${isW800 ? '<span class="ml-1 px-1.5 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black text-[10px]">🏅 八百壯士組</span>' : ''}
-                    <span class="text-slate-600"> · ${c.distanceKm}km / ${c.timeLimitHours}H · NT$${c.fee} · 前綴 <code>${c.bibPrefix}${c.bibStartNum}</code> · 限額 ${c.quota}</span>
+                    ${ebTag}
+                    <span class="text-slate-600"> · ${c.distanceKm}km / ${c.timeLimitHours}H · 一般 NT$${c.fee} · 前綴 <code>${c.bibPrefix}${c.bibStartNum}</code> · 限額 ${c.quota}</span>
                   </div>
                   <div class="flex items-center gap-1.5 shrink-0">
+                    <button type="button" data-edit-cat-fee="${c.catId}" class="px-2 py-0.5 rounded-lg font-bold text-[11px] border bg-emerald-50 border-emerald-300 text-emerald-900 hover:bg-emerald-100">✏️ 調價</button>
                     <button type="button" data-toggle-cat-w800="${c.catId}" class="px-2 py-0.5 rounded-lg font-bold text-[11px] border ${isW800 ? 'bg-amber-400 border-amber-500 text-slate-950' : 'bg-white border-slate-300 text-slate-600 hover:bg-amber-50'}">${isW800 ? '🏅 已標示八百壯士 ✓' : '☆ 標示為八百壯士組'}</button>
                     <button data-del-cat="${c.catId}" class="text-rose-600 font-bold px-1.5">刪</button>
                   </div>
@@ -667,17 +693,32 @@
           </div>
 
           <div class="bg-white p-4 rounded-xl border shadow-sm space-y-2.5">
-            <div class="flex items-center justify-between border-b pb-2">
-              <h3 class="font-black text-sm">🛍️ 動態加購服務管理（承辦人可自由增修刪）</h3>
-              <button id="btnZ1AddAddon" class="px-2.5 py-1 rounded-lg bg-amber-500 text-slate-950 font-bold">+ 新增加購項</button>
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+              <div>
+                <h3 class="font-black text-sm">🛍️ 動態加購服務管理（TUR 預設 3 項・可自由核取及增修刪）</h3>
+                <p class="text-[11px] text-slate-500 mt-0.5">勾選即顯示於報名表供選手加購；取消勾選則暫停顯示不需刪除，亦可自由改價或新增其他品項。</p>
+              </div>
+              <div class="flex gap-1.5 shrink-0">
+                <button type="button" id="btnZ1ResetTurAddons" class="px-2 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 font-bold text-[11px]">↺ 補齊 TUR 預設 3 項</button>
+                <button type="button" id="btnZ1AddAddon" class="px-2.5 py-1 rounded-lg bg-amber-500 text-slate-950 font-bold">+ 新增加購項</button>
+              </div>
             </div>
             <div class="space-y-1.5">
-              ${(schema.addons || []).map((a, idx) => `
-                <div class="p-2 rounded-lg bg-slate-50 border flex items-center justify-between">
-                  <span><b>${C.escapeHtml(a.name)}</b> — +NT$${a.price}</span>
-                  <button data-del-addon="${idx}" class="text-rose-600 font-bold px-1.5">移除</button>
-                </div>
-              `).join('')}
+              ${(schema.addons || []).map((a, idx) => {
+                const isOn = a.enabled !== false;
+                return `
+                <div class="p-2 rounded-lg border flex flex-wrap items-center justify-between gap-2 ${isOn ? 'bg-slate-50 border-slate-200' : 'bg-slate-100/70 border-slate-200 opacity-65'}">
+                  <label class="inline-flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" data-toggle-addon="${idx}" ${isOn ? 'checked' : ''} class="accent-amber-600" />
+                    <span class="${isOn ? '' : 'line-through text-slate-500'}"><b>${C.escapeHtml(a.name)}</b> — +NT$${Number(a.price || 0).toLocaleString()}</span>
+                    ${isOn ? '<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">啟用中</span>' : '<span class="px-1.5 py-0.5 rounded bg-slate-200 text-slate-600 text-[10px]">已停用</span>'}
+                  </label>
+                  <div class="flex items-center gap-1.5">
+                    <button type="button" data-edit-addon="${idx}" class="px-2 py-0.5 rounded bg-white border border-slate-300 hover:bg-amber-50 text-slate-700 font-bold text-[11px]">✏️ 改名/調價</button>
+                    <button type="button" data-del-addon="${idx}" class="text-rose-600 font-bold px-1.5">移除</button>
+                  </div>
+                </div>`;
+              }).join('') || '<div class="text-slate-400 text-center py-3">尚無加購項目，可點「↺ 補齊 TUR 預設 3 項」或「+ 新增加購項」</div>'}
             </div>
           </div>
 
@@ -791,9 +832,11 @@
       if (!f) return;
       if (f.size > 5 * 1024 * 1024) return App.toast('橫幅圖片上限為 5MB！', 'error');
       const reader = new FileReader();
-      reader.onload = () => {
-        ev.bannerUrl = reader.result;
+      reader.onload = async () => {
+        const compressed = await C.compressCustomBgImage(reader.result, 1000, 38000);
+        ev.bannerUrl = compressed;
         $('#z1BannerPreview').setAttribute('style', C.getBannerStyle(ev.bannerUrl));
+        App.toast(`🖼️ 橫幅已自動壓縮最佳化（${Math.round(compressed.length / 1024)} KB），不超過試算表儲存上限`, 'info');
       };
       reader.readAsDataURL(f);
     };
@@ -802,6 +845,14 @@
       if (rs && !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(rs)) {
         return App.toast('起跑時間格式須為 YYYY-MM-DD HH:mm:ss（含完整日期與整數秒）', 'error');
       }
+      const ebOn = Boolean($('#z1EarlyBirdEnabled')?.checked);
+      const ebEndNorm = C.normalizeEarlyBirdEnd($('#z1EarlyBirdEnd')?.value || '');
+      if (ebOn && (!ebEndNorm || !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(ebEndNorm))) {
+        return App.toast('啟用早鳥價時，請填寫正確之早鳥截止日期（YYYY-MM-DD 或 YYYY-MM-DD HH:mm:ss）', 'error');
+      }
+      schema.earlyBirdEnabled = ebOn;
+      schema.earlyBirdEnd = ebEndNorm;
+      ev.formSchemaJson = JSON.stringify(schema);
       ev.nameZh = $('#z1NameZh').value.trim() || ev.nameZh;
       ev.nameEn = $('#z1NameEn').value.trim() || C.zhToEnEventName(ev.nameZh);
       ev.raceType = $('#z1RaceType').value;
@@ -818,23 +869,46 @@
       await C.TurDB.put('events', ev);
       await App.enqueueSync('saveEvent', { event: ev });
       App.renderAll();
-      App.toast('✅ 活動設定、起跑時間、橫幅與簡章已儲存並同步雲端', 'success');
+      App.toast('✅ 活動設定、早鳥時段、起跑時間、橫幅與簡章已儲存並同步雲端', 'success');
     };
     $('#btnZ1AddCat').onclick = async () => {
       const name = prompt('分組名稱（如 21K 半馬組、100K 八百壯士組）：');
       if (!name) return;
       const dist = Number(prompt('距離 (km，繞圈賽請填單圈公里數)：', '21.1') || 21.1);
       const hrs = Number(prompt('限時 (小時)：', '4') || 4);
-      const fee = Number(prompt('報名費 (NT$)：', '1200') || 1200);
+      const fee = Number(prompt('一般報名費 (NT$)：', '1200') || 1200);
+      const ebRaw = prompt(`早鳥優惠價 (NT$，須低於一般價 ${fee}；若本組無早鳥優惠請填 0)：`, '0');
+      const earlyBirdFee = Math.max(0, Number(ebRaw || 0));
       const prefix = (prompt('號碼布前綴 (如 B)：', 'B') || 'B').toUpperCase();
       const isWarrior800 = confirm(`分組「${name}」是否標示為「🏅 八百壯士」參加人員？\n\n按「確定」＝標示為八百壯士組（完賽將計入英雄榜）\n按「取消」＝一般組別`);
-      const cat = { catId: `CAT-${Date.now().toString().slice(-5)}`, eventId: ev.eventId, name, distanceKm: dist, timeLimitHours: hrs, fee, bibPrefix: prefix, bibStartNum: '001', quota: 300, customRaceStart: '', isWarrior800 };
+      const cat = { catId: `CAT-${Date.now().toString().slice(-5)}`, eventId: ev.eventId, name, distanceKm: dist, timeLimitHours: hrs, fee, earlyBirdFee: earlyBirdFee > 0 && earlyBirdFee < fee ? earlyBirdFee : 0, bibPrefix: prefix, bibStartNum: '001', quota: 300, customRaceStart: '', isWarrior800 };
       App.State.categories.push(cat);
       await C.TurDB.put('categories', cat);
       await App.enqueueSync('saveCategory', { category: cat });
       renderZone1(App);
-      App.toast(`已新增分組「${name}」${isWarrior800 ? '（🏅 已標示為八百壯士組）' : ''}`, 'success');
+      App.toast(`已新增分組「${name}」${cat.earlyBirdFee ? `（🐤 早鳥 NT$${cat.earlyBirdFee}）` : ''}${isWarrior800 ? '（🏅 八百壯士組）' : ''}`, 'success');
     };
+    $$('[data-edit-cat-fee]').forEach((b) => {
+      b.onclick = async () => {
+        const cat = App.State.categories.find((c) => c.catId === b.dataset.editCatFee);
+        if (!cat) return;
+        const newFeeStr = prompt(`修改「${cat.name}」一般價格 (NT$)：`, String(cat.fee || 0));
+        if (newFeeStr === null) return;
+        const newFee = Math.max(0, Number(newFeeStr || 0));
+        const newEbStr = prompt(`修改「${cat.name}」早鳥價格 (NT$，填 0 代表本組無早鳥價；須低於一般價 ${newFee})：`, String(cat.earlyBirdFee || 0));
+        if (newEbStr === null) return;
+        const newEb = Math.max(0, Number(newEbStr || 0));
+        if (newEb > 0 && newEb >= newFee) {
+          return App.toast('早鳥價格必須低於一般價格！', 'error');
+        }
+        cat.fee = newFee;
+        cat.earlyBirdFee = newEb;
+        await C.TurDB.put('categories', cat);
+        await App.enqueueSync('saveCategory', { category: cat });
+        renderZone1(App);
+        App.toast(`✅ 已更新「${cat.name}」一般價 NT$${newFee}${newEb > 0 ? ` / 🐤 早鳥價 NT$${newEb}` : '（無早鳥價）'}`, 'success');
+      };
+    });
     $$('[data-toggle-cat-w800]').forEach((b) => {
       b.onclick = async () => {
         const cat = App.State.categories.find((c) => c.catId === b.dataset.toggleCatW800);
@@ -866,16 +940,66 @@
         App.toast(`🗑️ 已安全刪除分組「${target?.name || cid}」並同步雲端`, 'info');
       };
     });
-    $('#btnZ1AddAddon').onclick = async () => {
-      const name = prompt('加購項目名稱（如 賽事機能襪）：');
-      if (!name) return;
-      const price = Number(prompt('加購金額 (NT$)：', '250') || 250);
-      schema.addons.push({ code: 'addon_' + Date.now(), name, price });
+    $('#btnZ1ResetTurAddons').onclick = async () => {
+      if (!Array.isArray(schema.addons)) schema.addons = [];
+      let added = 0;
+      (C.DEFAULT_TUR_ADDONS || []).forEach((def) => {
+        if (!schema.addons.some((x) => x.code === def.code || x.name === def.name)) {
+          schema.addons.push({ ...def });
+          added++;
+        }
+      });
+      if (!Array.isArray(schema.customFields)) schema.customFields = [];
+      if (C.DEFAULT_ADDONS_NOTE_FIELD && !schema.customFields.some((f) => f.key === C.DEFAULT_ADDONS_NOTE_FIELD.key)) {
+        schema.customFields.unshift({ ...C.DEFAULT_ADDONS_NOTE_FIELD });
+      }
       ev.formSchemaJson = JSON.stringify(schema);
       await C.TurDB.put('events', ev);
       await App.enqueueSync('saveEvent', { event: ev });
       renderZone1(App);
+      App.toast(added ? `✅ 已補齊 ${added} 項 TUR 預設加購與備註欄位` : '✅ 本活動已具備完整 TUR 預設加購項目與備註欄位', 'success');
     };
+    $('#btnZ1AddAddon').onclick = async () => {
+      const name = prompt('加購項目名稱（如 賽事機能襪、接駁專車）：');
+      if (!name) return;
+      const price = Math.max(0, Number(prompt('加購金額 (NT$)：', '250') || 250));
+      if (!Array.isArray(schema.addons)) schema.addons = [];
+      schema.addons.push({ code: 'addon_' + Date.now(), name: name.trim(), price, enabled: true });
+      ev.formSchemaJson = JSON.stringify(schema);
+      await C.TurDB.put('events', ev);
+      await App.enqueueSync('saveEvent', { event: ev });
+      renderZone1(App);
+      App.toast(`✅ 已新增加購項「${name.trim()}」(+NT$${price})`, 'success');
+    };
+    $$('[data-toggle-addon]').forEach((cb) => {
+      cb.onchange = async () => {
+        const a = schema.addons?.[Number(cb.dataset.toggleAddon)];
+        if (!a) return;
+        a.enabled = cb.checked;
+        ev.formSchemaJson = JSON.stringify(schema);
+        await C.TurDB.put('events', ev);
+        await App.enqueueSync('saveEvent', { event: ev });
+        renderZone1(App);
+        App.toast(`${a.enabled ? '✅ 已啟用' : '⏸️ 已暫停'}加購項「${a.name}」`, 'info');
+      };
+    });
+    $$('[data-edit-addon]').forEach((b) => {
+      b.onclick = async () => {
+        const a = schema.addons?.[Number(b.dataset.editAddon)];
+        if (!a) return;
+        const nm = prompt('修改加購項目名稱：', a.name);
+        if (nm === null || !nm.trim()) return;
+        const prStr = prompt(`修改「${nm.trim()}」加購金額 (NT$)：`, String(a.price ?? 0));
+        if (prStr === null) return;
+        a.name = nm.trim();
+        a.price = Math.max(0, Number(prStr || 0));
+        ev.formSchemaJson = JSON.stringify(schema);
+        await C.TurDB.put('events', ev);
+        await App.enqueueSync('saveEvent', { event: ev });
+        renderZone1(App);
+        App.toast(`✅ 已更新加購項「${a.name}」(+NT$${a.price})`, 'success');
+      };
+    });
     $$('[data-del-addon]').forEach((b) => {
       b.onclick = async () => {
         schema.addons.splice(Number(b.dataset.delAddon), 1);
@@ -1181,7 +1305,10 @@
                     <div class="text-[10px] text-slate-500 mono">${p.idCard} · ${p.phone || '-'} ${p.groupCode ? `· <b class="text-amber-700">${p.groupCode}</b>` : ''}</div>
                   </td>
                   <td class="p-2">${C.escapeHtml(catMap.get(p.catId) || p.catId)}</td>
-                  <td class="p-2 mono font-bold">NT$${Number(p.totalAmount).toLocaleString()}</td>
+                  <td class="p-2 mono font-bold">
+                    <div>NT$${Number(p.totalAmount).toLocaleString()}</div>
+                    ${String(p.remark || '').includes('[早鳥價]') ? '<div class="mt-0.5 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px] inline-block">🐤 早鳥價</div>' : ''}
+                  </td>
                   <td class="p-2 mono text-[11px]">
                     <div>${C.escapeHtml(p.remittanceLast5 || p.merTradeNo || '-')}</div>
                     ${C.isBundleOrderCode(p.merTradeNo) ? `<div class="mt-0.5 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 font-bold text-[10px] inline-block">📦 合併單 ${C.escapeHtml(p.merTradeNo)}</div>` : ''}
@@ -1252,7 +1379,8 @@
     $$('[data-group-paid]').forEach((b) => {
       b.onclick = () => {
         const gc = b.dataset.groupPaid;
-        const ids = parts.filter((p) => p.groupCode === gc && String(p.payStatus).toUpperCase() !== 'PAID').map((p) => p.participantId);
+        const ids = parts.filter((p) => p.groupCode === gc && ['UNPAID', 'PENDING_PAY'].includes(String(p.payStatus).toUpperCase())).map((p) => p.participantId);
+        if (!ids.length) return App.toast(`團報 ${gc} 目前無待對帳之未繳費成員`, 'info');
         markParticipantsPaid(App, ids, `整團 ${gc} 共 ${ids.length} 人`);
       };
     });
@@ -2183,7 +2311,7 @@
         <div class="flex flex-wrap items-center gap-2">
           <span class="px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 font-black">🔒 結案成績鎖定中</span>
           <select id="z2EventSelect" class="px-3 py-1.5 border rounded-lg font-bold text-sm">
-            ${finished.map((e) => `<option value="${e.eventId}" ${e.eventId === ev.eventId ? 'selected' : ''}>${C.escapeHtml(e.nameZh)}</option>`).join('')}
+            ${finished.map((e) => `<option value="${e.eventId}" ${e.eventId === ev.eventId ? 'selected' : ''}>${C.isTestSuiteId(e.eventId) ? '🧪 ' : ''}${C.escapeHtml(e.nameZh)}</option>`).join('')}
           </select>
         </div>
         <button id="btnZ2Reopen" class="px-3 py-1.5 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold">🔓 重新開啟解鎖（退回專區 1）</button>
@@ -3062,7 +3190,7 @@
     const storeMap = {
       GlobalConfig: { arr: App.State.globalConfig, store: 'globalConfig', cols: ['configKey', 'configValue', 'description'] },
       Events: { arr: App.State.events, store: 'events', cols: ['eventId', 'ownerUsername', 'nameZh', 'raceType', 'status', 'raceStart', 'maxQuota'] },
-      Categories: { arr: App.State.categories, store: 'categories', cols: ['catId', 'eventId', 'name', 'distanceKm', 'timeLimitHours', 'fee', 'bibPrefix', 'quota'] },
+      Categories: { arr: App.State.categories, store: 'categories', cols: ['catId', 'eventId', 'name', 'distanceKm', 'timeLimitHours', 'fee', 'earlyBirdFee', 'bibPrefix', 'quota', 'isWarrior800'] },
       Stations: { arr: App.State.stations, store: 'stations', cols: ['stationId', 'eventId', 'stationCode', 'name', 'distanceKm', 'stationType'] },
       Participants: { arr: App.State.participants, store: 'participants', cols: ['participantId', 'eventId', 'bibNumber', 'name', 'nationality', 'payMethod', 'payStatus', 'totalAmount', 'chipUid'] },
       Users: { arr: App.State.users, store: 'users', cols: ['username', 'displayName', 'role', 'parentOrganizer', 'allowedStation', 'enabled'] }
@@ -3124,7 +3252,32 @@
           </div>
         </div>
 
-        <!-- 最高管理員專用：全機 .json 備份、合併/覆蓋還原、5場測試資料、CLEAR 清空 -->
+        <!-- 最高管理員專用：10 大全情境獨立測試資料管理（不影響任何正式資料，可隨時一鍵單獨清除） -->
+        ${(() => {
+          const ts = C.countTestSuiteStats(App.State);
+          const realEvCnt = App.State.events.length - ts.events;
+          const realPartCnt = App.State.participants.length - ts.participants;
+          return `
+          <div class="bg-emerald-50/70 p-4 rounded-2xl border-2 border-emerald-400 shadow-sm space-y-3 text-xs">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200 pb-2">
+              <div>
+                <div class="text-[11px] font-black text-emerald-700">🧪 ISOLATED 10-SCENARIO TEST SUITE (PREFIX: TEST-* / test_*)</div>
+                <h3 class="font-black text-base text-emerald-950">10 大全情境測試資料管理（與正式資料完全隔離，支援單獨一鍵清除）</h3>
+                <p class="text-[11px] text-emerald-900 mt-0.5">涵蓋早鳥開/閉、額滿防呆、同承辦人統報、不同承辦人隔離、PAYUNi 金流、晶片寫卡報到、繞圈刷圈、外部名單匯入與結案自訂底圖證書等 10 場完整生命週期。</p>
+              </div>
+              <div class="text-right mono text-[11px]">
+                <div class="text-emerald-900 font-black">測試資料：${ts.events} 場 / ${ts.participants} 筆報名 / ${ts.timingLogs} 筆計時 / ${ts.users} 測試帳號</div>
+                <div class="text-slate-600">正式資料（受保護）：${realEvCnt} 場 / ${realPartCnt} 筆報名</div>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-2 items-center">
+              <button id="btnZ5LoadTestSuite10" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow">🧪 載入／重建 10 大情境測試資料（保留現有正式資料）</button>
+              <button id="btnZ5ClearTestSuite10" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow">🧹 一鍵單獨清除測試資料（僅刪 TEST-*，完全不影響正式資料）</button>
+            </div>
+          </div>`;
+        })()}
+
+        <!-- 最高管理員專用：全機 .json 備份、合併/覆蓋還原、6場示範資料、CLEAR 清空 -->
         <div class="bg-white p-4 rounded-2xl border shadow-sm space-y-3 text-xs">
           <h3 class="font-black text-sm">💾 全機 .json 封存備份、雙模式還原與安全重置（最高管理員專用）</h3>
           <div class="flex flex-wrap gap-2 items-center">
@@ -3171,10 +3324,16 @@
       $$('[data-pick-sheet]').forEach((b) => { b.onclick = () => { directSheetName = b.dataset.pickSheet; renderZone5(App); }; });
 
       $('#btnZ5DirectBatchSave').onclick = async () => {
+        const numCols = new Set(['distanceKm', 'timeLimitHours', 'fee', 'earlyBirdFee', 'quota', 'maxQuota', 'totalAmount', 'enabled']);
+        const boolCols = new Set(['isWarrior800']);
         $$('[data-grid-r]').forEach((inp) => {
           const r = Number(inp.dataset.gridR);
           const col = inp.dataset.gridC;
-          if (activeTbl.arr[r]) activeTbl.arr[r][col] = inp.value;
+          if (!activeTbl.arr[r]) return;
+          let v = inp.value;
+          if (numCols.has(col)) v = Number(v || 0);
+          else if (boolCols.has(col)) v = String(v).trim().toLowerCase() === 'true' || v === '1';
+          activeTbl.arr[r][col] = v;
         });
         await C.TurDB.clearAndFill(activeTbl.store, activeTbl.arr);
         if (App.State.gasUrl && navigator.onLine) {
@@ -3235,6 +3394,78 @@
 
       $('#z5RestoreMerge').onchange = (e) => handleRestore(e.target.files?.[0], 'merge');
       $('#z5RestoreOverwrite').onchange = (e) => handleRestore(e.target.files?.[0], 'overwrite');
+
+      $('#btnZ5LoadTestSuite10').onclick = async () => {
+        const hasCloud = Boolean(App.State.gasUrl && navigator.onLine);
+        if (!confirm(`確定載入／重建「10 大全情境測試資料（TEST-S01 ～ TEST-S10）」？\n\n✅ 本操作採「獨立隔離合併寫入」，100% 保留您現有的所有正式活動、選手與帳號！\n${hasCloud ? '☁️ 已連線 GAS：將同步以 Upsert 寫入 Google 試算表。' : '💻 本機模式：將寫入本機 IndexedDB。'}`)) return;
+
+        const { suite, merged } = C.mergeTestSuiteIntoState(App.State);
+        const stores = ['events', 'categories', 'stations', 'participants', 'timingLogs', 'historyResults', 'users'];
+        for (const k of stores) {
+          App.State[k] = merged[k];
+          await C.TurDB.clearAndFill(k, merged[k]);
+        }
+
+        let cloudMsg = '';
+        if (hasCloud) {
+          App.toast('☁️ 正在以安全 Upsert 模式同步 10 大情境測試資料至雲端試算表...', 'info');
+          const pairs = [
+            ['Events', suite.events], ['Categories', suite.categories], ['Stations', suite.stations],
+            ['Participants', suite.participants], ['TimingLogs', suite.timingLogs],
+            ['HistoryResults', suite.historyResults], ['Users', suite.users]
+          ];
+          let okCnt = 0;
+          for (const [sn, rows] of pairs) {
+            try {
+              const r = await C.gasPost(App.State.gasUrl, { action: 'adminBatchUpdateSheet', sheetName: sn, rows, mode: 'upsert' });
+              if (r && r.ok) okCnt++;
+            } catch (_) {}
+          }
+          cloudMsg = `（☁️ 雲端同步 ${okCnt}/${pairs.length} 表）`;
+        }
+        App.rebuildIndices();
+        App.renderAll();
+        App.toast(`🧪 已載入 10 大情境測試資料（${suite.events.length} 場 / ${suite.participants.length} 筆報名 / ${suite.timingLogs.length} 筆感應），正式資料完整保留！${cloudMsg}`, 'success');
+      };
+
+      $('#btnZ5ClearTestSuite10').onclick = async () => {
+        const ts = C.countTestSuiteStats(App.State);
+        if (ts.total === 0) return App.toast('目前系統內已無任何 TEST-* 測試資料', 'info');
+        const hasCloud = Boolean(App.State.gasUrl && navigator.onLine);
+        if (!confirm(`確定「單獨一鍵清除」全部測試資料嗎？\n\n即將清除（僅限 TEST-* 與 test_*）：\n• 測試活動：${ts.events} 場\n• 測試組別／站點：${ts.categories} 組 / ${ts.stations} 站\n• 測試報名填表資料：${ts.participants} 筆（含您於測試場內新增之測試單）\n• 測試計時紀錄：${ts.timingLogs} 筆\n• 測試歷屆紀錄：${ts.historyResults} 筆\n• 測試帳號：${ts.users} 個\n\n🛡️ 所有正式活動、正式選手、正式帳號與系統設定 100% 保留不受影響！`)) return;
+
+        const { cleaned, totalRemoved } = C.stripTestSuiteFromState(App.State);
+        const stores = ['events', 'categories', 'stations', 'participants', 'timingLogs', 'historyResults', 'users'];
+        for (const k of stores) {
+          App.State[k] = cleaned[k];
+          await C.TurDB.clearAndFill(k, cleaned[k]);
+        }
+        // 同步清除佇列中屬於測試場的待傳項目，保留正式資料待傳項目
+        App.State.syncQueue = App.State.syncQueue.filter((q) => {
+          const p = q.payload || {};
+          const evId = p.eventId || p.event?.eventId || p.category?.eventId || p.station?.eventId || p.log?.eventId || (Array.isArray(p.runners) ? p.runners[0]?.eventId : '');
+          const pid = p.participantId || '';
+          const un = p.user?.username || '';
+          return !C.isTestSuiteId(evId) && !C.isTestSuiteId(pid) && !/^test_/i.test(String(un));
+        });
+        await C.TurDB.clearAndFill('syncQueue', App.State.syncQueue);
+
+        let cloudMsg = '';
+        if (hasCloud) {
+          try {
+            const res = await C.gasPost(App.State.gasUrl, { action: 'clearTestSuiteData' });
+            if (res && res.ok) cloudMsg = `（☁️ 雲端試算表同步清除 ${res.totalDeleted} 列測試資料！）`;
+          } catch (err) {
+            await App.enqueueSync('clearTestSuiteData', {});
+            cloudMsg = `（雲端清除已排入佇列）`;
+          }
+        }
+        App.State.z1EventId = App.State.events.find((e) => e.status !== 'finished')?.eventId || '';
+        App.State.z2EventId = App.State.events.find((e) => e.status === 'finished')?.eventId || '';
+        App.rebuildIndices();
+        App.renderAll();
+        App.toast(`🧹 已安全清除 ${totalRemoved} 筆測試資料，正式資料 100% 完整保留！${cloudMsg}`, 'success');
+      };
 
       $('#btnZ5Seed5').onclick = async () => {
         const hasCloud = Boolean(App.State.gasUrl && navigator.onLine);

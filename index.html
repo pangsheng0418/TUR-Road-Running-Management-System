@@ -970,6 +970,68 @@
         </label>
       </div>
 
+      <!-- 🐤 早鳥優惠價設定（納入 TUR 預設，可依需求核取或修改截止日期與金額） -->
+      <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-300 space-y-2.5">
+        <label class="flex items-start gap-2 cursor-pointer">
+          <input id="newEvEarlyBird" type="checkbox" checked class="mt-0.5 accent-emerald-600" />
+          <div>
+            <div class="font-black text-emerald-950">🐤 啟用早鳥優惠價（TUR 預設開啟・可依需求取消核取或改期）</div>
+            <div class="text-[11px] text-emerald-900 mt-0.5">截止前享早鳥價、截止後自動切回一般價；建立後可於「專區 1 → 活動表單」隨時修改日期與各組別早鳥價！</div>
+          </div>
+        </label>
+        <div id="newEvEarlyBirdFields" class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1.5 border-t border-emerald-200">
+          <div>
+            <label class="font-bold text-emerald-950">早鳥截止日期與時間（含此時間前）*</label>
+            <input id="newEvEarlyBirdEnd" type="datetime-local" step="1" value="2026-12-10T23:59:59" class="w-full px-2.5 py-1.5 border border-emerald-400 rounded-lg bg-white mt-0.5 mono font-bold" />
+          </div>
+          <div>
+            <label class="font-bold text-emerald-950">預設組別早鳥價 (NT$，0=本組不優惠)</label>
+            <input id="newEvEarlyBirdFee" type="number" min="0" value="1500" class="w-full px-2.5 py-1.5 border border-emerald-400 rounded-lg bg-white mt-0.5 mono font-bold" />
+          </div>
+        </div>
+      </div>
+
+      <!-- 🛍️ TUR 預設加購物品與補充說明（預設全勾選，建立前與建立後皆可依需求核取及增減） -->
+      <div class="p-3 rounded-xl bg-indigo-50/70 border border-indigo-200 space-y-2">
+        <div class="font-black text-indigo-950">🛍️ TUR 預設活動加購物品與備註欄位（可依需求核取或調價）</div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <label class="p-2 rounded-lg bg-white border border-indigo-200 space-y-1 cursor-pointer">
+            <div class="flex items-center gap-1.5 font-bold text-slate-900">
+              <input id="newEvAddonChip" type="checkbox" checked class="accent-indigo-600" />
+              <span>晶片採購</span>
+            </div>
+            <div class="flex items-center gap-1 text-[11px] text-slate-600">
+              <span>NT$</span>
+              <input id="newEvAddonChipPrice" type="number" min="0" value="300" class="w-full px-1.5 py-1 border rounded mono bg-slate-50 font-bold" />
+            </div>
+          </label>
+          <label class="p-2 rounded-lg bg-white border border-indigo-200 space-y-1 cursor-pointer">
+            <div class="flex items-center gap-1.5 font-bold text-slate-900">
+              <input id="newEvAddonLodging" type="checkbox" checked class="accent-indigo-600" />
+              <span>住宿預訂價</span>
+            </div>
+            <div class="flex items-center gap-1 text-[11px] text-slate-600">
+              <span>NT$</span>
+              <input id="newEvAddonLodgingPrice" type="number" min="0" value="1500" class="w-full px-1.5 py-1 border rounded mono bg-slate-50 font-bold" />
+            </div>
+          </label>
+          <label class="p-2 rounded-lg bg-white border border-indigo-200 space-y-1 cursor-pointer">
+            <div class="flex items-center gap-1.5 font-bold text-slate-900">
+              <input id="newEvAddonGear" type="checkbox" checked class="accent-indigo-600" />
+              <span>運動用品加購價</span>
+            </div>
+            <div class="flex items-center gap-1 text-[11px] text-slate-600">
+              <span>NT$</span>
+              <input id="newEvAddonGearPrice" type="number" min="0" value="680" class="w-full px-1.5 py-1 border rounded mono bg-slate-50 font-bold" />
+            </div>
+          </label>
+        </div>
+        <label class="flex items-center gap-2 pt-1 text-[11px] font-bold text-indigo-900 cursor-pointer">
+          <input id="newEvAddonNote" type="checkbox" checked class="accent-indigo-600" />
+          <span>📝 內建「加購項目補充說明／備註」欄位（讓選手補充晶片／住宿房型／運動用品尺寸等說明）</span>
+        </label>
+      </div>
+
       <div class="flex justify-end gap-2 pt-2 border-t">
         <button type="button" id="btnCancelNewEvent" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold">取消</button>
         <button type="submit" class="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black shadow">✅ 建立活動並進入設定</button>
@@ -978,9 +1040,9 @@
   </div>
 </div>
 
-<script src="js/tur-logo.js?v=5.3"></script>
-<script src="js/tur-core.js?v=5.3"></script>
-<script src="js/tur-zones.js?v=5.3"></script>
-<script src="js/tur-app.js?v=5.3"></script>
+<script src="js/tur-logo.js?v=5.5"></script>
+<script src="js/tur-core.js?v=5.5"></script>
+<script src="js/tur-zones.js?v=5.5"></script>
+<script src="js/tur-app.js?v=5.5"></script>
 </body>
 </html>
