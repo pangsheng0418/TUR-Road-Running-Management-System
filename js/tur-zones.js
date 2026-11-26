@@ -375,21 +375,21 @@
       locked: { box: 'bg-slate-100 border-slate-200 text-slate-500', tag: 'bg-slate-400 text-white', txt: '待前階段' }
     };
     bar.innerHTML = `
-      <div class="bg-white p-3 rounded-xl border shadow-sm space-y-2 text-xs">
+      <div class="bg-white px-3.5 py-2.5 rounded-xl border shadow-sm space-y-2 text-xs">
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <div class="font-black text-slate-800">🛡️ 五階段作業管制節點層層把關（點擊卡片直達該管制分頁）</div>
-          <span class="text-[11px] text-slate-500">目前進度：<b>階段 ${g.currentStage} / 5</b> · 未繳費不可發卡報到 · 未鳴槍不可計時 · 結案前須完成 5 項稽核</span>
+          <div class="font-black text-slate-800">🛡️ 賽事進度把關（階段 ${g.currentStage} / 5）</div>
+          <span class="text-xs text-slate-500">點任一階段可直達該分頁</span>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-5 gap-2">
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
           ${g.stages.map((s) => {
             const st = stStyles[s.status] || stStyles.locked;
             return `
-              <button type="button" data-jump-z1tab="${s.tab}" class="text-left p-2.5 rounded-xl border transition hover:shadow ${st.box}">
+              <button type="button" data-jump-z1tab="${s.tab}" class="text-left px-2.5 py-2 rounded-xl border transition hover:shadow ${st.box}">
                 <div class="flex items-center justify-between gap-1">
-                  <span class="font-black text-[11px]">${s.title}</span>
-                  <span class="px-1.5 py-0.5 rounded-full text-[9px] font-black ${st.tag}">${st.txt}</span>
+                  <span class="font-black text-xs">${s.title}</span>
+                  <span class="px-1.5 py-0.5 rounded-full text-[10px] font-black ${st.tag}">${st.txt}</span>
                 </div>
-                <div class="text-[10px] opacity-85 mt-1 mono">${C.escapeHtml(s.detail)}</div>
+                <div class="text-[11px] opacity-85 mt-0.5 mono truncate">${C.escapeHtml(s.detail)}</div>
               </button>`;
           }).join('')}
         </div>
@@ -413,26 +413,27 @@
     const box = $('#z1-setup');
 
     box.innerHTML = `
-      <!-- 🧭 依賽制類型專屬作業流程檢視卡（距離賽 vs 計時繞圈賽） -->
-      <div id="z1RaceWorkflowGuide" class="rounded-xl border-2 p-4 text-xs space-y-2.5 shadow-sm ${isLap ? 'bg-indigo-50/80 border-indigo-300' : 'bg-sky-50/80 border-sky-300'}">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <div>
+      <!-- 🧭 依賽制類型專屬作業流程檢視（預設收合，點一下展開，畫面清爽） -->
+      <details id="z1RaceWorkflowGuide" class="rounded-xl border text-xs shadow-sm ${isLap ? 'bg-indigo-50/70 border-indigo-200' : 'bg-sky-50/70 border-sky-200'}">
+        <summary class="px-4 py-2.5 cursor-pointer flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <span class="acc-arrow inline-block text-slate-500">▶</span>
             <span class="px-2.5 py-0.5 rounded-full font-black ${isLap ? 'bg-indigo-700 text-white' : 'bg-sky-700 text-white'}">${wf.badge}</span>
-            <span class="ml-2 font-black text-slate-900">專屬賽制流程檢視</span>
+            <span class="font-bold text-slate-800">檢視 5 步賽制流程</span>
           </div>
-          <span class="text-[11px] font-bold ${isLap ? 'text-indigo-900' : 'text-sky-900'}">${C.escapeHtml(wf.shortRule)}</span>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-5 gap-2">
+          <span class="text-xs font-semibold ${isLap ? 'text-indigo-900' : 'text-sky-900'}">${C.escapeHtml(wf.shortRule)}</span>
+        </summary>
+        <div class="px-4 pb-3.5 pt-1 grid grid-cols-1 sm:grid-cols-5 gap-2 border-t border-black/5">
           ${wf.steps.map((st) => `
             <div class="p-2.5 rounded-lg bg-white border ${st.ok ? 'border-emerald-300' : 'border-amber-300'}">
-              <div class="flex items-center justify-between font-black text-[11px]">
+              <div class="flex items-center justify-between font-black text-xs">
                 <span>${st.no}. ${C.escapeHtml(st.title)}</span>
                 <span class="${st.ok ? 'text-emerald-600' : 'text-amber-600'}">${st.ok ? '✓' : '!'}</span>
               </div>
-              <div class="text-[10px] text-slate-600 mt-1 leading-relaxed">${C.escapeHtml(st.desc)}</div>
+              <div class="text-[11px] text-slate-600 mt-1 leading-relaxed">${C.escapeHtml(st.desc)}</div>
             </div>`).join('')}
         </div>
-      </div>
+      </details>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <!-- 活動基本設定 -->
@@ -522,24 +523,30 @@
             <textarea id="z1Brochure" rows="5" placeholder="請輸入活動宗旨、路線、起跑/關門時間、補給站、晶片規則與退費須知..." class="w-full px-2.5 py-2 border rounded-lg text-xs leading-relaxed">${C.escapeHtml(ev.brochureText || '')}</textarea>
           </div>
 
-          <!-- 16 款精選橫幅（6 款動感路跑/越野 SVG ＋ 10 款漸層）＋ 5MB 自訂上傳 -->
+          <!-- 活動橫幅（顯示預覽，16 款樣式預設收合減少表單長度） -->
           <div class="space-y-2 pt-2 border-t">
-            <label class="font-bold block">活動橫幅（6 款動感路跑/越野插畫 ＋ 10 款經典漸層 ＋ 自訂上傳 ≤ 5MB）</label>
-            <div class="h-24 rounded-xl flex items-end p-3 text-white font-black text-sm shadow-inner" id="z1BannerPreview" style="${C.getBannerStyle(ev.bannerUrl)}">${C.escapeHtml(ev.nameZh)}</div>
-
-            <div class="text-[11px] font-bold text-amber-800">⚡ 動感路跑 / 越野跑 / 超馬精選樣式（6 款）</div>
-            <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-              ${C.CURATED_BANNERS.filter((b) => b.isDynamic).map((b) => `
-                <button type="button" data-pick-banner="${b.id}" class="h-12 rounded-lg border text-white font-bold text-[11px] flex items-end p-1.5 shadow-sm transition ${ev.bannerUrl === b.id ? 'ring-2 ring-amber-400 scale-[1.01]' : 'opacity-90 hover:opacity-100'}" style="${C.getBannerStyle(b.id)}">
-                  <span class="bg-black/45 px-1.5 py-0.5 rounded">${b.name}</span>
-                </button>`).join('')}
-            </div>
-
-            <div class="text-[11px] font-bold text-slate-600">🎨 經典漸層樣式（10 款）</div>
-            <div class="grid grid-cols-5 gap-1">
-              ${C.CURATED_BANNERS.filter((b) => !b.isDynamic).map((b) => `<button type="button" data-pick-banner="${b.id}" class="h-6 rounded border ${ev.bannerUrl === b.id ? 'ring-2 ring-amber-400' : ''}" style="background:${b.css};" title="${b.name}"></button>`).join('')}
-            </div>
-            <input id="z1BannerUpload" type="file" accept="image/*" class="text-[11px]" />
+            <label class="font-bold block">🎨 活動橫幅預覽</label>
+            <div class="h-20 rounded-xl flex items-end p-3 text-white font-black text-sm shadow-inner" id="z1BannerPreview" style="${C.getBannerStyle(ev.bannerUrl)}">${C.escapeHtml(ev.nameZh)}</div>
+            <details class="rounded-xl bg-slate-50 border p-2.5">
+              <summary class="cursor-pointer font-bold text-slate-700 flex items-center justify-between">
+                <span class="flex items-center gap-1.5"><span class="acc-arrow inline-block text-slate-400">▶</span><span>更換橫幅樣式（16 款內建 / 自訂上傳）</span></span>
+                <span class="text-[11px] text-sky-700">點擊展開</span>
+              </summary>
+              <div class="mt-2.5 space-y-2">
+                <div class="text-[11px] font-bold text-amber-800">⚡ 動感路跑 / 越野精選（6 款）</div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                  ${C.CURATED_BANNERS.filter((b) => b.isDynamic).map((b) => `
+                    <button type="button" data-pick-banner="${b.id}" class="h-12 rounded-lg border text-white font-bold text-[11px] flex items-end p-1.5 shadow-sm transition ${ev.bannerUrl === b.id ? 'ring-2 ring-amber-400 scale-[1.01]' : 'opacity-90 hover:opacity-100'}" style="${C.getBannerStyle(b.id)}">
+                      <span class="bg-black/45 px-1.5 py-0.5 rounded">${b.name}</span>
+                    </button>`).join('')}
+                </div>
+                <div class="text-[11px] font-bold text-slate-600">🎨 經典漸層（10 款）</div>
+                <div class="grid grid-cols-5 gap-1">
+                  ${C.CURATED_BANNERS.filter((b) => !b.isDynamic).map((b) => `<button type="button" data-pick-banner="${b.id}" class="h-6 rounded border ${ev.bannerUrl === b.id ? 'ring-2 ring-amber-400' : ''}" style="background:${b.css};" title="${b.name}"></button>`).join('')}
+                </div>
+                <input id="z1BannerUpload" type="file" accept="image/*" class="text-[11px] w-full" />
+              </div>
+            </details>
           </div>
           <button id="btnZ1SaveEvent" class="w-full py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black">💾 儲存活動設定與簡章</button>
         </div>
@@ -1988,43 +1995,50 @@
               </div>
             </div>
 
-            <!-- 官方與客製化皆支援上傳自訂設計底圖＋文字套印微調 -->
-            <div class="p-3 rounded-xl bg-indigo-50 border border-indigo-200 space-y-2">
-              <div class="flex items-center justify-between">
-                <span class="font-black text-indigo-950">🖼️ 上傳自己設計的底圖（支援畫布拖曳文字套印）</span>
-                <button type="button" id="btnCertClearBg" class="px-2 py-0.5 rounded bg-white border border-indigo-300 text-indigo-800 font-bold text-[11px]">恢復內建底圖</button>
+            <!-- 自訂底圖套印（預設收合，點開即可上傳與微調） -->
+            <details class="rounded-xl bg-indigo-50/70 border border-indigo-200">
+              <summary class="px-3 py-2.5 cursor-pointer font-bold text-indigo-950 flex items-center justify-between">
+                <span class="flex items-center gap-1.5"><span class="acc-arrow inline-block text-indigo-500">▶</span><span>🖼️ 上傳自訂設計底圖</span></span>
+                <span class="text-[11px] text-indigo-700 font-normal">選用</span>
+              </summary>
+              <div class="px-3 pb-3 pt-1 space-y-2 border-t border-indigo-200/60">
+                <div class="flex items-center justify-between gap-2">
+                  <input id="certCustomBgFile" type="file" accept="image/*" class="text-[11px] flex-1" />
+                  <button type="button" id="btnCertClearBg" class="px-2 py-0.5 rounded bg-white border border-indigo-300 text-indigo-800 font-bold text-[11px] shrink-0">恢復內建</button>
+                </div>
+                <div class="flex flex-wrap gap-2 items-center text-[11px]">
+                  <label class="font-bold">顏色</label>
+                  <input id="certCustomColor" type="color" value="${cfg.customTextPos?.color || '#ffffff'}" />
+                  <label class="font-bold">對齊</label>
+                  <select id="certCustomAlign" class="border rounded px-1.5 py-0.5 bg-white">
+                    <option value="center" ${cfg.customTextPos?.align === 'center' ? 'selected' : ''}>置中</option>
+                    <option value="left" ${cfg.customTextPos?.align === 'left' ? 'selected' : ''}>靠左</option>
+                    <option value="right" ${cfg.customTextPos?.align === 'right' ? 'selected' : ''}>靠右</option>
+                  </select>
+                  <label class="font-bold">字級</label>
+                  <input id="certCustomScale" type="range" min="0.7" max="1.4" step="0.05" value="${cfg.customTextPos?.fontScale || 1.12}" class="w-20 accent-indigo-600" />
+                </div>
               </div>
-              <input id="certCustomBgFile" type="file" accept="image/*" class="text-[11px] w-full" />
-              <div class="flex flex-wrap gap-2 items-center pt-1 text-[11px]">
-                <label class="font-bold">文字顏色</label>
-                <input id="certCustomColor" type="color" value="${cfg.customTextPos?.color || '#ffffff'}" />
-                <label class="font-bold">對齊</label>
-                <select id="certCustomAlign" class="border rounded px-1.5 py-0.5 bg-white">
-                  <option value="center" ${cfg.customTextPos?.align === 'center' ? 'selected' : ''}>置中</option>
-                  <option value="left" ${cfg.customTextPos?.align === 'left' ? 'selected' : ''}>靠左</option>
-                  <option value="right" ${cfg.customTextPos?.align === 'right' ? 'selected' : ''}>靠右</option>
-                </select>
-                <label class="font-bold">字級</label>
-                <input id="certCustomScale" type="range" min="0.7" max="1.4" step="0.05" value="${cfg.customTextPos?.fontScale || 1.0}" class="w-20 accent-indigo-600" />
-              </div>
-              <div class="text-[10px] text-indigo-700">💡 上傳自訂底圖後，直接在右側畫布按住拖曳即可調整姓名、號碼布與成績套印位置。</div>
-            </div>
+            </details>
 
             <div class="p-3 rounded-xl bg-amber-50/70 border border-amber-200 space-y-1">
-              <label class="font-black text-amber-950 block">🎖️ 本活動賽事總監姓名（平均置於證書最下列・置中）</label>
-              <input id="certDirectorInput" value="${C.escapeHtml(cfg.raceDirectorName || '')}" placeholder="請輸入本場賽事總監姓名（例如：林政宏）" class="w-full px-2.5 py-1.5 border border-amber-300 rounded-lg bg-white font-bold" />
+              <label class="font-black text-amber-950 block">🎖️ 賽事總監姓名（置於證書最下列）</label>
+              <input id="certDirectorInput" value="${C.escapeHtml(cfg.raceDirectorName || '')}" placeholder="例如：林政宏" class="w-full px-2.5 py-1.5 border border-amber-300 rounded-lg bg-white font-bold" />
             </div>
 
-            <div class="p-3 rounded-xl bg-slate-50 border space-y-1.5">
-              <div class="font-black text-slate-800">🎛️ 承辦人自由勾選顯示開關（15 項全模組化）</div>
-              <div class="grid grid-cols-2 gap-1.5">
+            <details class="rounded-xl bg-slate-50 border">
+              <summary class="px-3 py-2.5 cursor-pointer font-bold text-slate-800 flex items-center justify-between">
+                <span class="flex items-center gap-1.5"><span class="acc-arrow inline-block text-slate-400">▶</span><span>🎛️ 欄位顯示開關（15 項）</span></span>
+                <span class="text-[11px] text-slate-500 font-normal">點開細調</span>
+              </summary>
+              <div class="px-3 pb-3 pt-1 grid grid-cols-2 gap-1.5 border-t">
                 ${toggles.map(([k, lbl]) => `
                   <label class="flex items-center gap-1.5 cursor-pointer">
                     <input type="checkbox" class="cert-toggle" data-ckey="${k}" ${cfg[k] ? 'checked' : ''} />
                     <span>${lbl}</span>
                   </label>`).join('')}
               </div>
-            </div>
+            </details>
 
             <div>
               <label class="font-bold block mb-1">預覽選手切換（僅列完賽有成績 ${certRows.length} 人）</label>

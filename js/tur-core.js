@@ -1088,6 +1088,8 @@
       const sec = parseDurationToSec(h.finishTime);
       const status = String(h.status || 'FINISHED').toUpperCase();
       const canCert = status === 'FINISHED' && ((sec !== null && sec >= 0) || (Number(h.lapCount || 0) > 0 && dist > 0));
+      // 歷年成績僅列「已結案且有正式完賽成績」之紀錄
+      if (!canCert) return;
       const isW800 = Boolean(h.isWarrior800) || (canCert && isWarrior800Eligible(h.eventName, h.categoryName, dist));
       const key = `${dateStr}::${h.eventName}::${h.name}::${h.bibNumber || idx}`;
       if (dedup.has(key)) return;
@@ -1148,16 +1150,15 @@
       });
     });
 
-    // 2. 自動彙整系統內所有本季/已結案完賽選手紀錄
-    (events || []).forEach((ev) => {
+    // 2. 僅彙整系統內「已結案 (finished) 且具正式完賽成績」之選手紀錄
+    (events || []).filter((ev) => ev && ev.status === 'finished').forEach((ev) => {
       const rs = computeLeaderboard({ event: ev, categories, stations, participants, timingLogs });
       const dateStr = String(ev.raceStart || ev.regStart || '').slice(0, 10);
       const year = dateStr.slice(0, 4) || '2026';
-      rs.filter((r) => r.status === 'finished').forEach((r) => {
+      rs.filter((r) => isCertEligible(ev, r).ok).forEach((r) => {
         const key = `${dateStr}::${ev.nameZh}::${r.participant.name}::${r.participant.bibNumber}`;
         if (dedup.has(key)) return;
         dedup.add(key);
-        const certCheck = isCertEligible(ev, r);
         records.push({
           recordId: `LIVE-${ev.eventId}-${r.participant.participantId}`,
           source: 'live',
@@ -1176,9 +1177,9 @@
           overallRank: r.overallRank || '-',
           catRank: r.catRank || '-',
           status: 'FINISHED',
-          canCert: certCheck.ok,
+          canCert: true,
           isWarrior800: Boolean(r.isWarrior800),
-          remark: ev.status === 'finished' ? '系統結案成績' : '本季即時完賽（待結案後開放印證書）',
+          remark: '系統結案成績',
           certRow: r
         });
       });

@@ -12,12 +12,16 @@
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <style>
     :root { color-scheme: light; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif; line-height: 1.6; }
     .mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
     .input-valid { border-color: #16a34a !important; box-shadow: 0 0 0 2px rgba(22,163,74,0.16); background-color: #f0fdf4; }
     .input-invalid { border-color: #dc2626 !important; box-shadow: 0 0 0 2px rgba(220,38,38,0.16); background-color: #fef2f2; }
     .nav-pill.active, .nav-pill.active:hover, .nav-pill.active:focus { background-color: #0f172a !important; color: #ffffff !important; }
     .sub-pill.active, .sub-pill.active:hover { background-color: #f59e0b !important; color: #0f172a !important; font-weight: 800; }
+    details > summary { list-style: none; }
+    details > summary::-webkit-details-marker { display: none; }
+    details > summary .acc-arrow { transition: transform 0.15s ease; }
+    details[open] > summary .acc-arrow { transform: rotate(90deg); }
     .flash-overlay { pointer-events: none; position: fixed; inset: 0; z-index: 9999; opacity: 0; transition: opacity 0.12s ease-out; }
     .flash-green { background: rgba(34, 197, 94, 0.58); opacity: 1; }
     .flash-yellow { background: rgba(234, 179, 8, 0.62); opacity: 1; }
@@ -43,31 +47,31 @@
         <img src="assets/tur-logo.jpg" alt="TUR Taiwan Ultra Runners" class="h-7 sm:h-8 w-auto object-contain" />
       </div>
       <div>
-        <div class="font-bold text-sm sm:text-base leading-tight flex items-center gap-2">
-          <span>TUR 一體化賽事治理系統 <span class="text-amber-400 text-xs">v3.0</span></span>
-          <span id="netBadge" class="whitespace-nowrap text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">● 本機模式</span>
+        <div class="font-bold text-base leading-tight flex items-center gap-2">
+          <span>TUR 賽事管理系統</span>
+          <span id="netBadge" class="whitespace-nowrap text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">● 本機模式</span>
         </div>
-        <div class="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
-          <span id="roleStatusBadge" class="px-1.5 py-0.5 rounded bg-slate-800 text-sky-300 font-semibold">🏃 民眾 / 跑者前台</span>
+        <div class="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
+          <span id="roleStatusBadge" class="px-1.5 py-0.5 rounded bg-slate-800 text-sky-300 font-semibold">🏃 民眾前台</span>
           <span id="topGunClock" class="mono text-amber-400 font-bold hidden"></span>
         </div>
       </div>
     </div>
 
-    <div class="flex flex-wrap items-center gap-1.5 text-xs">
+    <div class="flex flex-wrap items-center gap-2 text-xs">
       <!-- 全站字體大小即時調整器 -->
       <div id="fontSizeSwitcher" class="flex items-center bg-slate-800 border border-slate-700 rounded-lg p-0.5" title="調整畫面字體大小">
-        <button type="button" data-font-scale="normal" class="px-2 py-1 rounded text-[11px] font-bold">A</button>
-        <button type="button" data-font-scale="large" class="px-2 py-1 rounded text-[11px] font-bold">A+</button>
-        <button type="button" data-font-scale="xlarge" class="px-2 py-1 rounded text-[11px] font-bold">A++</button>
+        <button type="button" data-font-scale="normal" class="px-2 py-1 rounded text-xs font-bold">A</button>
+        <button type="button" data-font-scale="large" class="px-2 py-1 rounded text-xs font-bold">A+</button>
+        <button type="button" data-font-scale="xlarge" class="px-2 py-1 rounded text-xs font-bold">A++</button>
       </div>
-      <button id="btnSyncUpload" class="hidden px-2.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 font-bold flex items-center gap-1">
+      <button id="btnSyncUpload" class="hidden px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 font-bold flex items-center gap-1">
         <span>☁️ 上傳</span><span id="pendingQueueCount" class="bg-slate-950/50 px-1.5 rounded-full mono">0</span>
       </button>
-      <button id="btnSyncPull" class="hidden px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700">🔄 雙向同步</button>
-      <a href="public.html" target="_blank" class="px-2.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black">🏅 公開查詢 / 證書</a>
-      <button id="btnOpenLogin" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold">🔐 後台 / 作業員登入</button>
-      <button id="btnLogout" class="hidden px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold">🚪 登出 / 換人</button>
+      <button id="btnSyncPull" class="hidden px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700">🔄 同步</button>
+      <a href="public.html" target="_blank" class="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black">🏅 成績 / 證書</a>
+      <button id="btnOpenLogin" class="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold">🔐 登入</button>
+      <button id="btnLogout" class="hidden px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold">🚪 登出</button>
     </div>
   </div>
 
@@ -81,59 +85,58 @@
 <main id="appMain" class="max-w-7xl w-full mx-auto px-3 sm:px-4 py-4 flex-1 space-y-4">
 
   <!-- ==================== 視圖 A：前台公開報名首頁 (/) ==================== -->
-  <section id="view-public-home" class="app-view space-y-4">
-    <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 shadow">
+  <section id="view-public-home" class="app-view space-y-5">
+    <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white rounded-2xl p-6 flex flex-wrap items-center justify-between gap-4 shadow">
       <div class="flex flex-wrap items-center gap-4">
         <div class="bg-white rounded-2xl px-4 py-2.5 shadow-lg shrink-0">
-          <img src="assets/tur-logo.jpg" alt="TUR Taiwan Ultra Runners" class="h-11 sm:h-14 w-auto object-contain" />
+          <img src="assets/tur-logo.jpg" alt="TUR Taiwan Ultra Runners" class="h-11 sm:h-12 w-auto object-contain" />
         </div>
         <div>
-          <div class="text-xs font-bold text-amber-400 tracking-wider">TAIWAN ULTRA RUNNERS · 官方線上報名平台</div>
-          <h1 class="text-xl sm:text-2xl font-black mt-1">開放報名賽事總覽（依月份分組）</h1>
-          <p class="text-xs text-slate-300 mt-1">支援個人 / 團體最多 50 人報名、預設銀行轉帳末五碼與自選 PAYUNi 統一金流秒級銷帳。</p>
+          <h1 class="text-xl sm:text-2xl font-black">開放報名賽事總覽</h1>
+          <p class="text-sm text-slate-300 mt-1">支援個人與團體報名，選擇活動即可開始填寫。</p>
         </div>
       </div>
-      <div class="flex flex-wrap gap-2 text-xs">
-        <button id="btnGoLookupFromHome" class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 font-bold">🔍 雙因子報名查詢與修改 (/lookup)</button>
-        <a href="public.html" target="_blank" class="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black">🏆 歷年成績 ＆ 八百壯士英雄榜</a>
+      <div class="flex flex-wrap gap-2.5 text-sm">
+        <button id="btnGoLookupFromHome" class="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 font-bold">🔍 報名查詢與修改</button>
+        <a href="public.html" target="_blank" class="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black">🏆 成績與證書查詢</a>
       </div>
     </div>
     <div id="publicEventGroups" class="space-y-6"></div>
   </section>
 
   <!-- ==================== 視圖 B：前台線上報名表單 (/register/:slug) ==================== -->
-  <section id="view-public-register" class="app-view hidden space-y-4">
+  <section id="view-public-register" class="app-view hidden space-y-5">
     <!-- 賽事動感橫幅 Hero -->
-    <div id="regBannerHero" class="rounded-2xl overflow-hidden shadow-md text-white p-5 flex flex-wrap items-end justify-between gap-3 min-h-[132px]">
+    <div id="regBannerHero" class="rounded-2xl overflow-hidden shadow-md text-white p-5 flex flex-wrap items-end justify-between gap-3 min-h-[124px]">
       <div>
         <button id="btnBackToHome" class="mb-2 px-3 py-1 rounded-lg bg-black/40 hover:bg-black/60 text-white text-xs font-bold backdrop-blur-sm">← 返回賽事列表</button>
-        <div id="regEventTitle" class="font-black text-lg sm:text-2xl drop-shadow">-</div>
-        <div id="regEventMeta" class="text-xs text-white/90 mt-0.5 drop-shadow">-</div>
+        <div id="regEventTitle" class="font-black text-xl sm:text-2xl drop-shadow">-</div>
+        <div id="regEventMeta" class="text-xs sm:text-sm text-white/90 mt-0.5 drop-shadow">-</div>
       </div>
-      <button type="button" id="btnFillSampleRunner" class="text-xs px-3.5 py-2 rounded-xl bg-white/90 hover:bg-white text-slate-900 font-black shadow">✨ 帶入合法範例</button>
+      <button type="button" id="btnFillSampleRunner" class="text-xs sm:text-sm px-3.5 py-2 rounded-xl bg-white/90 hover:bg-white text-slate-900 font-black shadow">✨ 帶入範例</button>
     </div>
 
-    <!-- 賽制類型明確說明條（區分距離賽 vs 計時繞圈賽與作業流程） -->
-    <div id="regRaceTypeBanner" class="rounded-2xl border-2 p-3.5 text-xs shadow-sm"></div>
+    <!-- 賽制類型簡明提示 -->
+    <div id="regRaceTypeBanner" class="rounded-2xl border p-3.5 text-xs sm:text-sm shadow-sm"></div>
 
-    <!-- 📜 活動簡章與參賽須知展示區 -->
-    <details id="regBrochureBox" open class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      <summary class="px-4 py-3 bg-slate-50 border-b cursor-pointer font-black text-sm text-slate-900 flex items-center justify-between">
-        <span>📜 活動簡章與參賽須知（報名前請詳閱）</span>
-        <span class="text-xs font-semibold text-sky-700">點擊展開 / 收合</span>
+    <!-- 📜 活動簡章與參賽須知（預設收合，點一下展開，不佔用表單空間） -->
+    <details id="regBrochureBox" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <summary class="px-4 py-3 bg-slate-50 cursor-pointer font-bold text-sm text-slate-900 flex items-center justify-between">
+        <span class="flex items-center gap-2"><span class="acc-arrow inline-block text-slate-400">▶</span><span>📜 活動簡章與參賽須知</span></span>
+        <span class="text-xs font-semibold text-sky-700">點擊展開閱讀</span>
       </summary>
-      <div id="regBrochureContent" class="p-4 text-xs sm:text-sm text-slate-700 leading-relaxed whitespace-pre-line"></div>
+      <div id="regBrochureContent" class="p-4 border-t text-sm text-slate-700 leading-relaxed whitespace-pre-line"></div>
     </details>
 
     <!-- 明確區分「個人報名」與「團體報名」雙模式切換卡 -->
     <div class="grid grid-cols-2 gap-3">
-      <button type="button" id="btnModeSolo" class="p-3.5 rounded-2xl border-2 border-slate-900 bg-slate-900 text-white text-left shadow transition">
-        <div class="font-black text-sm sm:text-base flex items-center gap-1.5"><span>🏃 個人報名</span><span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-400 text-slate-950">目前模式</span></div>
-        <div class="text-[11px] opacity-85 mt-0.5">單人填表直接送出，不顯示團報欄位，避免填錯。</div>
+      <button type="button" id="btnModeSolo" class="p-4 rounded-2xl border-2 border-slate-900 bg-slate-900 text-white text-left shadow transition">
+        <div class="font-black text-base flex items-center gap-2"><span>🏃 個人報名</span><span class="text-xs px-2 py-0.5 rounded-full bg-emerald-400 text-slate-950">目前</span></div>
+        <div class="text-xs opacity-85 mt-1">單人填寫，直接送出報名。</div>
       </button>
-      <button type="button" id="btnModeGroup" class="p-3.5 rounded-2xl border-2 border-slate-200 bg-white hover:border-amber-400 text-slate-800 text-left shadow-sm transition">
-        <div class="font-black text-sm sm:text-base flex items-center gap-1.5"><span>👥 團體報名（2～50 人）</span></div>
-        <div class="text-[11px] text-slate-500 mt-0.5">自動配發 GRP26 團報碼，支援整團統一匯款或各自匯款。</div>
+      <button type="button" id="btnModeGroup" class="p-4 rounded-2xl border-2 border-slate-200 bg-white hover:border-amber-400 text-slate-800 text-left shadow-sm transition">
+        <div class="font-black text-base flex items-center gap-2"><span>👥 團體報名（2～50 人）</span></div>
+        <div class="text-xs text-slate-500 mt-1">多人同報，自動配發團報代碼。</div>
       </button>
     </div>
 
@@ -351,20 +354,23 @@
           </div>
         </div>
 
-        <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-          <h3 class="font-bold text-sm mb-2">🛡️ 14 項防呆即時檢核</h3>
-          <div id="validationSummaryList" class="grid grid-cols-2 gap-1.5 text-[11px]"></div>
-        </div>
+        <details open class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+          <summary class="cursor-pointer font-bold text-sm flex items-center justify-between">
+            <span>🛡️ 填寫進度檢核（14 項）</span>
+            <span class="acc-arrow text-xs text-slate-400">▶</span>
+          </summary>
+          <div id="validationSummaryList" class="grid grid-cols-2 gap-1.5 text-xs mt-3"></div>
+        </details>
       </div>
     </div>
   </section>
 
   <!-- ==================== 視圖 C：雙因子查改 (/lookup) ==================== -->
-  <section id="view-public-lookup" class="app-view hidden bg-white rounded-xl border shadow-sm p-4 space-y-4">
+  <section id="view-public-lookup" class="app-view hidden bg-white rounded-2xl border shadow-sm p-5 space-y-4">
     <div class="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
       <div>
-        <h2 class="font-black text-base">🔐 跑者雙因子反向查詢與修改（/lookup）</h2>
-        <p class="text-xs text-slate-500">登入效期 45 分鐘；已繳費（PAID）自動鎖定金額與組別欄位，僅可修改聯絡資訊、飲食與備註。</p>
+        <h2 class="font-black text-lg">🔐 報名查詢與修改</h2>
+        <p class="text-xs sm:text-sm text-slate-500">已繳費後費用相關項目會自動鎖定，聯絡資訊與飲食習慣仍可修改。</p>
       </div>
       <div id="lookupTimerBadge" class="hidden text-xs px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-bold mono">剩餘 45:00</div>
     </div>
@@ -453,15 +459,20 @@
             <button id="btnNfcReadInspect" class="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 font-bold">🔍 讀取查看晶片</button>
           </div>
 
-          <!-- 電腦模擬演練區 -->
-          <div class="p-3 rounded-xl bg-indigo-50 border border-indigo-200 flex flex-wrap gap-1.5 text-xs">
-            <span class="font-bold text-indigo-900 w-full">🧪 電腦無實體晶片模擬測試（含讀取查看）：</span>
-            <button id="btnSimWriteNtag" class="px-2.5 py-1.5 rounded-lg bg-indigo-600 text-white font-bold">模擬 NTAG 寫入+回讀</button>
-            <button id="btnSimBindUid" class="px-2.5 py-1.5 rounded-lg bg-indigo-600 text-white font-bold">模擬綁定 UID</button>
-            <button id="btnSimReadLegacy" class="px-2.5 py-1.5 rounded-lg bg-amber-600 text-white font-bold">模擬舊卡核准</button>
-            <button id="btnSimReadInspect" class="px-2.5 py-1.5 rounded-lg bg-slate-900 text-amber-300 font-bold">🔍 模擬讀取查看晶片</button>
-            <button id="btnSimInvalidCard" class="px-2.5 py-1.5 rounded-lg bg-rose-600 text-white font-bold">模擬異常卡攔截</button>
-          </div>
+          <!-- 電腦模擬演練區（預設收合，不干擾現場晶片作業） -->
+          <details class="rounded-xl bg-indigo-50/70 border border-indigo-200 text-xs">
+            <summary class="px-3.5 py-2.5 cursor-pointer font-bold text-indigo-900 flex items-center justify-between">
+              <span class="flex items-center gap-1.5"><span class="acc-arrow inline-block text-indigo-500">▶</span><span>🧪 電腦無晶片模擬測試</span></span>
+              <span class="text-[11px] font-normal text-indigo-700">點擊展開</span>
+            </summary>
+            <div class="px-3.5 pb-3 pt-1 flex flex-wrap gap-1.5">
+              <button id="btnSimWriteNtag" class="px-2.5 py-1.5 rounded-lg bg-indigo-600 text-white font-bold">模擬 NTAG 寫入</button>
+              <button id="btnSimBindUid" class="px-2.5 py-1.5 rounded-lg bg-indigo-600 text-white font-bold">模擬綁定 UID</button>
+              <button id="btnSimReadLegacy" class="px-2.5 py-1.5 rounded-lg bg-amber-600 text-white font-bold">模擬舊卡核准</button>
+              <button id="btnSimReadInspect" class="px-2.5 py-1.5 rounded-lg bg-slate-900 text-amber-300 font-bold">🔍 模擬讀取晶片</button>
+              <button id="btnSimInvalidCard" class="px-2.5 py-1.5 rounded-lg bg-rose-600 text-white font-bold">模擬異常卡攔截</button>
+            </div>
+          </details>
 
           <!-- 🔍 晶片讀取查看結果顯示卡 -->
           <div id="writerInspectCard" class="hidden p-3.5 rounded-xl bg-sky-50 border-2 border-sky-400 text-xs space-y-1"></div>
@@ -497,26 +508,26 @@
           <button type="submit" class="px-5 py-3 rounded-xl bg-slate-900 text-white font-black">感應寫入</button>
         </form>
 
-        <!-- 🛠️ 晶片無法感應時：依目前鎖定活動選擇選手手動補登（含原因與時間） -->
-        <div id="opManualFallbackBox" class="p-3.5 rounded-xl bg-sky-50 border-2 border-sky-300 space-y-2.5 text-xs">
-          <div class="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <div class="font-black text-sm text-sky-950">🛠️ 晶片無法感應 — 選擇本活動選手手動補登</div>
-              <p class="text-[11px] text-sky-800">僅列出目前鎖定活動之已繳費配號選手；補登紀錄會自動標記異常原因並同步雲端。</p>
-            </div>
-            <span id="opFallbackStats" class="px-2.5 py-1 rounded-full bg-white border border-sky-200 font-bold text-sky-900 mono">-</span>
-          </div>
-          <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
+        <!-- 🛠️ 晶片無法感應時：依目前鎖定活動選擇選手手動補登（預設收合，需要時一鍵展開） -->
+        <details id="opManualFallbackBox" class="rounded-xl bg-sky-50 border-2 border-sky-300 text-xs">
+          <summary class="px-4 py-3 cursor-pointer flex flex-wrap items-center justify-between gap-2">
+            <span class="font-black text-sm text-sky-950 flex items-center gap-1.5">
+              <span class="acc-arrow inline-block text-sky-600">▶</span>
+              <span>🛠️ 晶片無法感應？點此手動補登本活動選手</span>
+            </span>
+            <span id="opFallbackStats" class="px-2.5 py-0.5 rounded-full bg-white border border-sky-200 font-bold text-sky-900 mono">-</span>
+          </summary>
+          <div class="px-4 pb-4 pt-1 grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end border-t border-sky-200/70">
             <div class="sm:col-span-4">
-              <label class="font-bold block mb-1">1. 篩選本活動選手（姓名/號碼布/組別）</label>
-              <input id="opManualPickerSearch" type="text" placeholder="輸入號碼布或姓名篩選..." class="w-full px-2.5 py-2 border rounded-lg bg-white" />
+              <label class="font-bold block mb-1">1. 搜尋選手</label>
+              <input id="opManualPickerSearch" type="text" placeholder="號碼布或姓名..." class="w-full px-2.5 py-2 border rounded-lg bg-white" />
             </div>
             <div class="sm:col-span-8">
-              <label class="font-bold block mb-1">2. 選擇欲補登之選手（顯示是否已過本站）</label>
+              <label class="font-bold block mb-1">2. 選擇欲補登選手</label>
               <select id="opManualRunnerSelect" class="w-full px-2.5 py-2 border rounded-lg bg-white font-bold mono"></select>
             </div>
             <div class="sm:col-span-5">
-              <label class="font-bold block mb-1">3. 手動補登原因（留存稽核備註）</label>
+              <label class="font-bold block mb-1">3. 補登原因</label>
               <select id="opManualReason" class="w-full px-2.5 py-2 border rounded-lg bg-white">
                 <option value="晶片無法感應 / 消磁">晶片無法感應 / 消磁</option>
                 <option value="選手忘帶晶片卡">選手忘帶晶片卡</option>
@@ -525,22 +536,27 @@
               </select>
             </div>
             <div class="sm:col-span-4">
-              <label class="font-bold block mb-1">4. 通過時間（留空自動帶入當下秒數）</label>
-              <input id="opManualTime" type="text" placeholder="留空=現在 (YYYY-MM-DD HH:mm:ss)" class="w-full px-2.5 py-2 border rounded-lg bg-white mono" />
+              <label class="font-bold block mb-1">4. 通過時間（留空＝現在）</label>
+              <input id="opManualTime" type="text" placeholder="YYYY-MM-DD HH:mm:ss" class="w-full px-2.5 py-2 border rounded-lg bg-white mono" />
             </div>
             <div class="sm:col-span-3">
-              <button type="button" id="btnOpManualFallback" class="w-full py-2 px-3 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-black shadow">✅ 確認手動補登</button>
+              <button type="button" id="btnOpManualFallback" class="w-full py-2 px-3 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-black shadow">✅ 確認補登</button>
             </div>
           </div>
-        </div>
+        </details>
 
-        <div class="p-3 rounded-xl bg-amber-50 border border-amber-200 space-y-2">
-          <div class="flex items-center justify-between text-xs">
-            <span class="font-bold text-amber-900">🎯 快速點選選手感應測試（綠勾＝已過本站）</span>
-            <button id="btnSimUnknownScan" class="px-2 py-1 rounded bg-rose-600 text-white font-bold">模擬非本場紅閃 🔴</button>
+        <details class="rounded-xl bg-amber-50/70 border border-amber-200 text-xs">
+          <summary class="px-3.5 py-2.5 cursor-pointer flex items-center justify-between font-bold text-amber-900">
+            <span class="flex items-center gap-1.5"><span class="acc-arrow inline-block text-amber-600">▶</span><span>🎯 快速點選選手模擬感應</span></span>
+            <span class="text-[11px] font-normal">測試用</span>
+          </summary>
+          <div class="px-3.5 pb-3 pt-1 space-y-2 border-t border-amber-200/60">
+            <div class="flex justify-end">
+              <button id="btnSimUnknownScan" class="px-2.5 py-1 rounded bg-rose-600 text-white font-bold">模擬非本場紅閃 🔴</button>
+            </div>
+            <div id="quickRunnerButtons" class="flex flex-wrap gap-1.5"></div>
           </div>
-          <div id="quickRunnerButtons" class="flex flex-wrap gap-1.5"></div>
-        </div>
+        </details>
       </div>
 
       <div class="bg-white outdoor-card rounded-xl border p-4 flex flex-col">
@@ -561,13 +577,13 @@
         <select id="z1EventSelect" class="px-3 py-1.5 border rounded-lg text-sm font-bold bg-slate-50"></select>
         <button id="btnZ1NewEvent" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold">+ 建立新活動</button>
       </div>
-      <div class="flex flex-wrap gap-1 text-xs">
-        <button data-z1tab="setup" class="sub-pill active px-3 py-1.5 rounded-lg bg-slate-100">分頁1 活動與表單</button>
-        <button data-z1tab="recon" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">分頁2 對帳・排號・CSV</button>
-        <button data-z1tab="chip" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">分頁3 📡 晶片與報到</button>
-        <button data-z1tab="gun" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">分頁4 起跑與站點</button>
-        <button data-z1tab="score" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">分頁5 成績與結案</button>
-        <button data-z1tab="ops" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">分頁6 名下作業員</button>
+      <div class="flex flex-wrap gap-1.5 text-xs sm:text-sm">
+        <button data-z1tab="setup" class="sub-pill active px-3 py-1.5 rounded-lg bg-slate-100">1. 活動表單</button>
+        <button data-z1tab="recon" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">2. 對帳排號</button>
+        <button data-z1tab="chip" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">3. 晶片報到</button>
+        <button data-z1tab="gun" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">4. 起跑站點</button>
+        <button data-z1tab="score" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">5. 成績結案</button>
+        <button data-z1tab="ops" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">6. 作業員</button>
       </div>
     </div>
 
@@ -799,9 +815,9 @@
   </div>
 </div>
 
-<script src="js/tur-logo.js?v=4.5"></script>
-<script src="js/tur-core.js?v=4.5"></script>
-<script src="js/tur-zones.js?v=4.5"></script>
-<script src="js/tur-app.js?v=4.5"></script>
+<script src="js/tur-logo.js?v=4.7"></script>
+<script src="js/tur-core.js?v=4.7"></script>
+<script src="js/tur-zones.js?v=4.7"></script>
+<script src="js/tur-app.js?v=4.7"></script>
 </body>
 </html>

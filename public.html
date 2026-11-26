@@ -9,42 +9,46 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", sans-serif; line-height: 1.6; }
     .mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
     .ptab.active { background-color: #f59e0b; color: #0f172a; font-weight: 900; }
+    details > summary { list-style: none; }
+    details > summary::-webkit-details-marker { display: none; }
+    details > summary .acc-arrow { transition: transform 0.15s ease; }
+    details[open] > summary .acc-arrow { transform: rotate(90deg); }
     canvas { touch-action: none; }
   </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
 
 <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-30">
-  <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-2.5">
     <div class="flex items-center gap-3">
       <div class="bg-white rounded-xl px-2.5 py-1 shadow flex items-center justify-center shrink-0">
         <img src="assets/tur-logo.jpg" alt="TUR Taiwan Ultra Runners" class="h-7 sm:h-8 w-auto object-contain" />
       </div>
       <div>
-        <h1 class="font-bold text-sm sm:text-base">TUR 公開成績查詢・歷年歸併・八百壯士 ＆ 動態完賽證書</h1>
-        <p class="text-[11px] text-slate-400">全面隱藏身分證與報到時間 · 遵循承辦人證書開關 · 3 款相框拖曳縮放 · 高解析 PNG / PDF</p>
+        <h1 class="font-black text-base sm:text-lg leading-tight">TUR 成績與證書查詢</h1>
+        <p class="text-xs text-slate-400">公開查詢自動隱蔽個資與報到時間</p>
       </div>
     </div>
     <div class="flex flex-wrap items-center gap-2 text-xs">
       <!-- 全站字體大小即時調整器 -->
       <div id="pubFontSizeSwitcher" class="flex items-center bg-slate-800 border border-slate-700 rounded-lg p-0.5" title="調整畫面字體大小">
-        <button type="button" data-font-scale="normal" class="px-2 py-1 rounded text-[11px] font-bold">A</button>
-        <button type="button" data-font-scale="large" class="px-2 py-1 rounded text-[11px] font-bold">A+</button>
-        <button type="button" data-font-scale="xlarge" class="px-2 py-1 rounded text-[11px] font-bold">A++</button>
+        <button type="button" data-font-scale="normal" class="px-2 py-1 rounded text-xs font-bold">A</button>
+        <button type="button" data-font-scale="large" class="px-2 py-1 rounded text-xs font-bold">A+</button>
+        <button type="button" data-font-scale="xlarge" class="px-2 py-1 rounded text-xs font-bold">A++</button>
       </div>
-      <select id="pubEventSelect" class="bg-slate-800 border border-slate-700 text-amber-300 rounded-lg px-2.5 py-1.5 max-w-[260px] sm:max-w-xs"></select>
-      <button id="btnPubReloadDemo" title="載入最新 5 場 38 位全階段示範資料" class="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold whitespace-nowrap">⚡ 示範資料</button>
-      <a href="index.html" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 whitespace-nowrap">← 返回報名/管理系統</a>
+      <select id="pubEventSelect" class="bg-slate-800 border border-slate-700 text-amber-300 rounded-lg px-3 py-1.5 max-w-[260px] sm:max-w-xs font-bold"></select>
+      <button id="btnPubReloadDemo" title="載入最新 6 場全情境示範資料" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold whitespace-nowrap">⚡ 示範資料</button>
+      <a href="index.html" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 whitespace-nowrap">← 返回報名</a>
     </div>
   </div>
-  <div class="max-w-7xl mx-auto px-4 pb-2 flex gap-1.5 overflow-x-auto text-xs">
-    <button data-ptab="live" class="ptab active px-3.5 py-1.5 rounded-lg bg-slate-800 whitespace-nowrap">📊 賽事動態進度與統計分析</button>
-    <button data-ptab="history" class="ptab px-3.5 py-1.5 rounded-lg bg-slate-800 whitespace-nowrap">📚 歷年成績查詢</button>
-    <button data-ptab="warriors" class="ptab px-3.5 py-1.5 rounded-lg bg-slate-800 whitespace-nowrap">🏅 八百壯士 100K+ 英雄榜</button>
-    <button data-ptab="cert" class="ptab px-3.5 py-1.5 rounded-lg bg-slate-800 whitespace-nowrap">🏆 官方與客製化完賽證書</button>
+  <div class="max-w-7xl mx-auto px-4 pb-2.5 flex gap-2 overflow-x-auto text-xs sm:text-sm">
+    <button data-ptab="live" class="ptab active px-4 py-1.5 rounded-lg bg-slate-800 whitespace-nowrap">📊 即時進度</button>
+    <button data-ptab="history" class="ptab px-4 py-1.5 rounded-lg bg-slate-800 whitespace-nowrap">📚 歷年成績</button>
+    <button data-ptab="warriors" class="ptab px-4 py-1.5 rounded-lg bg-slate-800 whitespace-nowrap">🏅 八百壯士</button>
+    <button data-ptab="cert" class="ptab px-4 py-1.5 rounded-lg bg-slate-800 whitespace-nowrap">🏆 完賽證書</button>
   </div>
 </header>
 
@@ -58,11 +62,17 @@
     <!-- 2. 全階段 6 張 KPI 統計卡（點擊卡片可直接篩選下方選手名單） -->
     <div id="pubKpiGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs"></div>
 
-    <!-- 3. 雙欄詳細統計分析（左：各管制節點通過漏斗｜右：分組明細＋性別國籍分佈） -->
-    <div id="pubAnalyticsGrid" class="grid grid-cols-1 lg:grid-cols-12 gap-4 text-xs">
-      <div id="pubCheckpointFunnel" class="lg:col-span-6 bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3"></div>
-      <div id="pubCategoryBreakdown" class="lg:col-span-6 bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3"></div>
-    </div>
+    <!-- 3. 詳細統計分析（可一鍵展開／收合，讓畫面聚焦好閱讀） -->
+    <details open class="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden">
+      <summary class="px-4 py-3 cursor-pointer flex items-center justify-between text-xs sm:text-sm font-bold text-slate-200 hover:bg-slate-900">
+        <span class="flex items-center gap-2"><span class="acc-arrow inline-block text-amber-400">▶</span><span>📈 詳細統計分析（節點通過・分組明細・性別與國籍）</span></span>
+        <span class="text-xs text-slate-400 font-normal">點擊收合 / 展開</span>
+      </summary>
+      <div id="pubAnalyticsGrid" class="p-4 pt-1 grid grid-cols-1 lg:grid-cols-12 gap-4 text-xs">
+        <div id="pubCheckpointFunnel" class="lg:col-span-6 bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3"></div>
+        <div id="pubCategoryBreakdown" class="lg:col-span-6 bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3"></div>
+      </div>
+    </details>
 
     <!-- 4. 搜尋、組別與階段快篩工具列 -->
     <div class="bg-slate-900 p-3.5 rounded-2xl border border-slate-800 space-y-3 text-xs">
@@ -100,10 +110,10 @@
     <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-3 text-xs">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 class="font-black text-base text-white">📚 歷年成績多維度查詢與個人完賽證書中心</h2>
-          <p class="text-[11px] text-slate-400">整合歷屆歸併庫與本季完賽紀錄（採 SHA-256 匿名歸併，不含身分證）· 只要完賽即可一鍵製作個人官方/客製化證書！</p>
+          <h2 class="font-black text-base sm:text-lg text-white">📚 歷年成績查詢</h2>
+          <p class="text-xs text-slate-400">僅列已結案且具正式完賽成績之紀錄；點選單一賽事後下方自動省略重複賽事名稱。</p>
         </div>
-        <button id="btnHisReset" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold">↺ 重設篩選</button>
+        <button id="btnHisReset" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold">↺ 重設</button>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
         <input id="hisSearch" type="text" placeholder="🔎 搜尋姓名 / 號碼布 / 賽事" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white" />
@@ -136,12 +146,14 @@
       </div>
     </div>
 
+    <div id="hisPickedEventBanner" class="hidden bg-amber-500/15 border border-amber-400/40 rounded-2xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs"></div>
+
     <div class="bg-slate-900 rounded-2xl border border-slate-800 overflow-x-auto">
       <table class="w-full text-xs text-left">
         <thead class="bg-slate-800 text-slate-200">
           <tr>
             <th class="p-3 whitespace-nowrap">年度 / 日期</th>
-            <th class="p-3">賽事名稱</th>
+            <th id="hisThEvent" class="p-3">賽事名稱</th>
             <th class="p-3 whitespace-nowrap">組別</th>
             <th class="p-3 whitespace-nowrap">姓名 / 號碼布</th>
             <th class="p-3 whitespace-nowrap">有效距離</th>
@@ -196,24 +208,24 @@
     <div class="lg:col-span-8 bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 class="font-bold text-base text-white">🏆 活動完賽證書中心（官方證書 ＆ 選手客製化證書）</h2>
-          <p id="certConfigHint" class="text-[11px] text-slate-400"></p>
+          <h2 class="font-black text-base sm:text-lg text-white">🏆 完賽證書中心</h2>
+          <p id="certConfigHint" class="text-xs text-slate-400 mt-0.5"></p>
         </div>
         <div class="flex gap-2">
-          <button id="btnDlPng" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs">⬇️ 下載高解析 PNG</button>
-          <button id="btnDlPdf" class="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs">📄 匯出 PDF</button>
+          <button id="btnDlPng" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-sm">⬇️ 下載 PNG</button>
+          <button id="btnDlPdf" class="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm">📄 匯出 PDF</button>
         </div>
       </div>
 
-      <!-- 明確區分：官方證書（無個人照）vs 選手客製化證書（可上傳個人照） -->
+      <!-- 明確區分：官方證書 vs 選手客製化證書 -->
       <div class="grid grid-cols-2 gap-2.5 text-xs">
         <button id="btnPubModeOfficial" class="p-3 rounded-xl border-2 border-amber-400 bg-amber-400 text-slate-950 text-left font-bold transition">
-          <div class="font-black text-sm">🏛️ 官方證書（正式無個人照）</div>
-          <div class="text-[11px] opacity-85 mt-0.5">6 樣式 × 6 底圖 × 直/橫式 × 6 字型（純淨大會正式成績版）</div>
+          <div class="font-black text-sm">🏛️ 官方證書</div>
+          <div class="text-xs opacity-85 mt-0.5">純淨正式版（不含個人照片）</div>
         </button>
         <button id="btnPubModeCustom" class="p-3 rounded-xl border-2 border-slate-700 bg-slate-950 text-slate-300 text-left font-bold transition hover:border-amber-400">
-          <div class="font-black text-sm">📸 選手客製化證書（可放個人照片）</div>
-          <div class="text-[11px] opacity-80 mt-0.5">比照官方全部樣式與字型，額外上傳個人完賽照（3 相框拖曳）與 40 字感言</div>
+          <div class="font-black text-sm">📸 客製化證書</div>
+          <div class="text-xs opacity-80 mt-0.5">可上傳個人照片與 40 字感言</div>
         </button>
       </div>
 
@@ -276,8 +288,8 @@
   </section>
 </main>
 
-<script src="js/tur-logo.js?v=4.5"></script>
-<script src="js/tur-core.js?v=4.5"></script>
+<script src="js/tur-logo.js?v=4.7"></script>
+<script src="js/tur-core.js?v=4.7"></script>
 <script>
 (() => {
   'use strict';
@@ -865,22 +877,44 @@
       });
     }
 
-    // 4. 明細表格（凡完賽均可一鍵製作個人證書）
+    // 4. 明細表格（點選單一賽事後，自動隱藏下方重複的賽事名稱欄，避免表格過長）
+    const hideEventCol = Pub.hisEvent !== 'all';
+    $('#hisThEvent').classList.toggle('hidden', hideEventCol);
+    const evBanner = $('#hisPickedEventBanner');
+    if (hideEventCol) {
+      evBanner.classList.remove('hidden');
+      evBanner.innerHTML = `
+        <div class="flex flex-wrap items-center gap-2 text-amber-200">
+          <span class="font-black text-amber-300">🏁 已選取賽事：${C.escapeHtml(Pub.hisEvent)}</span>
+          <span class="text-slate-300">（共 ${list.length} 筆完賽成績，下方清單已省略重複賽事名稱）</span>
+        </div>
+        <button id="btnHisClearEv" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold">✕ 顯示全部賽事</button>`;
+      const clrBtn = document.getElementById('btnHisClearEv');
+      if (clrBtn) {
+        clrBtn.onclick = () => {
+          Pub.hisEvent = 'all';
+          $('#hisEventFilter').value = 'all';
+          renderHistory();
+        };
+      }
+    } else {
+      evBanner.classList.add('hidden');
+      evBanner.innerHTML = '';
+    }
+
     $('#hisBody').innerHTML = list.map((h) => `
       <tr class="hover:bg-slate-800/60">
         <td class="p-3 mono whitespace-nowrap"><span class="px-1.5 py-0.5 rounded bg-slate-800 text-amber-300 font-bold mr-1">${h.year}</span><span class="text-slate-400">${h.eventDate}</span></td>
-        <td class="p-3 font-semibold text-white">${C.escapeHtml(h.eventName)}</td>
+        ${hideEventCol ? '' : `<td class="p-3 font-semibold text-white max-w-[260px] truncate" title="${C.escapeHtml(h.eventName)}">${C.escapeHtml(h.eventName)}</td>`}
         <td class="p-3 whitespace-nowrap">${C.escapeHtml(h.categoryName)}</td>
         <td class="p-3 whitespace-nowrap"><div class="font-black text-white">${C.escapeHtml(h.name)}</div><div class="text-[10px] mono text-slate-400">BIB ${C.escapeHtml(h.bibNumber)} · ${C.escapeHtml(h.nationality)}</div></td>
         <td class="p-3 mono font-bold text-amber-300 whitespace-nowrap">${h.distanceKm} km ${h.lapCount ? `<span class="text-[10px] text-slate-400">(${h.lapCount}圈)</span>` : ''}</td>
         <td class="p-3 mono whitespace-nowrap"><div class="font-black text-emerald-400">${h.finishTime}</div><div class="text-[10px] text-slate-400">${h.avgPace}</div></td>
         <td class="p-3 whitespace-nowrap">${h.isWarrior800 ? '<span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/40 font-bold">★ 八百壯士 100K+</span>' : `<span class="text-slate-400 text-[11px]">${C.escapeHtml(h.remark || '完賽認證')}</span>`}</td>
         <td class="p-3 whitespace-nowrap">
-          ${h.canCert
-            ? `<button data-his-cert="${C.escapeHtml(h.recordId)}" class="px-2.5 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black">🏅 製作證書</button>`
-            : `<span class="px-2 py-1 rounded bg-slate-800 text-slate-400 text-[10px]">${h.source === 'live' ? '⏳ 待活動結案' : '無正式完賽成績'}</span>`}
+          <button data-his-cert="${C.escapeHtml(h.recordId)}" class="px-2.5 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black">🏅 製作證書</button>
         </td>
-      </tr>`).join('') || '<tr><td colspan="8" class="p-8 text-center text-slate-500">查無符合條件之歷年成績</td></tr>';
+      </tr>`).join('') || `<tr><td colspan="${hideEventCol ? 7 : 8}" class="p-8 text-center text-slate-500">查無符合條件之已結案歷年成績</td></tr>`;
 
     $$('[data-his-cert]').forEach((b) => {
       b.onclick = () => {
