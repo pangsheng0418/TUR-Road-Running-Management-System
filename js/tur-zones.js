@@ -35,9 +35,7 @@
   }
 
   function maskId(id) {
-    const s = String(id || '');
-    if (s.length <= 4) return '****';
-    return s.slice(0, 3) + '****' + s.slice(-3);
+    return C.maskIdCard(id);
   }
 
   /* --------------------------------------------------------------------------
@@ -1248,7 +1246,7 @@
                       <div class="flex flex-wrap items-center gap-1.5">
                         <span class="px-2 py-0.5 rounded bg-slate-900 text-amber-300 font-black mono">${b.bundleCode}</span>
                         <span class="font-black text-slate-900">${C.escapeHtml(b.runnerName)}</span>
-                        <span class="mono text-slate-500">${C.escapeHtml(b.idCard)}</span>
+                        <span class="mono text-slate-500">${C.escapeHtml(C.maskIdCard(b.idCard))}</span>
                         <span class="px-2 py-0.5 rounded-full font-bold ${b.allPaid ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">${b.allPaid ? '✅ 已全數入帳' : `待對帳 ${b.unpaidCount}/${b.items.length} 場`}</span>
                         ${b.remittanceLast5 ? `<span class="px-2 py-0.5 rounded bg-amber-100 text-amber-950 mono font-bold">末五碼 ${C.escapeHtml(b.remittanceLast5)}</span>` : ''}
                       </div>
@@ -1302,7 +1300,7 @@
                   <td class="p-2 mono font-black">${p.bibNumber || '<span class="text-slate-400 font-normal">未配</span>'}</td>
                   <td class="p-2">
                     <div class="font-bold">${C.escapeHtml(p.name)} <span class="px-1 rounded bg-sky-100 text-sky-800 text-[10px]">${p.nationality || 'TWN'}</span></div>
-                    <div class="text-[10px] text-slate-500 mono">${p.idCard} · ${p.phone || '-'} ${p.groupCode ? `· <b class="text-amber-700">${p.groupCode}</b>` : ''}</div>
+                    <div class="text-[10px] text-slate-500 mono">${C.escapeHtml(C.maskIdCard(p.idCard))} · ${p.phone || '-'} ${p.groupCode ? `· <b class="text-amber-700">${p.groupCode}</b>` : ''}</div>
                   </td>
                   <td class="p-2">${C.escapeHtml(catMap.get(p.catId) || p.catId)}</td>
                   <td class="p-2 mono font-bold">
@@ -1458,7 +1456,7 @@
                   <td class="p-1.5 mono text-slate-400">#${it.rowNum}</td>
                   <td class="p-1.5 font-bold whitespace-nowrap">${it.status === 'ready' ? '<span class="text-emerald-700">✅ 可新增</span>' : (it.status === 'duplicate' ? '<span class="text-amber-800">🔄 重複</span>' : '<span class="text-rose-700">❌ 異常</span>')}</td>
                   <td class="p-1.5 font-bold">${C.escapeHtml(it.data.name || '-')}</td>
-                  <td class="p-1.5 mono">${C.escapeHtml(it.data.idCard || '-')}</td>
+                  <td class="p-1.5 mono">${C.escapeHtml(C.maskIdCard(it.data.idCard) || '-')}</td>
                   <td class="p-1.5 mono">${C.escapeHtml(it.data.gender || '-')}</td>
                   <td class="p-1.5">${C.escapeHtml(it.data.categoryName)}</td>
                   <td class="p-1.5 mono">${it.data.bibNumber || '<span class="text-indigo-600">(自動配號)</span>'}</td>
@@ -1568,7 +1566,8 @@
     $('#epName').value = p.name || '';
     $('#epCatId').innerHTML = cats.map((c) => `<option value="${c.catId}" ${c.catId === p.catId ? 'selected' : ''}>${C.escapeHtml(c.name)} ($${c.fee})</option>`).join('');
     $('#epBib').value = p.bibNumber || '';
-    $('#epIdCard').value = p.idCard || '';
+    $('#epIdCard').value = '';
+    $('#epIdCard').placeholder = p.idCard ? `${C.maskIdCard(p.idCard)}（隱碼保護，留空不變更）` : '請輸入身分證 / 護照';
     $('#epGender').value = p.gender || 'M';
     $('#epBirthday').value = p.birthday || '';
     $('#epNat').value = p.nationality || 'TWN';
@@ -1650,7 +1649,8 @@
       p.firstName = split.firstName;
       if (feeAllowed) p.catId = $('#epCatId').value;
       p.bibNumber = $('#epBib').value.trim().toUpperCase();
-      p.idCard = $('#epIdCard').value.trim().toUpperCase();
+      const newIdRaw = $('#epIdCard').value.trim().toUpperCase();
+      if (newIdRaw && !newIdRaw.includes('*')) p.idCard = newIdRaw;
       p.gender = $('#epGender').value;
       p.birthday = $('#epBirthday').value;
       p.age = C.calcAge(p.birthday) || p.age;
@@ -1915,7 +1915,7 @@
         insp.classList.remove('hidden');
         insp.innerHTML = `
           <div class="font-black text-sky-950">🔍 晶片讀取檢視結果：${p.bibNumber || '未配號'} ${C.escapeHtml(p.name)}（${C.escapeHtml(catMap.get(p.catId) || '-')}）</div>
-          <div class="mono text-slate-700 mt-1">NDEF 內容：<b>${C.escapeHtml(p.name)}|${p.idCard}</b> ｜ 晶片 UID：<b>${C.escapeHtml(p.chipUid || '尚未寫入')}</b> ｜ 報到狀態：<b>${p.checkinStatus === 'checked_in' ? '✅ 已報到' : '⏳ 未報到'}</b></div>
+          <div class="mono text-slate-700 mt-1">NDEF 內容：<b>${C.escapeHtml(p.name)}|${C.escapeHtml(C.maskIdCard(p.idCard))}</b> ｜ 晶片 UID：<b>${C.escapeHtml(p.chipUid || '尚未寫入')}</b> ｜ 報到狀態：<b>${p.checkinStatus === 'checked_in' ? '✅ 已報到' : '⏳ 未報到'}</b></div>
           <div class="text-slate-600 mt-0.5">本場已通過站點：<span class="mono">${logs.length ? logs.map((l) => `${l.stationCode}(${String(l.sensedTime).slice(11)})`).join(' → ') : '尚無感應紀錄'}</span></div>`;
       };
     });

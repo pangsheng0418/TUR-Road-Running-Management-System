@@ -40,7 +40,7 @@ const SHEET_SCHEMAS = {
   ],
   Categories: [
     'catId', 'eventId', 'name', 'distanceKm', 'timeLimitHours',
-    'fee', 'bibPrefix', 'bibStartNum', 'quota', 'customRaceStart'
+    'fee', 'bibPrefix', 'bibStartNum', 'quota', 'customRaceStart', 'isWarrior800', 'earlyBirdFee'
   ],
   Stations: [
     'stationId', 'eventId', 'stationCode', 'name', 'distanceKm', 'stationType', 'orderIndex'
@@ -101,6 +101,8 @@ function setupSheets() {
     } else if (sheet.getLastRow() === 0) {
       sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
       sheet.setFrozenRows(1);
+    } else {
+      ensureSheet(name);
     }
   });
 
@@ -148,8 +150,16 @@ function setupSheets() {
       showSplitAnalysis: true, showOfficialStamp: true,
       allowPublicPhotoQuote: true, enableWarrior800: true
     });
-    const atmSchema = JSON.stringify({ paymentMode: 'MANUAL_ATM', customFields: [], addons: [] });
-    const payuniSchema = JSON.stringify({ paymentMode: 'ONLINE_PAYUNi', customFields: [], addons: [] });
+    const defaultAddons = [
+      { code: 'chip_buy', name: '晶片採購', price: 300, enabled: true },
+      { code: 'lodging', name: '住宿預訂價', price: 1500, enabled: true },
+      { code: 'sport_gear', name: '運動用品加購價', price: 680, enabled: true }
+    ];
+    const defaultCustomFields = [
+      { key: 'addons_note', label: '加購項目補充說明／備註', type: 'textarea', required: false, options: [], placeholder: '請補充晶片採購、住宿預訂（房型／同住人）或運動用品（尺寸／款式）等說明，無加購可留空' }
+    ];
+    const atmSchema = JSON.stringify({ paymentMode: 'MANUAL_ATM', earlyBirdEnabled: true, earlyBirdEnd: '2026-12-31 23:59:59', customFields: defaultCustomFields, addons: defaultAddons });
+    const payuniSchema = JSON.stringify({ paymentMode: 'ONLINE_PAYUNi', earlyBirdEnabled: true, earlyBirdEnd: '2026-12-31 23:59:59', customFields: defaultCustomFields, addons: defaultAddons });
     const evRows = [
       ['TUR-2026-50K', 'org_north', '2026 TUR 台灣超級馬拉松挑戰賽', '2026 TUR Taiwan Ultra Marathon Challenge', 'TUR 台灣超馬協會', 'TUR Taiwan Ultra Runners', '新北市烏來區', 'distance', 0, 15, 'open', '2026-01-01 00:00:00', '2026-12-31 23:59:59', '2026-06-14 05:00:00', 800, 'dyn-trail', '【活動宗旨】挑戰台灣經典超馬路線。\n【起跑時間】2026-06-14 05:00 準時起跑。\n【補給站】每 5km 設置水站與熱食補給，請自備環保杯。', atmSchema, defaultCert],
       ['TUR-2026-12H', 'org_north', '2026 TUR 台北 12H 繞圈超馬賽', '2026 TUR Taipei 12H Lap Ultra', 'TUR 台灣超馬協會', 'TUR Taiwan Ultra Runners', '台北田徑暖身場', 'lap_timed', 1.0, 15, 'open', '2026-01-01 00:00:00', '2026-12-31 23:59:59', '2026-07-18 06:00:00', 400, 'dyn-track', '【活動賽制】標準繞圈限時賽，單圈 1.0 km，限時內完成之有效圈數累計總里程。\n【起跑時間】2026-07-18 06:00 準時起跑。\n【注意事項】超時圈次將留存紀錄但不計入有效里程。', payuniSchema, defaultCert]
@@ -159,10 +169,10 @@ function setupSheets() {
     const catSheet = ss.getSheetByName('Categories');
     if (catSheet.getLastRow() <= 1) {
       catSheet.getRange(2, 1, 4, SHEET_SCHEMAS.Categories.length).setValues([
-        ['CAT-50K', 'TUR-2026-50K', '50K 超馬組', 50, 8, 1800, 'A', '001', 300, ''],
-        ['CAT-100K', 'TUR-2026-50K', '100K 八百壯士組', 100, 16, 2600, 'U', '001', 200, ''],
-        ['CAT-12H', 'TUR-2026-12H', '12H 繞圈組', 1.0, 12, 2200, 'L', '001', 200, ''],
-        ['CAT-6H', 'TUR-2026-12H', '6H 繞圈組', 1.0, 6, 1500, 'S', '001', 200, '']
+        ['CAT-50K', 'TUR-2026-50K', '50K 超馬組', 50, 8, 1800, 'A', '001', 300, '', false, 0],
+        ['CAT-100K', 'TUR-2026-50K', '100K 八百壯士組', 100, 16, 2600, 'U', '001', 200, '', true, 0],
+        ['CAT-12H', 'TUR-2026-12H', '12H 繞圈組', 1.0, 12, 2200, 'L', '001', 200, '', false, 0],
+        ['CAT-6H', 'TUR-2026-12H', '6H 繞圈組', 1.0, 6, 1500, 'S', '001', 200, '', false, 0]
       ]);
     }
 
@@ -199,7 +209,69 @@ function clearEventsDataOnly() {
       sheet.getRange(2, 1, lastRow - 1, Math.max(SHEET_SCHEMAS[name].length, sheet.getLastColumn())).clearContent();
     }
   });
+  invalidateReadCache();
   return '已清空 6 張活動與成績工作表（已保留 Users 與 GlobalConfig）。';
+}
+
+/**
+ * 單獨一鍵清除「10 大全情境測試資料（TEST-* / test_*）」：
+ * 僅刪除測試活動與其底下所有分組、站點、報名選手、計時紀錄、歷屆測試紀錄及測試帳號，
+ * 100% 保留所有正式活動、正式選手、正式帳號與 GlobalConfig！
+ */
+function clearTestSuiteDataOnly() {
+  return handleClearTestSuiteData();
+}
+
+function isTestSuiteRow(sheetName, headers, row) {
+  const get = function (col) {
+    const i = headers.indexOf(col);
+    return i >= 0 ? String(row[i] || '').trim() : '';
+  };
+  if (sheetName === 'Events') return /^TEST-/i.test(get('eventId'));
+  if (sheetName === 'Categories') return /^TEST-/i.test(get('catId')) || /^TEST-/i.test(get('eventId'));
+  if (sheetName === 'Stations') return /^TEST-/i.test(get('stationId')) || /^TEST-/i.test(get('eventId'));
+  if (sheetName === 'Participants') return /^TEST-/i.test(get('participantId')) || /^TEST-/i.test(get('eventId')) || /^TURM-TEST-/i.test(get('merTradeNo'));
+  if (sheetName === 'TimingLogs') return /^TEST-/i.test(get('logId')) || /^TEST-/i.test(get('eventId'));
+  if (sheetName === 'HistoryResults') return /^TEST-/i.test(get('historyId'));
+  if (sheetName === 'Users') return /^test_/i.test(get('username')) || /^TEST-/i.test(get('allowedEventId'));
+  return false;
+}
+
+function handleClearTestSuiteData() {
+  const targets = ['Events', 'Categories', 'Stations', 'Participants', 'TimingLogs', 'HistoryResults', 'Users'];
+  const deletedBySheet = {};
+  let totalDeleted = 0;
+  targets.forEach(function (name) {
+    const sheet = ensureSheet(name);
+    const values = sheet.getDataRange().getValues();
+    if (values.length <= 1) { deletedBySheet[name] = 0; return; }
+    const headers = values[0].map(function (h) { return String(h || '').trim(); });
+    const kept = [];
+    let removed = 0;
+    for (let r = 1; r < values.length; r++) {
+      if (isTestSuiteRow(name, headers, values[r])) {
+        removed++;
+      } else {
+        kept.push(values[r]);
+      }
+    }
+    if (removed > 0) {
+      const colCnt = Math.max(SHEET_SCHEMAS[name].length, values[0].length);
+      sheet.getRange(2, 1, values.length - 1, colCnt).clearContent();
+      if (kept.length > 0) {
+        const padded = kept.map(function (row) {
+          const out = row.slice(0, colCnt);
+          while (out.length < colCnt) out.push('');
+          return out;
+        });
+        sheet.getRange(2, 1, padded.length, colCnt).setValues(padded);
+      }
+    }
+    deletedBySheet[name] = removed;
+    totalDeleted += removed;
+  });
+  invalidateReadCache();
+  return { ok: true, totalDeleted: totalDeleted, deletedBySheet: deletedBySheet, serverTime: formatNow() };
 }
 
 /* ============================================================================
@@ -236,44 +308,59 @@ function doPost(e) {
     }
     const action = payload.action || '';
 
+    let result = { ok: false, error: 'Unknown POST action: ' + action };
     switch (action) {
       case 'batchUploadLogs':
-        return jsonResponse(handleBatchUploadLogs(payload));
+        result = handleBatchUploadLogs(payload); break;
       case 'registerRunner':
-        return jsonResponse(handleRegisterRunner(payload));
+        result = handleRegisterRunner(payload); break;
       case 'payuniConfirm':
-        return jsonResponse(handlePayuniConfirm(payload));
+        result = handlePayuniConfirm(payload); break;
       case 'lookupAuth':
         return jsonResponse(handleLookupAuth(payload));
       case 'updateSelfRegistration':
-        return jsonResponse(handleUpdateSelfRegistration(payload));
+        result = handleUpdateSelfRegistration(payload); break;
       case 'updateParticipant':
-        return jsonResponse(handleUpdateParticipant(payload));
+        result = handleUpdateParticipant(payload); break;
       case 'deleteParticipant':
-        return jsonResponse(handleDeleteParticipant(payload));
+        result = handleDeleteParticipant(payload); break;
       case 'batchUpdateParticipants':
-        return jsonResponse(handleBatchUpdateParticipants(payload));
+        result = handleBatchUpdateParticipants(payload); break;
+      case 'markBundlePaid':
+        result = handleMarkBundlePaid(payload); break;
+      case 'updateBundleLast5':
+        result = handleUpdateBundleLast5(payload); break;
       case 'triggerGunStart':
-        return jsonResponse(handleTriggerGunStart(payload));
+        result = handleTriggerGunStart(payload); break;
       case 'saveEvent':
-        return jsonResponse(handleUpsertRow('Events', 'eventId', payload.event));
+        result = handleUpsertRow('Events', 'eventId', payload.event); break;
       case 'saveCategory':
-        return jsonResponse(handleUpsertRow('Categories', 'catId', payload.category));
+        result = handleUpsertRow('Categories', 'catId', payload.category); break;
+      case 'deleteCategory':
+        result = handleDeleteCategory(payload); break;
       case 'saveStation':
-        return jsonResponse(handleUpsertRow('Stations', 'stationId', payload.station));
+        result = handleUpsertRow('Stations', 'stationId', payload.station); break;
+      case 'deleteStation':
+        result = handleDeleteStation(payload); break;
       case 'saveUser':
-        return jsonResponse(handleUpsertRow('Users', 'username', payload.user));
+        result = handleUpsertRow('Users', 'username', payload.user); break;
       case 'saveGlobalConfig':
-        return jsonResponse(handleSaveGlobalConfig(payload));
+        result = handleSaveGlobalConfig(payload); break;
       case 'adjustTimingLog':
-        return jsonResponse(handleUpsertRow('TimingLogs', 'logId', payload.log));
+        result = handleUpsertRow('TimingLogs', 'logId', payload.log); break;
       case 'batchImportHistory':
-        return jsonResponse(handleBatchImportHistory(payload));
+        result = handleBatchImportHistory(payload); break;
+      case 'saveHistory':
+        result = handleUpsertRow('HistoryResults', 'historyId', payload.history); break;
       case 'adminBatchUpdateSheet':
-        return jsonResponse(handleAdminBatchUpdateSheet(payload));
+        result = handleAdminBatchUpdateSheet(payload); break;
+      case 'clearTestSuiteData':
+        result = handleClearTestSuiteData(); break;
       default:
-        return jsonResponse({ ok: false, error: 'Unknown POST action: ' + action });
+        return jsonResponse(result);
     }
+    if (result && result.ok) invalidateReadCache();
+    return jsonResponse(result);
   } catch (err) {
     return jsonResponse({ ok: false, error: err.message || String(err) });
   } finally {
@@ -282,10 +369,45 @@ function doPost(e) {
 }
 
 /* ============================================================================
+ * 伺服器端讀取快取（CacheService 20 秒加速，任何寫入自動失效確保零髒資料）
+ * ============================================================================ */
+function getCacheVersion() {
+  try {
+    return CacheService.getScriptCache().get('TUR_CACHE_VER') || '1';
+  } catch (_) { return '1'; }
+}
+
+function getReadCache(key) {
+  try {
+    const raw = CacheService.getScriptCache().get('TUR_V' + getCacheVersion() + '_' + key);
+    return raw ? JSON.parse(raw) : null;
+  } catch (_) { return null; }
+}
+
+function setReadCache(key, obj, ttlSec) {
+  try {
+    const raw = JSON.stringify(obj);
+    if (raw.length < 90000) {
+      CacheService.getScriptCache().put('TUR_V' + getCacheVersion() + '_' + key, raw, ttlSec || 20);
+    }
+  } catch (_) {}
+}
+
+function invalidateReadCache() {
+  try {
+    CacheService.getScriptCache().put('TUR_CACHE_VER', String(Date.now()), 21600);
+  } catch (_) {}
+}
+
+/* ============================================================================
  * Core Handlers
  * ============================================================================ */
 
 function handleGetBootstrapData(eventId) {
+  const cacheKey = 'boot_' + (eventId || 'ALL');
+  const cached = getReadCache(cacheKey);
+  if (cached) return cached;
+
   const ss = getTargetSpreadsheet();
   if (!ss.getSheetByName('Events') || !ss.getSheetByName('GlobalConfig')) {
     setupSheets();
@@ -307,7 +429,7 @@ function handleGetBootstrapData(eventId) {
     timingLogs = timingLogs.filter(function (r) { return String(r.eventId) === String(eventId); });
   }
 
-  return {
+  const out = {
     ok: true,
     version: 'v3.0',
     serverTime: formatNow(),
@@ -322,12 +444,21 @@ function handleGetBootstrapData(eventId) {
       globalConfig: globalConfig
     }
   };
+  setReadCache(cacheKey, out, 20);
+  return out;
 }
 
 /**
  * 公開頁查詢：嚴格隱藏身分證字號、聯絡電話、Email 與報到時間 (CHECKIN)
  */
 function handlePublicLookup(eventId, query) {
+  const q = String(query || '').trim().toUpperCase();
+  const cacheKey = !q ? ('pub_' + (eventId || 'ALL')) : '';
+  if (cacheKey) {
+    const cached = getReadCache(cacheKey);
+    if (cached) return cached;
+  }
+
   const events = readSheetAsObjects('Events', 'eventId');
   const categories = readSheetAsObjects('Categories', 'catId');
   const stations = readSheetAsObjects('Stations', 'stationId').filter(function (s) {
@@ -344,7 +475,6 @@ function handlePublicLookup(eventId, query) {
     timingLogs = timingLogs.filter(function (l) { return String(l.eventId) === String(eventId); });
   }
 
-  const q = String(query || '').trim().toUpperCase();
   const safeParticipants = participants
     .filter(function (p) {
       if (!q) return true;
@@ -368,7 +498,7 @@ function handlePublicLookup(eventId, query) {
       };
     });
 
-  return {
+  const out = {
     ok: true,
     data: {
       events: events,
@@ -379,6 +509,8 @@ function handlePublicLookup(eventId, query) {
       historyResults: historyResults
     }
   };
+  if (cacheKey) setReadCache(cacheKey, out, 20);
+  return out;
 }
 
 /**
@@ -529,10 +661,12 @@ function handlePayuniConfirm(payload) {
         }
       }
       let num = startNum;
-      let bib = prefix + ('000' + num).slice(-3);
-      while (used[bib.toUpperCase()]) {
+      let bib = prefix + (num < 1000 ? ('000' + num).slice(-3) : String(num));
+      let guard = 0;
+      while (used[bib.toUpperCase()] && guard < 100000) {
         num++;
-        bib = prefix + ('000' + num).slice(-3);
+        guard++;
+        bib = prefix + (num < 1000 ? ('000' + num).slice(-3) : String(num));
       }
       values[r][idxBib] = bib;
     }
@@ -593,40 +727,123 @@ function handleBatchUploadLogs(payload) {
   return { ok: true, inserted: rowsToInsert.length, skipped: skipped, serverTime: formatNow() };
 }
 
+function maskIdCardServer(id) {
+  const s = String(id || '').trim();
+  if (!s) return '';
+  if (s.length >= 8) return s.slice(0, 3) + '*****' + s.slice(-2);
+  if (s.length >= 5) return s.slice(0, 2) + '*****' + s.slice(-1);
+  return s[0] + '*****';
+}
+
+function getServerEffectiveCategoryFee(evObj, catObj) {
+  const regFee = Number(catObj ? catObj.fee : 0);
+  const ebFee = Number(catObj ? catObj.earlyBirdFee : 0);
+  if (!evObj || !evObj.formSchemaJson || !(ebFee > 0 && ebFee < regFee)) return regFee;
+  try {
+    const sc = JSON.parse(evObj.formSchemaJson);
+    if (!sc || !sc.earlyBirdEnabled || !sc.earlyBirdEnd) return regFee;
+    let endStr = String(sc.earlyBirdEnd).trim().replace('T', ' ');
+    if (/^\d{4}-\d{2}-\d{2}$/.test(endStr)) endStr += ' 23:59:59';
+    else if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(endStr)) endStr += ':59';
+    const nowTw = Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd HH:mm:ss');
+    return nowTw <= endStr ? ebFee : regFee;
+  } catch (_) {
+    return regFee;
+  }
+}
+
 function handleRegisterRunner(payload) {
   const runners = Array.isArray(payload.runners) ? payload.runners : (payload.runner ? [payload.runner] : []);
   if (runners.length === 0) return { ok: false, error: '報名資料不可為空' };
   if (runners.length > 50) return { ok: false, error: '單筆團體報名上限為 50 人' };
 
   const sheet = ensureSheet('Participants');
-  const headers = SHEET_SCHEMAS.Participants;
+  const sheetHeaders = sheet.getRange(1, 1, 1, Math.max(SHEET_SCHEMAS.Participants.length, sheet.getLastColumn())).getValues()[0].map(function (h) { return String(h || '').trim(); });
   const eventsMap = {};
   readSheetAsObjects('Events', 'eventId').forEach(function (ev) { eventsMap[String(ev.eventId)] = ev; });
+  const catsMap = {};
+  readSheetAsObjects('Categories', 'catId').forEach(function (c) { catsMap[String(c.catId)] = c; });
   const existing = readSheetAsObjects('Participants', 'participantId');
   const existingKeySet = {};
+  const activeCountByEvent = {};
+  const activeCountByCat = {};
   existing.forEach(function (p) {
+    if (String(p.payStatus || '').toUpperCase() === 'CANCELLED') return;
     existingKeySet[String(p.eventId) + '::' + String(p.idCard || '').toUpperCase()] = true;
+    activeCountByEvent[String(p.eventId)] = (activeCountByEvent[String(p.eventId)] || 0) + 1;
+    const ck = String(p.eventId) + '::' + String(p.catId || '');
+    activeCountByCat[ck] = (activeCountByCat[ck] || 0) + 1;
   });
+
+  // 伺服器端嚴格管制：多場聯合報名（共用 TURM-* 合併單號）僅限同一承辦人且同金流模式之活動
+  const bundleCode0 = runners.length > 1 && /^TURM-/i.test(String(runners[0].merTradeNo || '')) ? String(runners[0].merTradeNo).trim().toUpperCase() : '';
+  if (bundleCode0) {
+    const bundleOwners = {};
+    const bundlePayMethods = {};
+    for (let bi = 0; bi < runners.length; bi++) {
+      if (String(runners[bi].merTradeNo || '').trim().toUpperCase() !== bundleCode0) continue;
+      const bev = eventsMap[String(runners[bi].eventId || '')];
+      if (bev) {
+        const ownerKey = String(bev.ownerUsername || bev.organizerZh || 'TUR').trim();
+        bundleOwners[ownerKey] = true;
+      }
+      bundlePayMethods[String(runners[bi].payMethod || 'MANUAL_ATM')] = true;
+    }
+    if (Object.keys(bundleOwners).length > 1) {
+      return { ok: false, error: '多場聯合報名僅限同一承辦人舉辦之活動（不同承辦人收款帳戶不同，不可合併為同一筆結帳）' };
+    }
+    if (Object.keys(bundlePayMethods).length > 1) {
+      return { ok: false, error: '多場聯合報名僅限相同金流模式之活動合併結帳' };
+    }
+  }
 
   const rowsToInsert = [];
   const created = [];
   for (let i = 0; i < runners.length; i++) {
     const r = runners[i];
-    const key = String(r.eventId) + '::' + String(r.idCard || '').toUpperCase();
+    const evId = String(r.eventId || '');
+    const key = evId + '::' + String(r.idCard || '').toUpperCase();
     if (existingKeySet[key]) {
-      return { ok: false, error: '身分證/護照 ' + r.idCard + ' (' + r.name + ') 已報名本場活動' };
+      return { ok: false, error: '身分證/護照 ' + maskIdCardServer(r.idCard) + ' (' + r.name + ') 已報名本場活動' };
     }
-    // 伺服器端嚴格管制本活動設定之金流作業模式（外部名單匯入 EXTERNAL_IMPORT 除外）
-    const evObj = eventsMap[String(r.eventId)];
-    if (evObj && evObj.formSchemaJson && String(r.payMethod || '') !== 'EXTERNAL_IMPORT') {
-      try {
-        const sc = JSON.parse(evObj.formSchemaJson);
-        if (sc && sc.paymentMode && String(r.payMethod || '') !== String(sc.paymentMode)) {
-          return { ok: false, error: '本活動金流管制為 ' + sc.paymentMode + '，不允許使用 ' + (r.payMethod || '其他方式') + ' 報名' };
+    // 伺服器端嚴格管制活動開放狀態、總名額與金流作業模式（外部名單匯入 EXTERNAL_IMPORT 除外）
+    const evObj = eventsMap[evId];
+    const isExtImport = String(r.payMethod || '') === 'EXTERNAL_IMPORT';
+    if (evObj && !isExtImport) {
+      const evSt = String(evObj.status || 'open').toLowerCase();
+      if (evSt !== 'open' && evSt !== 'auto') {
+        return { ok: false, error: '活動「' + (evObj.nameZh || evId) + '」目前未開放報名（狀態：' + evSt + '）' };
+      }
+      const maxQ = Number(evObj.maxQuota || 0);
+      if (maxQ > 0 && (activeCountByEvent[evId] || 0) >= maxQ) {
+        return { ok: false, error: '活動「' + (evObj.nameZh || evId) + '」已達報名名額上限 (' + maxQ + ' 人)' };
+      }
+      const catObj = catsMap[String(r.catId || '')];
+      const catKey = evId + '::' + String(r.catId || '');
+      const catQ = Number(catObj ? catObj.quota : 0);
+      if (catObj && catQ > 0 && (activeCountByCat[catKey] || 0) >= catQ) {
+        return { ok: false, error: '分組「' + (catObj.name || r.catId) + '」已達名額上限 (' + catQ + ' 人)' };
+      }
+      if (evObj.formSchemaJson) {
+        try {
+          const sc = JSON.parse(evObj.formSchemaJson);
+          if (sc && sc.paymentMode && String(r.payMethod || '') !== String(sc.paymentMode)) {
+            return { ok: false, error: '本活動金流管制為 ' + sc.paymentMode + '，不允許使用 ' + (r.payMethod || '其他方式') + ' 報名' };
+          }
+        } catch (_) {}
+      }
+      // 伺服器端台灣時間二次核價防呆（防前端調系統時間套取已過期早鳥價）
+      if (catObj && r.totalAmount !== undefined && r.totalAmount !== '' && Number(r.totalAmount) > 0) {
+        const srvMinFee = getServerEffectiveCategoryFee(evObj, catObj);
+        if (Number(r.totalAmount) < srvMinFee) {
+          return { ok: false, error: '早鳥優惠期間已結束或組別金額不符，請重新整理頁面以最新價格報名（目前基本費 NT$' + srvMinFee + '）' };
         }
-      } catch (_) {}
+      }
     }
     existingKeySet[key] = true;
+    activeCountByEvent[evId] = (activeCountByEvent[evId] || 0) + 1;
+    const catKeyInc = evId + '::' + String(r.catId || '');
+    activeCountByCat[catKeyInc] = (activeCountByCat[catKeyInc] || 0) + 1;
     const rec = {
       participantId: r.participantId || ('TUR-' + Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyyMMdd') + '-' + Math.floor(10000 + Math.random() * 90000)),
       eventId: r.eventId || '',
@@ -667,50 +884,79 @@ function handleRegisterRunner(payload) {
       customFieldsJson: typeof r.customFieldsJson === 'string' ? r.customFieldsJson : JSON.stringify(r.customFields || {})
     };
     created.push(rec);
-    rowsToInsert.push(headers.map(function (h) { return rec[h]; }));
+    rowsToInsert.push(sheetHeaders.map(function (h) { return rec[h] !== undefined && rec[h] !== null ? rec[h] : ''; }));
   }
 
-  sheet.getRange(sheet.getLastRow() + 1, 1, rowsToInsert.length, headers.length).setValues(rowsToInsert);
+  sheet.getRange(sheet.getLastRow() + 1, 1, rowsToInsert.length, sheetHeaders.length).setValues(rowsToInsert);
 
   let emailsSent = 0;
   if (isAutoSendEmailEnabled()) {
     const evMap = getEventNameMap();
     const bankTxt = getBankSummaryText();
-    created.forEach(function (rec) {
-      if (rec.email && rec.email.indexOf('@') > 0) {
-        const evName = evMap[String(rec.eventId)] || rec.eventId;
-        const isPaid = String(rec.payStatus).toUpperCase() === 'PAID';
-        safeSendMail(
-          rec.email,
-          '【TUR 賽事報名確認】' + evName + '（序號 ' + rec.participantId + '）',
-          '親愛的 ' + rec.name + ' 您好：\n\n您已完成「' + evName + '」報名作業！\n' +
-          '────────────────────────\n' +
-          '• 報名序號：' + rec.participantId + '\n' +
-          (rec.groupCode ? '• 團報代碼：' + rec.groupCode + '（' + (rec.groupName || '') + '）\n' : '') +
-          (rec.bibNumber ? '• 參賽號碼布：' + rec.bibNumber + '\n' : '') +
-          '• 付款管道：' + rec.payMethod + '\n' +
-          '• 應繳金額：NT$ ' + rec.totalAmount + '\n' +
-          '• 目前繳費狀態：' + (isPaid ? '已繳費入帳 (PAID)' : '待繳費 (UNPAID)') + '\n' +
-          (!isPaid && rec.payMethod === 'ONLINE_PAYUNi'
-            ? '\n【線上金流付款說明】\n本場次採 PAYUNi 統一金流線上結帳，完成付款後將由系統自動秒級銷帳、配發號碼布並再次寄發入帳通知信。\n'
-            : (!isPaid && bankTxt ? '\n【大會匯款資訊（轉帳核對末五碼）】\n' + bankTxt + '\n請完成匯款後至「雙因子查改 (/lookup)」填報帳號末五碼供大會對帳。\n' : '')) +
-          '────────────────────────\n' +
-          '【反向查詢與修改說明 (/lookup)】\n' +
-          '您可隨時使用「身分證字號/護照」＋「報名序號或 Email」登入報名系統進行雙因子查改：\n' +
-          '1. 尚未繳費前：可修改組別、加購服務、匯款末五碼及所有聯絡資料。\n' +
-          '2. 確認繳費後：費用相關項目（組別、加購、金額、末五碼）將自動鎖定不可變更；其餘聯絡電話、緊急聯絡人、飲食與自訂欄位仍可修改。\n\n' +
-          'TUR 台灣超馬賽事組委會 敬上'
-        );
-        emailsSent++;
-        if (isPaid) {
-          sendPaymentConfirmedEmail({
-            email: rec.email, name: rec.name, pid: rec.participantId, bib: rec.bibNumber,
-            eventName: evName, amount: rec.totalAmount, paidAt: rec.paidAt || formatNow(), channel: rec.payMethod
-          });
+    const firstBundle = created.length > 1 && /^TURM-/i.test(String(created[0].merTradeNo || '')) ? String(created[0].merTradeNo) : '';
+    const isUnifiedBundle = firstBundle && created.every(function (c) { return String(c.merTradeNo || '') === firstBundle && c.email === created[0].email; });
+
+    if (isUnifiedBundle && created[0].email && created[0].email.indexOf('@') > 0) {
+      const grandTotal = created.reduce(function (s, c) { return s + Number(c.totalAmount || 0); }, 0);
+      const isPaid = String(created[0].payStatus).toUpperCase() === 'PAID';
+      const lines = created.map(function (c, i) {
+        return (i + 1) + '. ' + (evMap[String(c.eventId)] || c.eventId) + '｜序號 ' + c.participantId + (c.bibNumber ? '｜號碼布 ' + c.bibNumber : '') + '｜NT$ ' + c.totalAmount;
+      }).join('\n');
+      safeSendMail(
+        created[0].email,
+        '【TUR 多場活動聯合報名確認】合併單號 ' + firstBundle + '（共 ' + created.length + ' 場）',
+        '親愛的 ' + created[0].name + ' 您好：\n\n您已完成 TUR 多場活動聯合報名！\n' +
+        '────────────────────────\n' +
+        '• 合併結帳單號：' + firstBundle + '\n' +
+        '• 合併場次數：共 ' + created.length + ' 場\n' +
+        '• 合併應繳總金額：NT$ ' + grandTotal + '\n' +
+        '• 付款管道：' + created[0].payMethod + '\n' +
+        '• 繳費狀態：' + (isPaid ? '已繳費入帳 (PAID)' : '待繳費 (UNPAID)') + '\n' +
+        '────────────────────────\n' +
+        '【本次聯合報名場次明細】\n' + lines + '\n' +
+        (!isPaid && created[0].payMethod === 'MANUAL_ATM' && bankTxt
+          ? '\n【大會統一匯款資訊（請一次匯入合併總額 NT$ ' + grandTotal + '）】\n' + bankTxt + '\n請於匯款後至「報名查詢與修改 (/lookup)」輸入身分證與合併單號 ' + firstBundle + ' 一次補填帳號末五碼。\n'
+          : '') +
+        '\nTUR 台灣超馬賽事組委會 敬上'
+      );
+      emailsSent++;
+    } else {
+      created.forEach(function (rec) {
+        if (rec.email && rec.email.indexOf('@') > 0) {
+          const evName = evMap[String(rec.eventId)] || rec.eventId;
+          const isPaid = String(rec.payStatus).toUpperCase() === 'PAID';
+          safeSendMail(
+            rec.email,
+            '【TUR 賽事報名確認】' + evName + '（序號 ' + rec.participantId + '）',
+            '親愛的 ' + rec.name + ' 您好：\n\n您已完成「' + evName + '」報名作業！\n' +
+            '────────────────────────\n' +
+            '• 報名序號：' + rec.participantId + '\n' +
+            (rec.groupCode ? '• 團報代碼：' + rec.groupCode + '（' + (rec.groupName || '') + '）\n' : '') +
+            (rec.bibNumber ? '• 參賽號碼布：' + rec.bibNumber + '\n' : '') +
+            '• 付款管道：' + rec.payMethod + '\n' +
+            '• 應繳金額：NT$ ' + rec.totalAmount + '\n' +
+            '• 目前繳費狀態：' + (isPaid ? '已繳費入帳 (PAID)' : '待繳費 (UNPAID)') + '\n' +
+            (!isPaid && rec.payMethod === 'ONLINE_PAYUNi'
+              ? '\n【線上金流付款說明】\n本場次採 PAYUNi 統一金流線上結帳，完成付款後將由系統自動秒級銷帳、配發號碼布並再次寄發入帳通知信。\n'
+              : (!isPaid && bankTxt ? '\n【大會匯款資訊（轉帳核對末五碼）】\n' + bankTxt + '\n請完成匯款後至「雙因子查改 (/lookup)」填報帳號末五碼供大會對帳。\n' : '')) +
+            '────────────────────────\n' +
+            '【反向查詢與修改說明 (/lookup)】\n' +
+            '您可隨時使用「身分證字號/護照」＋「報名序號或 Email」登入報名系統進行雙因子查改：\n' +
+            '1. 尚未繳費前：可修改組別、加購服務、匯款末五碼及所有聯絡資料。\n' +
+            '2. 確認繳費後：費用相關項目（組別、加購、金額、末五碼）將自動鎖定不可變更；其餘聯絡電話、緊急聯絡人、飲食與自訂欄位仍可修改。\n\n' +
+            'TUR 台灣超馬賽事組委會 敬上'
+          );
           emailsSent++;
+          if (isPaid) {
+            sendPaymentConfirmedEmail({
+              email: rec.email, name: rec.name, pid: rec.participantId, bib: rec.bibNumber,
+              eventName: evName, amount: rec.totalAmount, paidAt: rec.paidAt || formatNow(), channel: rec.payMethod
+            });
+            emailsSent++;
+          }
         }
-      }
-    });
+      });
+    }
   }
 
   return { ok: true, count: created.length, participants: created, emailsSent: emailsSent };
@@ -722,10 +968,138 @@ function handleLookupAuth(payload) {
   const list = readSheetAsObjects('Participants', 'participantId');
   const found = list.find(function (p) {
     return String(p.idCard || '').toUpperCase() === idCard &&
-      (String(p.participantId || '').toUpperCase() === credential || String(p.email || '').toUpperCase() === credential);
+      (String(p.participantId || '').toUpperCase() === credential ||
+        String(p.email || '').toUpperCase() === credential ||
+        String(p.merTradeNo || '').toUpperCase() === credential);
   });
   if (!found) return { ok: false, error: '查無符合之報名資料' };
-  return { ok: true, expiresAt: Date.now() + 45 * 60 * 1000, participant: found };
+  const allById = list.filter(function (p) {
+    return String(p.idCard || '').toUpperCase() === idCard && String(p.payStatus || '').toUpperCase() !== 'CANCELLED';
+  });
+  return { ok: true, expiresAt: Date.now() + 45 * 60 * 1000, participant: found, allParticipants: allById };
+}
+
+function handleUpdateBundleLast5(payload) {
+  const idCard = String(payload.idCard || '').trim().toUpperCase();
+  const bundleCode = String(payload.bundleCode || '').trim().toUpperCase();
+  const last5 = String(payload.remittanceLast5 || '').trim();
+  if (!bundleCode || !/^\d{5}$/.test(last5)) return { ok: false, error: '合併單號無效或末五碼須為 5 位純數字' };
+  const sheet = ensureSheet('Participants');
+  const range = sheet.getDataRange();
+  const values = range.getValues();
+  if (values.length <= 1) return { ok: false, error: '無選手資料' };
+  const headers = values[0];
+  const idxId = headers.indexOf('idCard');
+  const idxMer = headers.indexOf('merTradeNo');
+  const idxPay = headers.indexOf('payStatus');
+  const idxL5 = headers.indexOf('remittanceLast5');
+  let updated = 0;
+  for (let r = 1; r < values.length; r++) {
+    if (String(values[r][idxMer] || '').toUpperCase() !== bundleCode) continue;
+    if (idCard && String(values[r][idxId] || '').toUpperCase() !== idCard) continue;
+    const st = String(values[r][idxPay] || '').toUpperCase();
+    if (st === 'PAID' || st === 'CANCELLED') continue;
+    values[r][idxL5] = last5;
+    updated++;
+  }
+  if (updated > 0) range.setValues(values);
+  return { ok: true, bundleCode: bundleCode, updated: updated, remittanceLast5: last5 };
+}
+
+function handleMarkBundlePaid(payload) {
+  const bundleCode = String(payload.bundleCode || '').trim().toUpperCase();
+  if (!bundleCode) return { ok: false, error: '缺少合併單號 bundleCode' };
+  const paidAt = payload.paidAt || formatNow();
+  const sheet = ensureSheet('Participants');
+  const range = sheet.getDataRange();
+  const values = range.getValues();
+  if (values.length <= 1) return { ok: false, error: '無選手資料' };
+
+  const headers = values[0];
+  const idxPid = headers.indexOf('participantId');
+  const idxMer = headers.indexOf('merTradeNo');
+  const idxPay = headers.indexOf('payStatus');
+  const idxPaidAt = headers.indexOf('paidAt');
+  const idxBib = headers.indexOf('bibNumber');
+  const idxEv = headers.indexOf('eventId');
+  const idxCat = headers.indexOf('catId');
+  const idxEmail = headers.indexOf('email');
+  const idxName = headers.indexOf('name');
+  const idxAmt = headers.indexOf('totalAmount');
+
+  const cats = readSheetAsObjects('Categories', 'catId');
+  const evMap = getEventNameMap();
+  let updated = 0;
+  const confirmedItems = [];
+
+  for (let r = 1; r < values.length; r++) {
+    if (String(values[r][idxMer] || '').toUpperCase() !== bundleCode) continue;
+    const prevPay = String(values[r][idxPay] || '').toUpperCase();
+    if (prevPay === 'CANCELLED' || prevPay === 'PAID') continue;
+
+    values[r][idxPay] = 'PAID';
+    values[r][idxPaidAt] = paidAt;
+
+    if (!values[r][idxBib]) {
+      const evId = String(values[r][idxEv]);
+      const pidStr = String(values[r][idxPid]);
+      const used = {};
+      for (let k = 1; k < values.length; k++) {
+        if (String(values[k][idxEv]) === evId && values[k][idxBib]) {
+          used[String(values[k][idxBib]).toUpperCase()] = true;
+        }
+      }
+      const preferredBib = payload.bibMap && payload.bibMap[pidStr] ? String(payload.bibMap[pidStr]).toUpperCase() : '';
+      if (preferredBib && !used[preferredBib]) {
+        values[r][idxBib] = preferredBib;
+      } else {
+        const cat = cats.find(function (c) { return String(c.catId) === String(values[r][idxCat]); });
+        const prefix = cat ? String(cat.bibPrefix || 'R') : 'R';
+        const startNum = cat ? parseInt(cat.bibStartNum || '1', 10) : 1;
+        let num = startNum;
+        let bib = prefix + (num < 1000 ? ('000' + num).slice(-3) : String(num));
+        let guard = 0;
+        while (used[bib.toUpperCase()] && guard < 100000) {
+          num++;
+          guard++;
+          bib = prefix + (num < 1000 ? ('000' + num).slice(-3) : String(num));
+        }
+        values[r][idxBib] = bib;
+      }
+    }
+
+    confirmedItems.push({
+      email: String(values[r][idxEmail] || ''),
+      name: String(values[r][idxName] || ''),
+      pid: String(values[r][idxPid] || ''),
+      bib: String(values[r][idxBib] || ''),
+      eventName: evMap[String(values[r][idxEv])] || String(values[r][idxEv]),
+      amount: Number(values[r][idxAmt] || 0)
+    });
+    updated++;
+  }
+
+  if (updated > 0) range.setValues(values);
+
+  if (updated > 0 && isAutoSendEmailEnabled() && confirmedItems[0].email && confirmedItems[0].email.indexOf('@') > 0) {
+    const sumAmt = confirmedItems.reduce(function (s, m) { return s + m.amount; }, 0);
+    const detailTxt = confirmedItems.map(function (m, i) {
+      return (i + 1) + '. ' + m.eventName + '｜序號 ' + m.pid + '｜號碼布 ' + (m.bib || '待配') + '｜NT$ ' + m.amount;
+    }).join('\n');
+    safeSendMail(
+      confirmedItems[0].email,
+      '【TUR 合併繳費入帳確認通知】合併單號 ' + bundleCode + '（共 ' + confirmedItems.length + ' 場已入帳）',
+      '親愛的 ' + confirmedItems[0].name + ' 您好：\n\n您的多場聯合報名合併款項已確認入帳完成（PAID）！\n' +
+      '────────────────────────\n' +
+      '• 合併單號：' + bundleCode + '\n' +
+      '• 實繳合併總額：NT$ ' + sumAmt + '\n' +
+      '• 入帳時間：' + paidAt + '\n' +
+      '────────────────────────\n' +
+      '【已入帳與配號場次明細】\n' + detailTxt + '\n\n' +
+      '祝您各場次順利完賽！\nTUR 台灣超馬賽事組委會 敬上'
+    );
+  }
+  return { ok: true, bundleCode: bundleCode, updated: updated, items: confirmedItems };
 }
 
 function handleUpdateSelfRegistration(payload) {
@@ -750,14 +1124,46 @@ function handleUpdateSelfRegistration(payload) {
   for (let r = 1; r < values.length; r++) {
     if (String(values[r][idxPid]) === pid && String(values[r][idxId]).toUpperCase() === idCard) {
       const ev = evById[String(values[r][idxEv])];
+      const evSt = String(ev ? ev.status : 'open').toLowerCase();
       const paySt = String(values[r][idxPay] || '').toUpperCase();
       if (paySt === 'CANCELLED') return { ok: false, error: '此筆報名已取消，無法修改' };
-      if (ev && String(ev.status) === 'finished') return { ok: false, error: '本活動已結案鎖定，不再開放反向修改' };
+      if (evSt === 'finished') return { ok: false, error: '本活動已結案鎖定，不再開放反向修改' };
       if (idxRace >= 0 && String(values[r][idxRace]) === 'finished') return { ok: false, error: '您已完成賽事並寫入正式成績，無法再修改報名資料' };
 
       const isPaid = paySt === 'PAID';
-      // 嚴格把關：已繳費 (PAID) 絕對禁止修改任何費用相關欄位 (catId, addonsDetail, totalAmount, remittanceLast5, payMethod)
-      const allowed = isPaid
+      const isFeeLocked = isPaid || evSt === 'closed';
+      // 未繳費且活動開放中更換組別時，檢查目標組別名額並以台灣時間二次核價
+      if (!isFeeLocked && patch.catId) {
+        const idxCatCol = headers.indexOf('catId');
+        const oldCatId = idxCatCol >= 0 ? String(values[r][idxCatCol] || '') : '';
+        if (String(patch.catId) !== oldCatId) {
+          const allCats = readSheetAsObjects('Categories', 'catId');
+          const newCatObj = allCats.find(function (c) { return String(c.catId) === String(patch.catId); });
+          if (newCatObj) {
+            const targetQ = Number(newCatObj.quota || 0);
+            if (targetQ > 0) {
+              let usedInTarget = 0;
+              for (let k = 1; k < values.length; k++) {
+                if (k === r) continue;
+                if (String(values[k][idxEv]) === String(values[r][idxEv]) && String(values[k][idxCatCol]) === String(patch.catId) && String(values[k][idxPay] || '').toUpperCase() !== 'CANCELLED') {
+                  usedInTarget++;
+                }
+              }
+              if (usedInTarget >= targetQ) {
+                return { ok: false, error: '目標分組「' + (newCatObj.name || patch.catId) + '」名額已滿 (' + targetQ + ' 人)，無法更換' };
+              }
+            }
+            if (patch.totalAmount !== undefined && patch.totalAmount !== '') {
+              const srvMinFee = getServerEffectiveCategoryFee(ev, newCatObj);
+              if (Number(patch.totalAmount) < srvMinFee) {
+                return { ok: false, error: '早鳥期間已過，更換組別須以目前價格計算（基本費 NT$' + srvMinFee + '）' };
+              }
+            }
+          }
+        }
+      }
+      // 嚴格把關：已繳費 (PAID) 或報名已截止 (closed) 絕對禁止修改任何費用相關欄位
+      const allowed = isFeeLocked
         ? ['phone', 'email', 'city', 'emergencyName', 'emergencyPhone', 'diet', 'remark', 'customFieldsJson']
         : ['phone', 'email', 'city', 'emergencyName', 'emergencyPhone', 'diet', 'remark', 'customFieldsJson', 'catId', 'addonsDetail', 'totalAmount', 'remittanceLast5', 'nationality'];
       allowed.forEach(function (f) {
@@ -789,9 +1195,51 @@ function handleUpdateSelfRegistration(payload) {
 }
 
 function handleUpdateParticipant(payload) {
-  const u = payload.participant || payload.update;
+  const u = payload.participant || payload.update || (payload.participantId ? payload : null);
   if (!u || !u.participantId) return { ok: false, error: '缺少 participantId' };
   return handleBatchUpdateParticipants({ updates: [u], sendMail: Boolean(payload.sendMail) });
+}
+
+function handleDeleteCategory(payload) {
+  const catId = String(payload.catId || '');
+  if (!catId) return { ok: false, error: '缺少 catId' };
+  const parts = readSheetAsObjects('Participants', 'participantId');
+  const inUse = parts.filter(function (p) { return String(p.catId) === catId && String(p.payStatus || '').toUpperCase() !== 'CANCELLED'; }).length;
+  if (inUse > 0) return { ok: false, error: '此分組尚有 ' + inUse + ' 位已報名選手，禁止刪除以免造成資料孤兒！' };
+  const sheet = ensureSheet('Categories');
+  const values = sheet.getDataRange().getValues();
+  if (values.length <= 1) return { ok: true, deleted: 0 };
+  const idx = values[0].indexOf('catId');
+  for (let r = values.length - 1; r >= 1; r--) {
+    if (String(values[r][idx]) === catId) { sheet.deleteRow(r + 1); return { ok: true, deleted: 1, catId: catId }; }
+  }
+  return { ok: true, deleted: 0, catId: catId };
+}
+
+function handleDeleteStation(payload) {
+  const stationId = String(payload.stationId || '');
+  if (!stationId) return { ok: false, error: '缺少 stationId' };
+  const sheet = ensureSheet('Stations');
+  const values = sheet.getDataRange().getValues();
+  if (values.length <= 1) return { ok: true, deleted: 0 };
+  const idxId = values[0].indexOf('stationId');
+  const idxEv = values[0].indexOf('eventId');
+  const idxCode = values[0].indexOf('stationCode');
+  let targetRow = -1, targetEv = '', targetCode = '';
+  for (let r = values.length - 1; r >= 1; r--) {
+    if (String(values[r][idxId]) === stationId) {
+      targetRow = r + 1;
+      targetEv = String(values[r][idxEv] || '');
+      targetCode = String(values[r][idxCode] || '');
+      break;
+    }
+  }
+  if (targetRow === -1) return { ok: true, deleted: 0, stationId: stationId };
+  const logs = readSheetAsObjects('TimingLogs', 'logId');
+  const hasLogs = logs.some(function (l) { return String(l.eventId) === targetEv && String(l.stationCode) === targetCode; });
+  if (hasLogs) return { ok: false, error: '站點 ' + targetCode + ' 已有感應計時紀錄，禁止刪除以免影響成績計算！' };
+  sheet.deleteRow(targetRow);
+  return { ok: true, deleted: 1, stationId: stationId };
 }
 
 /**
@@ -833,7 +1281,12 @@ function handleBatchUpdateParticipants(payload) {
   const idxPaidAt = headers.indexOf('paidAt');
   const evMap = getEventNameMap();
   const updateMap = {};
-  updates.forEach(function (u) { if (u && u.participantId) updateMap[String(u.participantId)] = u; });
+  updates.forEach(function (u) {
+    if (u && u.participantId) {
+      const k = String(u.participantId);
+      updateMap[k] = Object.assign(updateMap[k] || {}, u);
+    }
+  });
 
   let count = 0;
   const mails = [];
@@ -906,17 +1359,23 @@ function handleTriggerGunStart(payload) {
 function handleUpsertRow(sheetName, keyField, obj) {
   if (!obj || !obj[keyField]) return { ok: false, error: '缺少主鍵 ' + keyField };
   const sheet = ensureSheet(sheetName);
-  const headers = SHEET_SCHEMAS[sheetName];
   const values = sheet.getDataRange().getValues();
+  const headers = (values.length > 0 && values[0].length > 0)
+    ? values[0].map(function (h) { return String(h || '').trim(); })
+    : SHEET_SCHEMAS[sheetName];
   const keyIdx = headers.indexOf(keyField);
-  const rowArr = headers.map(function (h) { return obj[h] !== undefined && obj[h] !== null ? obj[h] : ''; });
+  if (keyIdx < 0) return { ok: false, error: '工作表 ' + sheetName + ' 找不到主鍵欄位 ' + keyField };
 
   for (let r = 1; r < values.length; r++) {
     if (String(values[r][keyIdx]) === String(obj[keyField])) {
-      sheet.getRange(r + 1, 1, 1, headers.length).setValues([rowArr]);
+      const merged = headers.map(function (h, ci) {
+        return obj[h] !== undefined && obj[h] !== null ? obj[h] : (values[r][ci] !== undefined ? values[r][ci] : '');
+      });
+      sheet.getRange(r + 1, 1, 1, headers.length).setValues([merged]);
       return { ok: true, mode: 'updated', id: obj[keyField] };
     }
   }
+  const rowArr = headers.map(function (h) { return obj[h] !== undefined && obj[h] !== null ? obj[h] : ''; });
   sheet.getRange(sheet.getLastRow() + 1, 1, 1, headers.length).setValues([rowArr]);
   return { ok: true, mode: 'inserted', id: obj[keyField] };
 }

@@ -94,6 +94,25 @@
     return String(str ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
+  function maskIdCard(id) {
+    const s = String(id || '').trim();
+    if (!s) return '';
+    if (s.length >= 8) return `${s.slice(0, 3)}*****${s.slice(-2)}`;
+    if (s.length >= 5) return `${s.slice(0, 2)}*****${s.slice(-1)}`;
+    return `${s[0]}*****`;
+  }
+
+  function maskNdefPayload(payload) {
+    const s = String(payload || '').trim();
+    if (!s) return '';
+    if (s.includes('|')) {
+      const parts = s.split('|');
+      parts[1] = maskIdCard(parts[1]);
+      return parts.join('|');
+    }
+    return s;
+  }
+
   /* --------------------------------------------------------------------------
    * 2. 28 組中文複姓與英文姓名拆併、中文賽名自動英譯、身分證檢核 & SHA-256
    * -------------------------------------------------------------------------- */
@@ -2998,7 +3017,7 @@
   global.TurCore = {
     DEFAULT_GAS_URL,
     onLogoReady,
-    pad2, formatDateTime, parseDateTime, formatDuration, formatPace, escapeHtml,
+    pad2, formatDateTime, parseDateTime, formatDuration, formatPace, escapeHtml, maskIdCard, maskNdefPayload,
     COMPOUND_SURNAMES_28, splitFullName, mergeNameParts, zhToEnEventName,
     verifyTaiwanIdChecksum, inferGenderFromId, calcAge, sha256Hex,
     CURATED_BANNERS, DEFAULT_BROCHURE_TEMPLATE, DEFAULT_TUR_ADDONS, DEFAULT_ADDONS_NOTE_FIELD, CUSTOM_FIELD_TYPES, CUSTOM_FIELD_PRESETS, HISTORY_IMPORT_SPEC, EXTERNAL_IMPORT_SPEC, PAYMENT_MODES,

@@ -1193,7 +1193,7 @@
     if (pickedOwners.size > 1) errs.push('僅限合併同一位承辦人舉辦之活動');
     picked.forEach((it) => {
       const dup = idCard && State.participants.some((p) => p.eventId === it.ev.eventId && String(p.idCard).toUpperCase() === idCard && String(p.payStatus).toUpperCase() !== 'CANCELLED');
-      if (dup) errs.push(`身分證 ${idCard} 已報名「${it.ev.nameZh}」，請取消勾選該場`);
+      if (dup) errs.push(`身分證 ${C.maskIdCard(idCard)} 已報名「${it.ev.nameZh}」，請取消勾選該場`);
       const usedEv = State.participants.filter((p) => p.eventId === it.ev.eventId && String(p.payStatus).toUpperCase() !== 'CANCELLED').length;
       if (Number(it.ev.maxQuota) > 0 && usedEv >= Number(it.ev.maxQuota)) errs.push(`「${it.ev.nameZh}」活動總名額已滿`);
       const usedCat = State.participants.filter((p) => p.eventId === it.ev.eventId && p.catId === it.cat.catId && String(p.payStatus).toUpperCase() !== 'CANCELLED').length;
@@ -1599,7 +1599,7 @@
         <div class="font-black text-slate-900">${p.bibNumber || '未配號'} · ${C.escapeHtml(p.name)} <span class="text-xs font-bold text-slate-600">(${C.escapeHtml(cat?.name || '')})</span></div>
         <span class="px-2 py-0.5 rounded-full text-xs font-black ${isChecked ? 'bg-emerald-600 text-white' : 'bg-amber-200 text-amber-950'}">${isChecked ? '✅ 已完成現場報到' : '⏳ 尚未報到'}</span>
       </div>
-      <div class="text-xs mono text-slate-700">NDEF 字串：<b>${C.escapeHtml(p.name)}|${p.idCard}</b> ｜ UID：<b>${p.chipUid || '尚未綁定'}</b></div>`;
+      <div class="text-xs mono text-slate-700">NDEF 字串：<b>${C.escapeHtml(p.name)}|${C.escapeHtml(C.maskIdCard(p.idCard))}</b> ｜ UID：<b>${p.chipUid || '尚未綁定'}</b></div>`;
   }
 
   async function setWriterRunnerCheckin(p, checked) {
@@ -1619,7 +1619,7 @@
     card.classList.remove('hidden');
     if (!p) {
       card.className = 'p-3.5 rounded-xl bg-rose-50 border-2 border-rose-400 text-xs space-y-1';
-      card.innerHTML = `<div class="font-black text-rose-800">🔴 讀取結果：查無本場次對應選手（非本場晶片）</div><div class="mono text-rose-700">UID：${C.escapeHtml(rawUid || '-')} ｜ NDEF：${C.escapeHtml(rawPayload || '空')}</div>`;
+      card.innerHTML = `<div class="font-black text-rose-800">🔴 讀取結果：查無本場次對應選手（非本場晶片）</div><div class="mono text-rose-700">UID：${C.escapeHtml(rawUid || '-')} ｜ NDEF：${C.escapeHtml(C.maskNdefPayload(rawPayload) || '空')}</div>`;
       return;
     }
     const cat = State.categories.find((c) => c.catId === p.catId);
@@ -1631,7 +1631,7 @@
         <span class="font-black text-sky-950 text-sm">🔍 晶片讀取檢視：${p.bibNumber || '未配號'} ${C.escapeHtml(p.name)} (${C.escapeHtml(cat?.name || '-')})</span>
         <span class="px-2 py-0.5 rounded-full font-bold ${p.checkinStatus === 'checked_in' ? 'bg-emerald-600 text-white' : 'bg-amber-200 text-amber-950'}">${p.checkinStatus === 'checked_in' ? '✅ 已報到' : '⏳ 未報到'}</span>
       </div>
-      <div class="mono text-slate-700">UID：<b>${C.escapeHtml(rawUid || p.chipUid || '-')}</b> ｜ NDEF：<b>${C.escapeHtml(rawPayload || `${p.name}|${p.idCard}`)}</b> ｜ 繳費：<b>${p.payStatus}</b></div>
+      <div class="mono text-slate-700">UID：<b>${C.escapeHtml(rawUid || p.chipUid || '-')}</b> ｜ NDEF：<b>${C.escapeHtml(C.maskNdefPayload(rawPayload || `${p.name}|${p.idCard}`))}</b> ｜ 繳費：<b>${p.payStatus}</b></div>
       <div class="text-slate-600">賽道紀錄：<span class="mono">${C.escapeHtml(passedTxt)}</span></div>`;
   }
 
@@ -1690,7 +1690,7 @@
           if (m) { Feedback.success(); State.selectedWriterPid = m.participantId; renderWriterSelected(); renderWriterList(); }
           else Feedback.error();
           showChipInspectResult(m, uid, txt);
-          appendWriterLog(`🔍 [讀取查看] UID=${uid} NDEF="${txt}" -> ${m ? `${m.bibNumber} ${m.name}` : '非本場卡片'}`);
+          appendWriterLog(`🔍 [讀取查看] UID=${uid} NDEF="${C.maskNdefPayload(txt)}" -> ${m ? `${m.bibNumber} ${m.name}` : '非本場卡片'}`);
           ndef.onreading = null;
         };
       } catch (err) { Feedback.error(); appendWriterLog(`🔴 讀取失敗：${err.message}`); }
@@ -1703,7 +1703,7 @@
         const newUid = p.chipUid || `04:${Math.random().toString(16).slice(2, 4).toUpperCase()}:9F:22`;
         await applyPostWrite(p, newUid);
         Feedback.writeOk();
-        appendWriterLog(`✅ [模擬寫入+回讀驗證通過] NDEF="${payload}" (${payload.length}B) UID=${p.chipUid}${autoChk ? '｜已同步報到' : ''}`);
+        appendWriterLog(`✅ [模擬寫入+回讀驗證通過] NDEF="${C.maskNdefPayload(payload)}" (${payload.length}B) UID=${p.chipUid}${autoChk ? '｜已同步報到' : ''}`);
         showChipInspectResult(p, p.chipUid, payload);
         return;
       }
@@ -1711,7 +1711,7 @@
         const ndef = new NDEFReader();
         await ndef.write({ records: [{ recordType: 'text', data: payload }] });
         Feedback.writeOk();
-        appendWriterLog(`✅ NDEF 寫入完成："${payload}"，啟動回讀驗證...`);
+        appendWriterLog(`✅ NDEF 寫入完成："${C.maskNdefPayload(payload)}"，啟動回讀驗證...`);
         await ndef.scan();
         ndef.onreading = async (e) => {
           const uid = String(e.serialNumber || '').toUpperCase();
@@ -1747,7 +1747,7 @@
         if (autoChk) await applyPostWrite(sample, sample.chipUid);
         renderWriterSelected();
         showChipInspectResult(sample, sample.chipUid || 'LEGACY-CARD', `${sample.name}|${sample.idCard}`);
-        appendWriterLog(`♻️ [模擬舊晶片共用核准] 讀到 ${sample.name}|${sample.idCard} -> 本場已繳費 (${sample.bibNumber})${autoChk ? '｜已同步報到' : ''}`);
+        appendWriterLog(`♻️ [模擬舊晶片共用核准] 讀到 ${sample.name}|${C.maskIdCard(sample.idCard)} -> 本場已繳費 (${sample.bibNumber})${autoChk ? '｜已同步報到' : ''}`);
       } else if (!sim) {
         const ndef = new NDEFReader();
         await ndef.scan();
@@ -1762,7 +1762,7 @@
             if (autoChk) await applyPostWrite(m, m.chipUid || uid);
             showChipInspectResult(m, uid, txt);
             appendWriterLog(`♻️ 舊卡核准：${m.name} (${m.bibNumber})${autoChk ? '｜已同步報到' : ''}`);
-          } else { Feedback.error(); showChipInspectResult(null, uid, txt); appendWriterLog(`🔴 非本場晶片攔截：${txt || uid}`); }
+          } else { Feedback.error(); showChipInspectResult(null, uid, txt); appendWriterLog(`🔴 非本場晶片攔截：${C.maskNdefPayload(txt) || uid}`); }
           ndef.onreading = null;
         };
       }
