@@ -504,6 +504,10 @@
               <input id="z1OrgZh" value="${C.escapeHtml(ev.organizerZh || '')}" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5" />
             </div>
             <div>
+              <label class="font-bold">🎖️ 賽事總監姓名（證書最下列顯示）</label>
+              <input id="z1Director" value="${C.escapeHtml(C.parseJsonSafe(ev.certConfigJson, C.defaultCertConfig()).raceDirectorName || '')}" placeholder="例如：林政宏" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5" />
+            </div>
+            <div class="col-span-2">
               <label class="font-bold">活動地點</label>
               <input id="z1Loc" value="${C.escapeHtml(ev.location || '')}" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5" />
             </div>
@@ -703,6 +707,9 @@
       ev.organizerZh = $('#z1OrgZh').value.trim();
       ev.location = $('#z1Loc').value.trim();
       ev.brochureText = $('#z1Brochure').value.trim();
+      const certCfg = C.parseJsonSafe(ev.certConfigJson, C.defaultCertConfig());
+      certCfg.raceDirectorName = ($('#z1Director')?.value || '').trim();
+      ev.certConfigJson = JSON.stringify(certCfg);
       await C.TurDB.put('events', ev);
       await App.enqueueSync('saveEvent', { event: ev });
       App.renderAll();
@@ -1872,8 +1879,8 @@
     const toggles = [
       ['showEventName', '活動名稱'], ['showRunnerName', '選手姓名'], ['showBib', '參賽編號 Bib'],
       ['showCategory', '參賽組別'], ['showPrimaryResult', '主要成績'], ['showSecondaryResult', '次要成績'],
-      ['showDate', '活動日期'], ['showOverallRank', '總名次 Overall'], ['showCatRank', '分組名次 Cat'],
-      ['showPace', '平均配速 Pace'], ['showSplitAnalysis', '感應點區段均速分析'], ['showOfficialStamp', '大會鋼印章戳'],
+      ['showDate', '活動日期'], ['showRaceDirector', '賽事總監姓名'], ['showOverallRank', '總名次 Overall'], ['showCatRank', '分組名次 Cat'],
+      ['showPace', '平均配速 Pace'], ['showSplitAnalysis', '感應點區段均速分析'], ['showOfficialStamp', '下方 Logo 與鋼印'],
       ['allowPublicPhotoQuote', '開放前台照片(3框)與40字感言'], ['enableWarrior800', '啟用八百壯士 100K+ 榮譽標註']
     ];
 
@@ -2003,8 +2010,13 @@
               <div class="text-[10px] text-indigo-700">💡 上傳自訂底圖後，直接在右側畫布按住拖曳即可調整姓名、號碼布與成績套印位置。</div>
             </div>
 
+            <div class="p-3 rounded-xl bg-amber-50/70 border border-amber-200 space-y-1">
+              <label class="font-black text-amber-950 block">🎖️ 本活動賽事總監姓名（平均置於證書最下列・置中）</label>
+              <input id="certDirectorInput" value="${C.escapeHtml(cfg.raceDirectorName || '')}" placeholder="請輸入本場賽事總監姓名（例如：林政宏）" class="w-full px-2.5 py-1.5 border border-amber-300 rounded-lg bg-white font-bold" />
+            </div>
+
             <div class="p-3 rounded-xl bg-slate-50 border space-y-1.5">
-              <div class="font-black text-slate-800">🎛️ 承辦人自由勾選顯示開關（14 項全模組化）</div>
+              <div class="font-black text-slate-800">🎛️ 承辦人自由勾選顯示開關（15 項全模組化）</div>
               <div class="grid grid-cols-2 gap-1.5">
                 ${toggles.map(([k, lbl]) => `
                   <label class="flex items-center gap-1.5 cursor-pointer">
@@ -2091,6 +2103,7 @@
     $('#certFontSel').onchange = (e) => { cfg.fontId = e.target.value; redraw(); };
     $('#certLayoutSel').onchange = (e) => { cfg.layoutId = e.target.value; redraw(); };
     $('#certPaletteSel').onchange = (e) => { cfg.paletteId = e.target.value; redraw(); };
+    $('#certDirectorInput').oninput = (e) => { cfg.raceDirectorName = e.target.value; redraw(); };
     $('#certPreviewRunner').onchange = redraw;
     $$('.cert-toggle').forEach((cb) => { cb.onchange = () => { cfg[cb.dataset.ckey] = cb.checked; redraw(); }; });
     $('#certCustomColor').oninput = (e) => { cfg.customTextPos.color = e.target.value; redraw(); };

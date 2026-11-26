@@ -341,13 +341,15 @@
       fontId: 'sans-modern',
       customBgDataUrl: '',
       customTextPos: {
-        nameX: 0.5, nameY: 0.42,
-        bibX: 0.5, bibY: 0.50,
-        resultX: 0.5, resultY: 0.62,
+        nameX: 0.5, nameY: 0.38,
+        bibX: 0.5, bibY: 0.46,
+        resultX: 0.5, resultY: 0.58,
         color: '#ffffff',
         align: 'center',
-        fontScale: 1.0
+        fontScale: 1.12
       },
+      // 活動賽事總監姓名（顯示於證書最下列置中）
+      raceDirectorName: '林政宏',
       // 基本與成績欄位開關
       showEventName: true,
       showRunnerName: true,
@@ -356,6 +358,7 @@
       showPrimaryResult: true,
       showSecondaryResult: true,
       showDate: true,
+      showRaceDirector: true,
       // 進階榮譽與分析開關
       showOverallRank: true,
       showCatRank: true,
@@ -1419,20 +1422,102 @@
     const ev = row?.event || { nameZh: 'TUR 台灣超級馬拉松挑戰賽', nameEn: 'TUR Taiwan Ultra Marathon', raceStart: '2026-11-26', organizerZh: 'TUR 台灣超馬協會' };
     const p = row?.participant || { name: '示範選手', bibNumber: 'A001', nationality: 'TWN', gender: 'M' };
     const cat = row?.category || { name: '50K 超馬組', distanceKm: 50 };
+    const directorName = String(cfg.raceDirectorName ?? ev.raceDirectorName ?? '林政宏').trim();
+    const cx = W / 2;
+
+    // 共用頁尾繪製：TUR 官方 LOGO 移至下方置中 ＋ 最下列（比賽日期 / 主辦單位 / 賽事總監）平均置中對齊
+    const drawBottomLogoAndFooter = (isCustomBg) => {
+      const logoW = isPortrait ? 340 : 370;
+      const logoH = isPortrait ? 86 : 90;
+      const logoY = H - 252;
+
+      if (cfg.showOfficialStamp) {
+        drawTurLogoBadge(ctx, Math.round(cx - logoW / 2), logoY, logoW, logoH, pal.accent);
+        drawOfficialStamp(ctx, Math.round(cx + logoW / 2 + (isPortrait ? 92 : 112)), Math.round(logoY + logoH / 2), pal.accent, isPortrait ? 48 : 52);
+      }
+
+      const footerItems = [];
+      if (cfg.showDate) {
+        const dateStr = (ev.raceStart || formatDateTime()).slice(0, 10);
+        footerItems.push({ label: '比賽日期  DATE', value: dateStr, highlight: false });
+      }
+      footerItems.push({
+        label: '主辦單位  ORGANIZER',
+        value: ev.organizerZh || ev.organizerEn || 'TUR 台灣超馬協會',
+        highlight: false
+      });
+      if (cfg.showRaceDirector !== false && directorName) {
+        footerItems.push({
+          label: '賽事總監  RACE DIRECTOR',
+          value: directorName,
+          highlight: true
+        });
+      }
+
+      if (footerItems.length > 0) {
+        const padX = isPortrait ? 84 : 100;
+        const innerW = W - padX * 2;
+        const dividerY = H - 148;
+        const labelY = H - 118;
+        const valY = H - 80;
+
+        ctx.save();
+        ctx.strokeStyle = isCustomBg ? 'rgba(255,255,255,0.45)' : pal.accent;
+        ctx.globalAlpha = isCustomBg ? 0.6 : 0.35;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(padX, dividerY);
+        ctx.lineTo(W - padX, dividerY);
+        ctx.stroke();
+
+        const slotW = innerW / footerItems.length;
+        ctx.textAlign = 'center';
+        if (isCustomBg) {
+          ctx.shadowColor = 'rgba(0,0,0,0.6)';
+          ctx.shadowBlur = 8;
+        }
+
+        footerItems.forEach((it, idx) => {
+          const itemCx = padX + slotW * (idx + 0.5);
+          if (idx > 0) {
+            ctx.save();
+            ctx.strokeStyle = isCustomBg ? '#ffffff' : pal.sub;
+            ctx.globalAlpha = 0.28;
+            ctx.lineWidth = 1.5;
+            const sepX = padX + slotW * idx;
+            ctx.beginPath();
+            ctx.moveTo(sepX, dividerY + 18);
+            ctx.lineTo(sepX, H - 72);
+            ctx.stroke();
+            ctx.restore();
+          }
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = isCustomBg ? '#e2e8f0' : pal.sub;
+          ctx.font = `700 ${isPortrait ? 18 : 19}px ${FF}`;
+          ctx.fillText(it.label, itemCx, labelY, slotW - 24);
+
+          ctx.fillStyle = it.highlight
+            ? (isCustomBg ? '#fde047' : pal.accent)
+            : (isCustomBg ? '#ffffff' : pal.text);
+          ctx.font = `900 ${isPortrait ? 26 : 28}px ${FF}`;
+          ctx.fillText(it.value, itemCx, valY, slotW - 24);
+        });
+        ctx.restore();
+      }
+    };
 
     ctx.clearRect(0, 0, W, H);
 
-    // 1. 自訂上傳底圖套印模式（官方證書與客製化證書皆支援上傳自己設計的底圖，並保留文字位置/字級/字色/字型套印）
+    // 1. 自訂上傳底圖套印模式（預設置中放大、Logo 置於下方、最下列平均置中含賽事總監）
     if (userOpts.customBgImg) {
       drawCoverImage(ctx, userOpts.customBgImg, 0, 0, W, H);
       const pos = { ...defaultCertConfig().customTextPos, ...(cfg.customTextPos || {}) };
-      const fs = Number(pos.fontScale || 1.0);
+      const fs = Number(pos.fontScale || 1.12);
 
-      // 若為「選手客製化證書」才額外繪製個人照片區；官方證書絕不出現個人照片
       if (isCustomRunner && (userOpts.photoImg || userOpts.showPhotoPlaceholder)) {
         const photoBox = isPortrait
-          ? { x: W - 410, y: 210, w: 330, h: 390 }
-          : { x: 1030, y: 220, w: 480, h: 590 };
+          ? { x: Math.round(cx - 165), y: 200, w: 330, h: 360 }
+          : { x: 1030, y: 210, w: 480, h: 580 };
         drawRunnerPhotoFrame(ctx, photoBox, pal, userOpts);
       }
 
@@ -1442,15 +1527,15 @@
       ctx.shadowBlur = 10;
 
       if (cfg.showEventName) {
-        ctx.font = `800 ${Math.round(34 * fs)}px ${FF}`;
-        ctx.fillText(ev.nameZh || '', W * pos.nameX, H * Math.max(0.08, pos.nameY - 0.14));
+        ctx.font = `900 ${Math.round(42 * fs)}px ${FF}`;
+        ctx.fillText(ev.nameZh || '', W * pos.nameX, H * Math.max(0.10, pos.nameY - 0.14));
       }
       if (cfg.showRunnerName) {
-        ctx.font = `900 ${Math.round(84 * fs)}px ${FF}`;
+        ctx.font = `900 ${Math.round(92 * fs)}px ${FF}`;
         ctx.fillText(p.name, W * pos.nameX, H * pos.nameY);
       }
       if (cfg.showBib || cfg.showCategory) {
-        ctx.font = `700 ${Math.round(32 * fs)}px ${NF}`;
+        ctx.font = `800 ${Math.round(34 * fs)}px ${NF}`;
         const parts = [];
         if (cfg.showBib) parts.push(`BIB ${p.bibNumber}`);
         if (cfg.showCategory) parts.push(cat.name);
@@ -1461,7 +1546,7 @@
         const primary = ev.raceType === 'lap_timed'
           ? `${Number(row?.totalDistanceKm || 0).toFixed(2)} KM`
           : formatDuration(row?.elapsedSec);
-        ctx.font = `900 ${Math.round(64 * fs)}px ${NF}`;
+        ctx.font = `900 ${Math.round(70 * fs)}px ${NF}`;
         ctx.fillText(primary, W * pos.resultX, H * pos.resultY);
       }
       if (cfg.showOverallRank || cfg.showCatRank || cfg.showPace) {
@@ -1469,18 +1554,15 @@
         if (cfg.showOverallRank) subParts.push(`總名次 #${row?.overallRank ?? '-'}`);
         if (cfg.showCatRank) subParts.push(`分組 #${row?.catRank ?? '-'}`);
         if (cfg.showPace) subParts.push(`均速 ${row?.avgPace || '--:--'}`);
-        ctx.font = `700 ${Math.round(26 * fs)}px ${FF}`;
-        ctx.fillText(subParts.join('   |   '), W * pos.resultX, H * Math.min(0.92, pos.resultY + 0.08));
+        ctx.font = `700 ${Math.round(28 * fs)}px ${FF}`;
+        ctx.fillText(subParts.join('   |   '), W * pos.resultX, H * Math.min(0.76, pos.resultY + 0.08));
       }
       if (isCustomRunner && cfg.allowPublicPhotoQuote && String(userOpts.quote || '').trim()) {
-        ctx.font = `italic 600 ${Math.round(24 * fs)}px ${FF}`;
-        ctx.fillText(`「${String(userOpts.quote).trim().slice(0, 40)}」`, W * pos.resultX, H * Math.min(0.95, pos.resultY + 0.14));
+        ctx.font = `italic 700 ${Math.round(26 * fs)}px ${FF}`;
+        ctx.fillText(`「${String(userOpts.quote).trim().slice(0, 40)}」`, W * pos.resultX, H * Math.min(0.80, pos.resultY + 0.14));
       }
       ctx.shadowBlur = 0;
-      if (cfg.showOfficialStamp) {
-        drawTurLogoBadge(ctx, isPortrait ? W - 380 : W - 470, 62, isPortrait ? 310 : 390, isPortrait ? 82 : 100, pal.accent);
-        drawOfficialStamp(ctx, W - 165, H - 155, pal.accent);
-      }
+      drawBottomLogoAndFooter(true);
       return;
     }
 
@@ -1510,7 +1592,7 @@
       ctx.beginPath(); ctx.moveTo(W * 0.56, 0); ctx.lineTo(W, 0); ctx.lineTo(W, H); ctx.lineTo(W * 0.36, H); ctx.closePath(); ctx.fill();
       ctx.globalAlpha = 1; ctx.fillRect(0, 0, 24, H);
     } else if (cfg.layoutId === 'minimal') {
-      ctx.fillStyle = pal.accent; ctx.fillRect(80, 96, 120, 8); ctx.fillRect(80, H - 110, W - 160, 3);
+      ctx.fillStyle = pal.accent; ctx.fillRect(cx - 100, 62, 200, 8); ctx.fillRect(90, H - 60, W - 180, 3);
     } else if (cfg.layoutId === 'trail') {
       ctx.fillStyle = pal.accent; ctx.globalAlpha = 0.15;
       ctx.beginPath(); ctx.moveTo(0, H); ctx.lineTo(0, H * 0.72); ctx.lineTo(W * 0.25, H * 0.54);
@@ -1520,50 +1602,71 @@
       ctx.strokeStyle = pal.accent2; ctx.lineWidth = 6; ctx.strokeRect(46, 46, W - 92, H - 92);
       ctx.shadowBlur = 0;
     } else if (cfg.layoutId === 'podium') {
-      ctx.fillStyle = pal.accent; ctx.fillRect(0, 0, W, 178);
-      ctx.fillStyle = pal.accent2; ctx.fillRect(0, 178, W, 10);
+      ctx.fillStyle = pal.accent; ctx.fillRect(0, 0, W, 222);
+      ctx.fillStyle = pal.accent2; ctx.fillRect(0, 222, W, 10);
     }
     ctx.restore();
 
     // 3. 選手個人照片框：僅「選手客製化證書」顯示，官方證書絕對不加入個人照片
     const showPhoto = isCustomRunner && (userOpts.photoImg || userOpts.showPhotoPlaceholder);
     const photoBox = isPortrait
-      ? { x: W - 420, y: 235, w: 330, h: 400 }
-      : { x: 1020, y: 220, w: 490, h: 610 };
+      ? { x: Math.round(cx - 165), y: 246, w: 330, h: 350 }
+      : { x: 1040, y: 246, w: 465, h: 575 };
 
     if (showPhoto) {
       drawRunnerPhotoFrame(ctx, photoBox, pal, userOpts);
     }
 
-    // 4. 標題與選手資訊（完整套用 6 種字型）
-    ctx.textAlign = 'left';
+    // 4. 置中標題與活動名稱（預設字體大幅放大，清晰易讀）
     const isPodium = cfg.layoutId === 'podium';
-    let curY = 108;
+    ctx.textAlign = 'center';
+    let curY = isPortrait ? 114 : 104;
 
     ctx.fillStyle = isPodium ? '#0f172a' : pal.accent;
-    ctx.font = `900 25px ${FF}`;
-    ctx.fillText(isCustomRunner ? 'PERSONAL FINISHER CERTIFICATE · 個人客製化完賽證明' : 'OFFICIAL FINISHER CERTIFICATE · 官方完賽證明', 90, curY);
-    curY += 52;
+    ctx.font = `900 ${isPortrait ? 28 : 29}px ${FF}`;
+    ctx.fillText(isCustomRunner ? 'PERSONAL FINISHER CERTIFICATE · 個人客製化完賽證明' : 'OFFICIAL FINISHER CERTIFICATE · 官方完賽證明', cx, curY, W - 160);
+    curY += isPortrait ? 60 : 58;
 
     if (cfg.showEventName) {
       ctx.fillStyle = isPodium ? '#0f172a' : pal.text;
-      ctx.font = `900 42px ${FF}`;
-      const titleMaxW = isPortrait ? (W - 535) : 980;
-      ctx.fillText(ev.nameZh || '', 90, curY, titleMaxW);
-      curY += 46;
-      ctx.fillStyle = pal.sub;
-      ctx.font = `600 21px ${FF}`;
-      ctx.fillText(ev.nameEn || '', 90, curY, titleMaxW);
-      curY += 76;
+      ctx.font = `900 ${isPortrait ? 48 : 54}px ${FF}`;
+      ctx.fillText(ev.nameZh || '', cx, curY, W - 160);
+      curY += isPortrait ? 44 : 42;
+      ctx.fillStyle = isPodium ? '#334155' : pal.sub;
+      ctx.font = `600 ${isPortrait ? 23 : 24}px ${FF}`;
+      ctx.fillText(ev.nameEn || '', cx, curY, W - 180);
+      curY += isPortrait ? 22 : 20;
     } else {
-      curY += 50;
+      curY += 16;
+    }
+
+    // 置中金線分隔
+    if (!isPodium) {
+      ctx.save();
+      ctx.fillStyle = pal.accent;
+      ctx.globalAlpha = 0.7;
+      ctx.fillRect(cx - 110, curY, 220, 4);
+      ctx.restore();
+    }
+
+    // 5. 內容主區中心點（官方全幅置中；客製化橫式左欄置中、直式全幅置中於照片下方）
+    const contentLeft = isPortrait ? 84 : 95;
+    const contentW = (showPhoto && !isPortrait) ? 900 : (W - contentLeft * 2);
+    const contentCx = contentLeft + contentW / 2;
+
+    if (showPhoto && isPortrait) {
+      curY = photoBox.y + photoBox.h + 88;
+    } else {
+      curY += isPortrait ? 102 : 94;
     }
 
     if (cfg.showRunnerName) {
+      ctx.textAlign = 'center';
       ctx.fillStyle = pal.text;
-      ctx.font = `900 82px ${FF}`;
-      ctx.fillText(p.name || '-', 90, curY, isPortrait ? (W - 180) : 980);
-      curY += 56;
+      const nameSize = (showPhoto && !isPortrait) ? 88 : (isPortrait ? 96 : 104);
+      ctx.font = `900 ${nameSize}px ${FF}`;
+      ctx.fillText(p.name || '-', contentCx, curY, contentW - 20);
+      curY += isPortrait ? 62 : 56;
     }
 
     const metaParts = [];
@@ -1572,13 +1675,14 @@
     if (cfg.showCategory) metaParts.push(cat.name);
     if (cfg.enableWarrior800 && row?.isWarrior800) metaParts.push('★ 八百壯士 100K+ 完賽認證');
     if (metaParts.length) {
+      ctx.textAlign = 'center';
       ctx.fillStyle = pal.accent2;
-      ctx.font = `800 27px ${NF}`;
-      ctx.fillText(metaParts.join('  ·  '), 90, curY, W - 180);
-      curY += 42;
+      ctx.font = `800 ${(showPhoto && !isPortrait) ? 28 : 33}px ${NF}`;
+      ctx.fillText(metaParts.join('  ·  '), contentCx, curY, contentW - 10);
+      curY += isPortrait ? 44 : 38;
     }
 
-    // 5. 動態成績卡片網格（官方證書無照片框，卡片自動滿版大氣展開）
+    // 6. 動態成績卡片網格（置中文字、字體加大加粗）
     const cards = [];
     if (cfg.showPrimaryResult) {
       cards.push(ev.raceType === 'lap_timed'
@@ -1600,94 +1704,84 @@
       cards.push({ label: 'AVG PACE 平均配速', val: row?.avgPace || '--:--' });
     }
 
-    const cardAreaW = showPhoto && !isPortrait ? 870 : W - 180;
-    const cols = (!showPhoto && !isPortrait && cards.length === 4) ? 4 : 2;
-    const gap = 18;
-    const cardW = (cardAreaW - gap * (cols - 1)) / cols;
-    const cardH = 104;
+    const cols = (!showPhoto && !isPortrait && cards.length === 4) ? 4 : Math.min(2, Math.max(1, cards.length));
+    const gap = 20;
+    const cardW = (contentW - gap * (cols - 1)) / cols;
+    const cardH = isPortrait ? 132 : (showPhoto ? 116 : 132);
 
     cards.forEach((c, idx) => {
       const col = idx % cols;
       const r = Math.floor(idx / cols);
-      const x = 90 + col * (cardW + gap);
+      const x = contentLeft + col * (cardW + gap);
       const y = curY + r * (cardH + 16);
-      ctx.fillStyle = pal.id === 'royal' ? 'rgba(15,23,42,0.06)' : 'rgba(255,255,255,0.08)';
-      roundRectPath(ctx, x, y, cardW, cardH, 14);
+      const cardCx = x + cardW / 2;
+      ctx.fillStyle = pal.id === 'royal' ? 'rgba(15,23,42,0.06)' : 'rgba(255,255,255,0.09)';
+      roundRectPath(ctx, x, y, cardW, cardH, 16);
       ctx.fill();
+      ctx.textAlign = 'center';
       ctx.fillStyle = pal.sub;
-      ctx.font = `700 17px ${FF}`;
-      ctx.fillText(c.label, x + 20, y + 34);
+      ctx.font = `700 ${cols === 4 ? 20 : 21}px ${FF}`;
+      ctx.fillText(c.label, cardCx, y + 38, cardW - 20);
       ctx.fillStyle = pal.accent;
-      ctx.font = `900 ${cols === 4 ? 32 : 38}px ${NF}`;
-      ctx.fillText(c.val, x + 20, y + 80);
+      ctx.font = `900 ${cols === 4 ? 44 : 48}px ${NF}`;
+      ctx.fillText(c.val, cardCx, y + (cardH > 120 ? 102 : 92), cardW - 20);
     });
 
-    curY += Math.ceil(cards.length / cols) * (cardH + 16) + 22;
+    curY += Math.ceil(cards.length / cols) * (cardH + 16) + 18;
 
-    // 6. 感應點區段均速與綜合分析表
-    if (cfg.showSplitAnalysis && row?.splitDetails && row.splitDetails.length > 0) {
-      const splits = row.splitDetails.slice(0, isPortrait ? 8 : 5);
-      const boxH = 48 + splits.length * 36;
-      ctx.fillStyle = pal.id === 'royal' ? 'rgba(15,23,42,0.05)' : 'rgba(255,255,255,0.06)';
-      roundRectPath(ctx, 90, curY, cardAreaW, boxH, 14);
+    // 7. 感應點區段均速與綜合分析表（置中呈現，空間自動收斂不撞頁尾 Logo）
+    const footerGuardY = H - 270;
+    if (cfg.showSplitAnalysis && row?.splitDetails && row.splitDetails.length > 0 && curY + 95 < footerGuardY) {
+      const quoteReserve = (isCustomRunner && cfg.allowPublicPhotoQuote && String(userOpts.quote || '').trim()) ? 70 : 0;
+      const rowStep = isPortrait ? 40 : 38;
+      const maxFitRows = Math.max(1, Math.floor((footerGuardY - quoteReserve - curY - 56) / rowStep));
+      const splits = row.splitDetails.slice(0, Math.min(isPortrait ? 6 : 5, maxFitRows));
+      const boxH = 54 + splits.length * rowStep;
+
+      ctx.fillStyle = pal.id === 'royal' ? 'rgba(15,23,42,0.05)' : 'rgba(255,255,255,0.07)';
+      roundRectPath(ctx, contentLeft, curY, contentW, boxH, 16);
       ctx.fill();
 
+      ctx.textAlign = 'center';
       ctx.fillStyle = pal.accent2;
-      ctx.font = `700 19px ${FF}`;
-      ctx.fillText('CHECKPOINT SPLIT ANALYSIS · 感應點區段均速分析', 114, curY + 32);
+      ctx.font = `800 22px ${FF}`;
+      ctx.fillText('CHECKPOINT SPLIT ANALYSIS · 感應點區段均速分析', contentCx, curY + 35, contentW - 30);
 
       splits.forEach((sp, i) => {
-        const sy = curY + 66 + i * 36;
+        const sy = curY + 74 + i * rowStep;
         ctx.fillStyle = pal.text;
-        ctx.font = `600 20px ${NF}`;
-        ctx.fillText(`${sp.code.padEnd(8, ' ')}  通過 ${sp.time}  |  累計 ${formatDuration(sp.cumSec)}  |  區段均速 ${sp.segPace}`, 114, sy);
+        ctx.font = `700 ${(showPhoto && !isPortrait) ? 21 : 24}px ${NF}`;
+        ctx.fillText(`${sp.code}   通過 ${sp.time}   ｜   累計 ${formatDuration(sp.cumSec)}   ｜   區段均速 ${sp.segPace}`, contentCx, sy, contentW - 36);
       });
-      curY += boxH + 24;
+      curY += boxH + 18;
     }
 
-    // 7. 選手 40 字完賽感言（僅客製化證書呈現）
+    // 8. 選手 40 字完賽感言（僅客製化證書呈現，置中顯示）
     const quote = String(userOpts.quote || '').trim().slice(0, 40);
-    if (isCustomRunner && cfg.allowPublicPhotoQuote && quote) {
-      ctx.fillStyle = pal.accent;
-      ctx.fillRect(90, curY, 7, 54);
+    if (isCustomRunner && cfg.allowPublicPhotoQuote && quote && curY + 42 < footerGuardY) {
+      ctx.textAlign = 'center';
       ctx.fillStyle = pal.text;
-      ctx.font = `italic 600 24px ${FF}`;
-      ctx.fillText(`「${quote}」`, 114, curY + 36);
-      curY += 74;
+      ctx.font = `italic 700 26px ${FF}`;
+      ctx.fillText(`「${quote}」`, contentCx, curY + 34, contentW - 30);
     }
 
-    // 8. 官方 TUR LOGO 銘牌 ＋ 大會鋼印章戳（已依需求移除紅色圓形徽章）
-    if (cfg.showOfficialStamp) {
-      if (isPortrait) {
-        drawTurLogoBadge(ctx, W - 420, 68, 330, 88, pal.accent);
-      } else {
-        drawTurLogoBadge(ctx, 1110, 72, 400, 102, pal.accent);
-      }
-      drawOfficialStamp(ctx, W - 165, H - 155, pal.accent);
-    }
-
-    // 9. 頁尾日期與主辦單位
-    if (cfg.showDate) {
-      ctx.fillStyle = pal.sub;
-      ctx.font = `600 19px ${FF}`;
-      const dateStr = (ev.raceStart || formatDateTime()).slice(0, 10);
-      ctx.fillText(`DATE: ${dateStr}   |   ORGANIZER: ${ev.organizerZh || ev.organizerEn || 'TUR'}`, 90, H - 72);
-    }
+    // 9. 下方官方 TUR LOGO ＋ 鋼印 ＋ 最下列（比賽日期 / 主辦單位 / 賽事總監姓名）平均置中
+    drawBottomLogoAndFooter(false);
   }
 
-  function drawOfficialStamp(ctx, cx, cy, color) {
+  function drawOfficialStamp(ctx, cx, cy, color, radius = 56) {
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(-0.18);
-    ctx.strokeStyle = color; ctx.globalAlpha = 0.78; ctx.lineWidth = 4;
-    ctx.beginPath(); ctx.arc(0, 0, 64, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = color; ctx.globalAlpha = 0.8; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(0, 0, radius, 0, Math.PI * 2); ctx.stroke();
     ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.arc(0, 0, 54, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, radius - 9, 0, Math.PI * 2); ctx.stroke();
     ctx.fillStyle = color; ctx.textAlign = 'center';
-    ctx.font = '900 20px "Noto Sans TC", sans-serif';
-    ctx.fillText('TUR 官方認證', 0, -4);
-    ctx.font = '700 13px monospace';
-    ctx.fillText('OFFICIAL TIMING', 0, 18);
+    ctx.font = `900 ${Math.round(radius * 0.31)}px "Noto Sans TC", sans-serif`;
+    ctx.fillText('TUR 官方認證', 0, -2);
+    ctx.font = `700 ${Math.round(radius * 0.21)}px monospace`;
+    ctx.fillText('OFFICIAL TIMING', 0, Math.round(radius * 0.28));
     ctx.restore();
   }
 
@@ -1805,7 +1899,8 @@
    * -------------------------------------------------------------------------- */
   function buildFull5EventsSeed() {
     const now = formatDateTime();
-    const certJson = JSON.stringify(defaultCertConfig());
+    const mkCertJson = (director) => JSON.stringify({ ...defaultCertConfig(), raceDirectorName: director });
+    const certJson = mkCertJson('林政宏');
     const formJson = JSON.stringify(defaultFormSchema('MANUAL_ATM'));
     const formJsonPayuni = JSON.stringify(defaultFormSchema('ONLINE_PAYUNi'));
     const formJsonWithCustom = JSON.stringify({
@@ -1866,7 +1961,7 @@
         organizerZh: 'TUR 台灣超馬協會', organizerEn: 'TUR Taiwan Ultra Runners', location: '台北田徑暖身場',
         raceType: 'lap_timed', lapDistanceKm: 1.0, debounceSeconds: 15, status: 'open',
         regStart: '2026-11-01 00:00:00', regEnd: '2026-12-31 23:59:59', raceStart: '2026-11-26 06:00:00',
-        maxQuota: 400, bannerUrl: 'dyn-track', brochureText: '【賽制說明】12H / 6H 標準繞圈限時賽，單圈 1.0 km，採 PAYUNi 統一金流線上繳費。\n【計時規則】於限時內通過主拱門之有效圈數累計總里程；超時圈留存紀錄但不計入有效里程。\n【補給配置】主會場旁全時段供應熱湯、水果、電解質與冰塊。', formSchemaJson: formJsonPayuni, certConfigJson: certJson
+        maxQuota: 400, bannerUrl: 'dyn-track', brochureText: '【賽制說明】12H / 6H 標準繞圈限時賽，單圈 1.0 km，採 PAYUNi 統一金流線上繳費。\n【計時規則】於限時內通過主拱門之有效圈數累計總里程；超時圈留存紀錄但不計入有效里程。\n【補給配置】主會場旁全時段供應熱湯、水果、電解質與冰塊。', formSchemaJson: formJsonPayuni, certConfigJson: mkCertJson('郭志明')
       },
       {
         eventId: 'TUR-2026-W800', ownerUsername: 'org_south',
@@ -1874,7 +1969,7 @@
         organizerZh: '南區超馬聯盟', organizerEn: 'South Taiwan Ultra Alliance', location: '高雄市旗山區',
         raceType: 'distance', lapDistanceKm: 0, debounceSeconds: 15, status: 'open',
         regStart: '2026-12-01 00:00:00', regEnd: '2027-01-31 23:59:59', raceStart: '',
-        maxQuota: 300, bannerUrl: 'dyn-warrior', brochureText: '【八百壯士認證賽事】凡 15 小時內完成 100K 者，自動登錄 TUR 八百壯士 100K+ 英雄榜並加發專屬榮譽標註完賽證書！\n【報名與查改】採轉帳核對末五碼；繳費前可透過 /lookup 修改組別與加購，入帳後自動鎖定費用選項。', formSchemaJson: formJsonW800, certConfigJson: certJson
+        maxQuota: 300, bannerUrl: 'dyn-warrior', brochureText: '【八百壯士認證賽事】凡 15 小時內完成 100K 者，自動登錄 TUR 八百壯士 100K+ 英雄榜並加發專屬榮譽標註完賽證書！\n【報名與查改】採轉帳核對末五碼；繳費前可透過 /lookup 修改組別與加購，入帳後自動鎖定費用選項。', formSchemaJson: formJsonW800, certConfigJson: mkCertJson('陳文龍')
       },
       {
         eventId: 'TUR-2026-EARLY6H', ownerUsername: 'org_south',
@@ -1882,7 +1977,7 @@
         organizerZh: '南區超馬聯盟', organizerEn: 'South Taiwan Ultra Alliance', location: '花蓮太平洋公園海濱環道',
         raceType: 'lap_timed', lapDistanceKm: 0.8, debounceSeconds: 15, status: 'closed',
         regStart: '2026-09-01 00:00:00', regEnd: '2026-11-20 23:59:59', raceStart: '2026-12-19 07:00:00',
-        maxQuota: 200, bannerUrl: 'dyn-coast', brochureText: '【賽前晶片與報到示範場】報名已截止並預先設定起跑時間（2026-12-19 07:00:00），供作業員測試晶片寫入、讀取查看與現場報到管制。', formSchemaJson: formJsonPayuni, certConfigJson: certJson
+        maxQuota: 200, bannerUrl: 'dyn-coast', brochureText: '【賽前晶片與報到示範場】報名已截止並預先設定起跑時間（2026-12-19 07:00:00），供作業員測試晶片寫入、讀取查看與現場報到管制。', formSchemaJson: formJsonPayuni, certConfigJson: mkCertJson('吳家豪')
       },
       {
         eventId: 'TUR-2026-FIN100', ownerUsername: 'org_north',
@@ -1890,7 +1985,7 @@
         organizerZh: 'TUR 台灣超馬協會', organizerEn: 'TUR Taiwan Ultra Runners', location: '台北陽明山國家公園',
         raceType: 'distance', lapDistanceKm: 0, debounceSeconds: 15, status: 'finished',
         regStart: '2026-01-01 00:00:00', regEnd: '2026-03-31 23:59:59', raceStart: '2026-04-18 05:00:00',
-        maxQuota: 500, bannerUrl: 'dyn-coast', brochureText: DEFAULT_BROCHURE_TEMPLATE, formSchemaJson: formJson, certConfigJson: certJson
+        maxQuota: 500, bannerUrl: 'dyn-coast', brochureText: DEFAULT_BROCHURE_TEMPLATE, formSchemaJson: formJson, certConfigJson: mkCertJson('林政宏')
       },
       {
         eventId: 'TUR-2026-FIN24H', ownerUsername: 'org_south',
@@ -1898,7 +1993,7 @@
         organizerZh: '南區超馬聯盟', organizerEn: 'South Taiwan Ultra Alliance', location: '台南市立田徑場',
         raceType: 'lap_timed', lapDistanceKm: 1.0, debounceSeconds: 15, status: 'finished',
         regStart: '2026-02-01 00:00:00', regEnd: '2026-05-01 23:59:59', raceStart: '2026-05-23 18:00:00',
-        maxQuota: 300, bannerUrl: 'dyn-night', brochureText: DEFAULT_BROCHURE_TEMPLATE, formSchemaJson: formJsonPayuni, certConfigJson: certJson
+        maxQuota: 300, bannerUrl: 'dyn-night', brochureText: DEFAULT_BROCHURE_TEMPLATE, formSchemaJson: formJsonPayuni, certConfigJson: mkCertJson('黃建民')
       }
     ];
 
