@@ -288,8 +288,8 @@
   </section>
 </main>
 
-<script src="js/tur-logo.js?v=5.1"></script>
-<script src="js/tur-core.js?v=5.1"></script>
+<script src="js/tur-logo.js?v=5.2"></script>
+<script src="js/tur-core.js?v=5.2"></script>
 <script>
 (() => {
   'use strict';
@@ -462,7 +462,10 @@
 
     Pub.customBgImg = null;
     if (cfg.customBgDataUrl) {
-      const im = new Image(); im.onload = () => { Pub.customBgImg = im; drawCert(); }; im.src = cfg.customBgDataUrl;
+      const im = new Image();
+      if (/^https?:\/\//i.test(cfg.customBgDataUrl)) im.crossOrigin = 'anonymous';
+      im.onload = () => { Pub.customBgImg = im; drawCert(); };
+      im.src = cfg.customBgDataUrl;
     }
 
     const eligRows = Pub.rows.filter((r) => C.isCertEligible(ev, r).ok);

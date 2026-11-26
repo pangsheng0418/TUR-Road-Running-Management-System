@@ -2282,28 +2282,61 @@
               </div>
             </div>
 
-            <!-- 自訂底圖套印（預設收合，點開即可上傳與微調） -->
-            <details class="rounded-xl bg-indigo-50/70 border border-indigo-200">
-              <summary class="px-3 py-2.5 cursor-pointer font-bold text-indigo-950 flex items-center justify-between">
-                <span class="flex items-center gap-1.5"><span class="acc-arrow inline-block text-indigo-500">▶</span><span>🖼️ 上傳自訂設計底圖</span></span>
-                <span class="text-[11px] text-indigo-700 font-normal">選用</span>
+            <!-- 自訂底圖套印（預設載入 10 項原資訊，每欄獨立調整位置 / 大小 / 顏色 / 對齊 / 顯示，畫布直接拖曳） -->
+            <details id="certCustomBgDetails" ${cfg.customBgDataUrl ? 'open' : ''} class="rounded-xl bg-indigo-50/70 border-2 border-indigo-300">
+              <summary class="px-3 py-2.5 cursor-pointer font-black text-indigo-950 flex items-center justify-between">
+                <span class="flex items-center gap-1.5"><span class="acc-arrow inline-block text-indigo-500">▶</span><span>🖼️ 上傳自訂設計底圖（10 欄獨立排版）</span></span>
+                <span class="text-[11px] font-bold ${cfg.customBgDataUrl ? 'text-emerald-700' : 'text-indigo-700'}">${cfg.customBgDataUrl ? '已啟用自訂底圖 ✓' : '選用'}</span>
               </summary>
-              <div class="px-3 pb-3 pt-1 space-y-2 border-t border-indigo-200/60">
+              <div class="px-3 pb-3 pt-2 space-y-2.5 border-t border-indigo-200/70">
                 <div class="flex items-center justify-between gap-2">
                   <input id="certCustomBgFile" type="file" accept="image/*" class="text-[11px] flex-1" />
-                  <button type="button" id="btnCertClearBg" class="px-2 py-0.5 rounded bg-white border border-indigo-300 text-indigo-800 font-bold text-[11px] shrink-0">恢復內建</button>
+                  <button type="button" id="btnCertClearBg" class="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold text-[11px] shrink-0">恢復內建</button>
                 </div>
-                <div class="flex flex-wrap gap-2 items-center text-[11px]">
-                  <label class="font-bold">顏色</label>
-                  <input id="certCustomColor" type="color" value="${cfg.customTextPos?.color || '#ffffff'}" />
-                  <label class="font-bold">對齊</label>
-                  <select id="certCustomAlign" class="border rounded px-1.5 py-0.5 bg-white">
-                    <option value="center" ${cfg.customTextPos?.align === 'center' ? 'selected' : ''}>置中</option>
-                    <option value="left" ${cfg.customTextPos?.align === 'left' ? 'selected' : ''}>靠左</option>
-                    <option value="right" ${cfg.customTextPos?.align === 'right' ? 'selected' : ''}>靠右</option>
-                  </select>
-                  <label class="font-bold">字級</label>
-                  <input id="certCustomScale" type="range" min="0.7" max="1.4" step="0.05" value="${cfg.customTextPos?.fontScale || 1.12}" class="w-20 accent-indigo-600" />
+                <div class="flex gap-1.5">
+                  <input id="certCustomBgUrl" type="url" value="${/^https?:\/\//i.test(cfg.customBgDataUrl || '') ? C.escapeHtml(cfg.customBgDataUrl) : ''}" placeholder="或貼上外部設計底圖網址 (https://...)" class="flex-1 px-2 py-1 border rounded-lg bg-white text-[11px]" />
+                  <button type="button" id="btnCertApplyBgUrl" class="px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-bold text-[11px] shrink-0">套用網址</button>
+                </div>
+                <div class="text-[10px] text-indigo-800">💡 上傳後自動壓縮最佳化（安全同步雲端），並預設載入 10 項原資訊；可直接於右側畫布<b>點選任一欄位拖曳位置</b>！</div>
+
+                <!-- 10 欄位各自獨立調整控制面板 -->
+                <div id="certCustomElemEditor" class="${cfg.customBgDataUrl ? '' : 'hidden'} p-2.5 rounded-xl bg-white border border-indigo-200 space-y-2.5">
+                  <div class="flex items-center justify-between">
+                    <span class="font-black text-indigo-950">🎯 步驟 1：點選要微調的欄位（或直接點右側畫布）</span>
+                    <button type="button" id="btnCeResetAll" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px]">↩️ 恢復預設</button>
+                  </div>
+                  <div id="ceLayerPills" class="grid grid-cols-2 gap-1"></div>
+
+                  <div id="ceActivePanel" class="p-2.5 rounded-lg bg-indigo-50/70 border border-indigo-200 space-y-2">
+                    <div class="flex items-center justify-between">
+                      <span id="ceActiveTitle" class="font-black text-indigo-950">🏃 選手姓名</span>
+                      <label class="inline-flex items-center gap-1 font-bold text-slate-800 cursor-pointer">
+                        <input id="ceVisible" type="checkbox" class="accent-indigo-600" /> 顯示此欄位
+                      </label>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="font-bold w-12 shrink-0">大小</span>
+                      <input id="ceSize" type="range" min="14" max="160" step="1" class="flex-1 accent-indigo-600" />
+                      <span id="ceSizeVal" class="mono font-black text-indigo-700 w-12 text-right">98px</span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-1.5 items-center">
+                      <div class="flex items-center gap-1">
+                        <span class="font-bold">顏色</span>
+                        <input id="ceColor" type="color" value="#ffffff" class="w-7 h-6 border rounded cursor-pointer" />
+                      </div>
+                      <select id="ceAlign" class="border rounded px-1.5 py-1 bg-white font-semibold">
+                        <option value="center">置中對齊</option>
+                        <option value="left">靠左對齊</option>
+                        <option value="right">靠右對齊</option>
+                      </select>
+                      <button type="button" id="btnCeCenterX" class="px-2 py-1 rounded bg-white border border-indigo-300 hover:bg-indigo-100 text-indigo-900 font-bold">↔ 水平置中</button>
+                    </div>
+                    <div class="grid grid-cols-3 gap-1.5 items-center">
+                      <label class="flex items-center gap-1"><span class="font-bold">X%</span><input id="ceX" type="number" min="2" max="98" step="1" class="w-14 px-1.5 py-0.5 border rounded bg-white mono" /></label>
+                      <label class="flex items-center gap-1"><span class="font-bold">Y%</span><input id="ceY" type="number" min="2" max="98" step="1" class="w-14 px-1.5 py-0.5 border rounded bg-white mono" /></label>
+                      <button type="button" id="btnCeApplyColorAll" class="px-1.5 py-1 rounded bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold text-[10px]">🎨 全欄同色</button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </details>
@@ -2343,6 +2376,44 @@
         </div>
       </div>`;
 
+    // 確保 10 欄自訂底圖獨立圖層配置已初始化（預設載入原資訊）
+    cfg.customBgElements = C.getMergedCustomBgElements(cfg);
+    let selectedElemKey = 'runnerName';
+
+    const syncCustomElemEditorUI = () => {
+      const edBox = $('#certCustomElemEditor');
+      if (!edBox) return;
+      edBox.classList.toggle('hidden', !z2CustomBgImg);
+      const pillsEl = $('#ceLayerPills');
+      if (pillsEl) {
+        pillsEl.innerHTML = C.CERT_CUSTOM_ELEMENTS.map((m) => {
+          const el = cfg.customBgElements[m.key];
+          const act = m.key === selectedElemKey;
+          return `<button type="button" data-pick-celem="${m.key}" class="px-2 py-1 rounded-lg border text-left text-[11px] flex items-center justify-between gap-1 transition ${act ? 'bg-indigo-600 border-indigo-700 text-white font-black shadow-sm' : (el.visible ? 'bg-slate-50 border-slate-200 text-slate-800 hover:border-indigo-400 font-bold' : 'bg-slate-100 border-slate-200 text-slate-400 line-through')}">
+            <span class="truncate">${m.icon} ${m.label}</span>
+            <span class="text-[10px] shrink-0">${el.visible ? '👁️' : '🚫'}</span>
+          </button>`;
+        }).join('');
+        $$('[data-pick-celem]').forEach((b) => {
+          b.onclick = () => { selectedElemKey = b.dataset.pickCelem; syncCustomElemEditorUI(); redraw(); };
+        });
+      }
+      const meta = C.CERT_CUSTOM_ELEMENTS.find((m) => m.key === selectedElemKey) || C.CERT_CUSTOM_ELEMENTS[1];
+      const cur = cfg.customBgElements[meta.key];
+      if (!cur) return;
+      $('#ceActiveTitle').textContent = `${meta.icon} ${meta.label}`;
+      $('#ceVisible').checked = Boolean(cur.visible);
+      $('#ceSize').min = String(meta.minSize);
+      $('#ceSize').max = String(meta.maxSize);
+      $('#ceSize').value = String(Math.round(cur.size));
+      $('#ceSizeVal').textContent = `${Math.round(cur.size)}px`;
+      $('#ceColor').value = cur.color || '#ffffff';
+      $('#ceAlign').value = cur.align || 'center';
+      $('#ceAlign').disabled = Boolean(meta.isLogo);
+      $('#ceX').value = String(Math.round(Number(cur.x) * 100));
+      $('#ceY').value = String(Math.round(Number(cur.y) * 100));
+    };
+
     const redraw = () => {
       const idx = Number($('#certPreviewRunner')?.value || 0);
       const targetRow = certRows[idx] || certRows[0];
@@ -2361,17 +2432,31 @@
       C.renderCertificateCanvas(cEl, targetRow, cfg, {
         certMode: cfg.certMode || 'official',
         customBgImg: z2CustomBgImg,
+        selectedElementKey: z2CustomBgImg ? selectedElemKey : '',
         showPhotoPlaceholder: cfg.certMode === 'custom_runner',
         quote: '突破極限，感謝每一站熱情的志工！'
       });
     };
 
-    if (cfg.customBgDataUrl && !z2CustomBgImg) {
+    const loadCustomBgSrc = (src) => {
       const im = new Image();
-      im.onload = () => { z2CustomBgImg = im; redraw(); };
-      im.src = cfg.customBgDataUrl;
+      if (/^https?:\/\//i.test(src)) im.crossOrigin = 'anonymous';
+      im.onload = () => {
+        z2CustomBgImg = im;
+        const det = $('#certCustomBgDetails');
+        if (det) det.open = true;
+        syncCustomElemEditorUI();
+        redraw();
+      };
+      im.onerror = () => App.toast('自訂底圖載入失敗，請檢查圖片格式或網址是否允許跨網域讀取', 'error');
+      im.src = src;
+    };
+
+    if (cfg.customBgDataUrl && !z2CustomBgImg) {
+      loadCustomBgSrc(cfg.customBgDataUrl);
     }
     C.onLogoReady(() => { if ($('#z2CertCanvas')) redraw(); });
+    syncCustomElemEditorUI();
     redraw();
 
     $('#z2EventSelect').onchange = (e) => { App.State.z2EventId = e.target.value; z2CustomBgImg = null; renderZone2(App); };
@@ -2407,36 +2492,122 @@
     C.bindFastInput($('#certDirectorInput'), (e) => { cfg.raceDirectorName = e.target.value; redraw(); }, 150);
     $('#certPreviewRunner').onchange = redraw;
     $$('.cert-toggle').forEach((cb) => { cb.onchange = () => { cfg[cb.dataset.ckey] = cb.checked; redraw(); }; });
-    $('#certCustomColor').oninput = (e) => { cfg.customTextPos.color = e.target.value; redraw(); };
-    $('#certCustomAlign').onchange = (e) => { cfg.customTextPos.align = e.target.value; redraw(); };
-    $('#certCustomScale').oninput = (e) => { cfg.customTextPos.fontScale = Number(e.target.value); redraw(); };
-    $('#btnCertClearBg').onclick = () => { cfg.customBgDataUrl = ''; z2CustomBgImg = null; $('#certCustomBgFile').value = ''; redraw(); };
+    $('#ceVisible').onchange = (e) => {
+      cfg.customBgElements[selectedElemKey].visible = e.target.checked;
+      syncCustomElemEditorUI();
+      redraw();
+    };
+    $('#ceSize').oninput = (e) => {
+      const v = Number(e.target.value);
+      cfg.customBgElements[selectedElemKey].size = v;
+      $('#ceSizeVal').textContent = `${Math.round(v)}px`;
+      redraw();
+    };
+    $('#ceColor').oninput = (e) => {
+      cfg.customBgElements[selectedElemKey].color = e.target.value;
+      redraw();
+    };
+    $('#ceAlign').onchange = (e) => {
+      cfg.customBgElements[selectedElemKey].align = e.target.value;
+      redraw();
+    };
+    $('#ceX').oninput = (e) => {
+      cfg.customBgElements[selectedElemKey].x = Math.max(0.02, Math.min(0.98, Number(e.target.value || 50) / 100));
+      redraw();
+    };
+    $('#ceY').oninput = (e) => {
+      cfg.customBgElements[selectedElemKey].y = Math.max(0.02, Math.min(0.98, Number(e.target.value || 50) / 100));
+      redraw();
+    };
+    $('#btnCeCenterX').onclick = () => {
+      cfg.customBgElements[selectedElemKey].x = 0.5;
+      syncCustomElemEditorUI();
+      redraw();
+    };
+    $('#btnCeApplyColorAll').onclick = () => {
+      const clr = cfg.customBgElements[selectedElemKey].color || '#ffffff';
+      C.CERT_CUSTOM_ELEMENTS.forEach((m) => { if (!m.isLogo) cfg.customBgElements[m.key].color = clr; });
+      redraw();
+      App.toast(`🎨 已將全部文字欄位套用顏色 ${clr}`, 'info');
+    };
+    $('#btnCeResetAll').onclick = () => {
+      cfg.customBgElements = C.defaultCustomBgElements(cfg.orientation);
+      syncCustomElemEditorUI();
+      redraw();
+      App.toast('↩️ 已恢復 10 欄預設排版與字級', 'info');
+    };
+    $('#btnCertClearBg').onclick = () => {
+      cfg.customBgDataUrl = '';
+      z2CustomBgImg = null;
+      $('#certCustomBgFile').value = '';
+      if ($('#certCustomBgUrl')) $('#certCustomBgUrl').value = '';
+      syncCustomElemEditorUI();
+      redraw();
+    };
+    $('#btnCertApplyBgUrl').onclick = () => {
+      const url = ($('#certCustomBgUrl')?.value || '').trim();
+      if (!/^https?:\/\/.+/i.test(url)) return App.toast('請輸入 http:// 或 https:// 開頭之底圖網址', 'warn');
+      cfg.customBgDataUrl = url;
+      loadCustomBgSrc(url);
+      App.toast('🖼️ 已載入外部自訂底圖，可直接點選畫布欄位拖曳！', 'success');
+    };
     $('#certCustomBgFile').onchange = (e) => {
       const f = e.target.files?.[0];
       if (!f) return;
       const r = new FileReader();
-      r.onload = () => {
-        cfg.customBgDataUrl = r.result;
-        const im = new Image();
-        im.onload = () => { z2CustomBgImg = im; redraw(); };
-        im.src = r.result;
+      r.onload = async () => {
+        const compressed = await C.compressCustomBgImage(r.result, 1280, 42000);
+        cfg.customBgDataUrl = compressed;
+        loadCustomBgSrc(compressed);
+        App.toast(`🖼️ 已載入自訂底圖並自動壓縮最佳化（${Math.round(compressed.length / 1024)} KB），可點選畫布各欄位拖曳微調！`, 'success');
       };
       r.readAsDataURL(f);
     };
 
-    // 自訂底圖拖曳調整文字中心位置（官方與客製化證書皆支援）
+    // 自訂底圖畫布直接點選任一欄位＋獨立拖曳（含水平中線 50% 磁吸）
     const cv = $('#z2CertCanvas');
-    let dragText = false;
-    cv.onpointerdown = () => { if (z2CustomBgImg) dragText = true; };
-    cv.onpointerup = () => { dragText = false; };
-    cv.onpointermove = (e) => {
-      if (!dragText || !z2CustomBgImg) return;
+    let dragElemKey = '';
+    let grabOffsetX = 0;
+    let grabOffsetY = 0;
+    cv.onpointerdown = (e) => {
+      if (!z2CustomBgImg) return;
       const rect = cv.getBoundingClientRect();
-      const nx = Math.max(0.1, Math.min(0.9, (e.clientX - rect.left) / rect.width));
-      const ny = Math.max(0.15, Math.min(0.8, (e.clientY - rect.top) / rect.height));
-      cfg.customTextPos.nameX = nx; cfg.customTextPos.nameY = ny;
-      cfg.customTextPos.bibX = nx; cfg.customTextPos.bibY = ny + 0.08;
-      cfg.customTextPos.resultX = nx; cfg.customTextPos.resultY = ny + 0.19;
+      const px = (e.clientX - rect.left) * (cv.width / rect.width);
+      const py = (e.clientY - rect.top) * (cv.height / rect.height);
+      const boxes = cv._customHitBoxes || [];
+      let hit = null;
+      for (let i = boxes.length - 1; i >= 0; i--) {
+        const b = boxes[i];
+        if (px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h) {
+          hit = b;
+          break;
+        }
+      }
+      if (hit) {
+        selectedElemKey = hit.key;
+        dragElemKey = hit.key;
+        const cur = cfg.customBgElements[hit.key];
+        grabOffsetX = (px / cv.width) - Number(cur.x);
+        grabOffsetY = (py / cv.height) - Number(cur.y);
+        cv.setPointerCapture?.(e.pointerId);
+        syncCustomElemEditorUI();
+        redraw();
+      }
+    };
+    cv.onpointerup = () => { dragElemKey = ''; };
+    cv.onpointercancel = () => { dragElemKey = ''; };
+    cv.onpointermove = (e) => {
+      if (!dragElemKey || !z2CustomBgImg) return;
+      const rect = cv.getBoundingClientRect();
+      let nx = (e.clientX - rect.left) / rect.width - grabOffsetX;
+      let ny = (e.clientY - rect.top) / rect.height - grabOffsetY;
+      nx = Math.max(0.02, Math.min(0.98, nx));
+      ny = Math.max(0.02, Math.min(0.98, ny));
+      if (Math.abs(nx - 0.5) < 0.012) nx = 0.5;
+      cfg.customBgElements[dragElemKey].x = Number(nx.toFixed(4));
+      cfg.customBgElements[dragElemKey].y = Number(ny.toFixed(4));
+      if ($('#ceX')) $('#ceX').value = String(Math.round(nx * 100));
+      if ($('#ceY')) $('#ceY').value = String(Math.round(ny * 100));
       redraw();
     };
 

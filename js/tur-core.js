@@ -331,6 +331,81 @@
     };
   }
 
+  const CERT_CUSTOM_ELEMENTS = [
+    { key: 'eventName', label: '賽事名稱', icon: '🏁', minSize: 18, maxSize: 96, isLogo: false },
+    { key: 'runnerName', label: '選手姓名', icon: '🏃', minSize: 28, maxSize: 160, isLogo: false },
+    { key: 'bibCategory', label: '號碼布 / 組別', icon: '🏷️', minSize: 16, maxSize: 72, isLogo: false },
+    { key: 'primaryResult', label: '主要成績', icon: '⏱️', minSize: 28, maxSize: 140, isLogo: false },
+    { key: 'secondaryResult', label: '次要成績 / 距離', icon: '📏', minSize: 16, maxSize: 72, isLogo: false },
+    { key: 'rankPace', label: '名次 / 均速', icon: '📊', minSize: 14, maxSize: 60, isLogo: false },
+    { key: 'logo', label: 'TUR 官方 LOGO', icon: '🖼️', minSize: 40, maxSize: 180, isLogo: true },
+    { key: 'date', label: '比賽日期', icon: '📅', minSize: 14, maxSize: 56, isLogo: false },
+    { key: 'organizer', label: '主辦單位', icon: '🏛️', minSize: 14, maxSize: 56, isLogo: false },
+    { key: 'director', label: '賽事總監', icon: '🎖️', minSize: 14, maxSize: 56, isLogo: false }
+  ];
+
+  function defaultCustomBgElements(orientation = 'landscape') {
+    const isP = orientation === 'portrait';
+    return {
+      eventName:       { visible: true, x: 0.50, y: isP ? 0.13 : 0.14, size: isP ? 42 : 48, color: '#ffffff', align: 'center' },
+      runnerName:      { visible: true, x: 0.50, y: isP ? 0.30 : 0.31, size: isP ? 88 : 98, color: '#ffffff', align: 'center' },
+      bibCategory:     { visible: true, x: 0.50, y: isP ? 0.38 : 0.40, size: isP ? 30 : 34, color: '#fde047', align: 'center' },
+      primaryResult:   { visible: true, x: 0.50, y: isP ? 0.51 : 0.54, size: isP ? 72 : 80, color: '#fde047', align: 'center' },
+      secondaryResult: { visible: true, x: 0.50, y: isP ? 0.58 : 0.62, size: isP ? 30 : 34, color: '#ffffff', align: 'center' },
+      rankPace:        { visible: true, x: 0.50, y: isP ? 0.65 : 0.69, size: isP ? 24 : 28, color: '#e2e8f0', align: 'center' },
+      logo:            { visible: true, x: 0.50, y: isP ? 0.80 : 0.81, size: isP ? 82 : 88, color: '#f59e0b', align: 'center' },
+      date:            { visible: true, x: 0.20, y: 0.92, size: isP ? 22 : 26, color: '#ffffff', align: 'center' },
+      organizer:       { visible: true, x: 0.50, y: 0.92, size: isP ? 22 : 26, color: '#ffffff', align: 'center' },
+      director:        { visible: true, x: 0.80, y: 0.92, size: isP ? 22 : 26, color: '#fde047', align: 'center' }
+    };
+  }
+
+  function getMergedCustomBgElements(cfg) {
+    const base = defaultCustomBgElements(cfg?.orientation || 'landscape');
+    const saved = cfg?.customBgElements && typeof cfg.customBgElements === 'object' ? cfg.customBgElements : {};
+    const out = {};
+    CERT_CUSTOM_ELEMENTS.forEach(({ key }) => {
+      out[key] = { ...base[key], ...(saved[key] || {}) };
+    });
+    return out;
+  }
+
+  function compressCustomBgImage(dataUrl, maxDim = 1280, maxChars = 42000) {
+    return new Promise((resolve) => {
+      if (!dataUrl || typeof global.document === 'undefined') return resolve(dataUrl || '');
+      if (dataUrl.length <= maxChars) return resolve(dataUrl);
+      const img = new Image();
+      img.onload = () => {
+        try {
+          let w = img.width || maxDim;
+          let h = img.height || Math.round(maxDim * 0.707);
+          const ratio = Math.min(1, maxDim / Math.max(w, h));
+          w = Math.max(320, Math.round(w * ratio));
+          h = Math.max(240, Math.round(h * ratio));
+          const c = global.document.createElement('canvas');
+          let out = dataUrl;
+          let curScale = 1;
+          for (let attempt = 0; attempt < 6; attempt++) {
+            c.width = Math.max(320, Math.round(w * curScale));
+            c.height = Math.max(240, Math.round(h * curScale));
+            const g = c.getContext('2d');
+            g.drawImage(img, 0, 0, c.width, c.height);
+            for (const q of [0.82, 0.72, 0.62, 0.52, 0.42]) {
+              out = c.toDataURL('image/jpeg', q);
+              if (out.length <= maxChars) return resolve(out);
+            }
+            curScale *= 0.8;
+          }
+          resolve(out);
+        } catch (_) {
+          resolve(dataUrl);
+        }
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    });
+  }
+
   function defaultCertConfig() {
     return {
       certMode: 'official', // 'official' (官方證書，無個人照片) | 'custom_runner' (選手客製化證書，含個人照片)
@@ -1527,11 +1602,11 @@
 
     ctx.clearRect(0, 0, W, H);
 
-    // 1. 自訂上傳底圖套印模式（預設置中放大、Logo 置於下方、最下列平均置中含賽事總監）
+    // 1. 自訂上傳底圖套印模式（10 欄位各自獨立位置 / 字體大小 / 顏色 / 對齊 / 顯示開關，支援畫布直接點選拖曳）
     if (userOpts.customBgImg) {
       drawCoverImage(ctx, userOpts.customBgImg, 0, 0, W, H);
-      const pos = { ...defaultCertConfig().customTextPos, ...(cfg.customTextPos || {}) };
-      const fs = Number(pos.fontScale || 1.12);
+      const elems = getMergedCustomBgElements(cfg);
+      const hitBoxes = [];
 
       if (isCustomRunner && (userOpts.photoImg || userOpts.showPhotoPlaceholder)) {
         const photoBox = isPortrait
@@ -1540,50 +1615,130 @@
         drawRunnerPhotoFrame(ctx, photoBox, pal, userOpts);
       }
 
-      ctx.fillStyle = pos.color || '#ffffff';
-      ctx.textAlign = pos.align || 'center';
-      ctx.shadowColor = 'rgba(0,0,0,0.48)';
-      ctx.shadowBlur = 10;
+      const bibParts = [];
+      if (cfg.showBib !== false) bibParts.push(`BIB ${p.bibNumber || '---'}`);
+      if (cfg.showCategory !== false) bibParts.push(cat.name || '');
+      if (cfg.enableWarrior800 !== false && row?.isWarrior800) bibParts.push('★ 八百壯士');
 
-      if (cfg.showEventName) {
-        ctx.font = `900 ${Math.round(42 * fs)}px ${FF}`;
-        ctx.fillText(ev.nameZh || '', W * pos.nameX, H * Math.max(0.10, pos.nameY - 0.14));
+      const primaryTxt = ev.raceType === 'lap_timed'
+        ? `${Number(row?.totalDistanceKm || 0).toFixed(2)} KM`
+        : formatDuration(row?.elapsedSec);
+      const secondaryTxt = ev.raceType === 'lap_timed'
+        ? `${row?.lapCount || 0} 圈 (${formatDuration(row?.elapsedSec)})`
+        : `完賽距離 ${Number(row?.totalDistanceKm ?? cat.distanceKm ?? 0).toFixed(1)} KM`;
+      const rankParts = [];
+      if (cfg.showOverallRank !== false) rankParts.push(`總名次 #${row?.overallRank ?? '-'}`);
+      if (cfg.showCatRank !== false) rankParts.push(`分組 #${row?.catRank ?? '-'}`);
+      if (cfg.showPace !== false) rankParts.push(`均速 ${row?.avgPace || '--:--'}`);
+
+      const dateVal = (ev.raceStart || formatDateTime()).slice(0, 10);
+      const textValues = {
+        eventName: { text: ev.nameZh || '', font: FF, weight: '900' },
+        runnerName: { text: p.name || '-', font: FF, weight: '900' },
+        bibCategory: { text: bibParts.filter(Boolean).join('  ·  '), font: NF, weight: '800' },
+        primaryResult: { text: primaryTxt, font: NF, weight: '900' },
+        secondaryResult: { text: secondaryTxt, font: FF, weight: '800' },
+        rankPace: { text: rankParts.join('   |   '), font: FF, weight: '700' },
+        date: { text: `比賽日期：${dateVal}`, font: FF, weight: '800' },
+        organizer: { text: `主辦單位：${ev.organizerZh || 'TUR 台灣超馬協會'}`, font: FF, weight: '800' },
+        director: { text: directorName ? `賽事總監：${directorName}` : '', font: FF, weight: '800' }
+      };
+
+      const selKey = userOpts.selectedElementKey || '';
+      const selEl = selKey ? elems[selKey] : null;
+      // 若正在編輯且水平靠近中線 (50%)，繪製柔和垂直置中輔助線
+      if (selEl && selEl.visible && Math.abs(Number(selEl.x) - 0.5) <= 0.012) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.75)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([10, 8]);
+        ctx.beginPath();
+        ctx.moveTo(cx, 24);
+        ctx.lineTo(cx, H - 24);
+        ctx.stroke();
+        ctx.restore();
       }
-      if (cfg.showRunnerName) {
-        ctx.font = `900 ${Math.round(92 * fs)}px ${FF}`;
-        ctx.fillText(p.name, W * pos.nameX, H * pos.nameY);
-      }
-      if (cfg.showBib || cfg.showCategory) {
-        ctx.font = `800 ${Math.round(34 * fs)}px ${NF}`;
-        const parts = [];
-        if (cfg.showBib) parts.push(`BIB ${p.bibNumber}`);
-        if (cfg.showCategory) parts.push(cat.name);
-        if (cfg.enableWarrior800 && row?.isWarrior800) parts.push('★ 八百壯士 100K+');
-        ctx.fillText(parts.join('  ·  '), W * pos.bibX, H * pos.bibY);
-      }
-      if (cfg.showPrimaryResult) {
-        const primary = ev.raceType === 'lap_timed'
-          ? `${Number(row?.totalDistanceKm || 0).toFixed(2)} KM`
-          : formatDuration(row?.elapsedSec);
-        ctx.font = `900 ${Math.round(70 * fs)}px ${NF}`;
-        ctx.fillText(primary, W * pos.resultX, H * pos.resultY);
-      }
-      if (cfg.showOverallRank || cfg.showCatRank || cfg.showPace) {
-        const subParts = [];
-        if (cfg.showOverallRank) subParts.push(`總名次 #${row?.overallRank ?? '-'}`);
-        if (cfg.showCatRank) subParts.push(`分組 #${row?.catRank ?? '-'}`);
-        if (cfg.showPace) subParts.push(`均速 ${row?.avgPace || '--:--'}`);
-        ctx.font = `700 ${Math.round(28 * fs)}px ${FF}`;
-        ctx.fillText(subParts.join('   |   '), W * pos.resultX, H * Math.min(0.76, pos.resultY + 0.08));
-      }
+
+      CERT_CUSTOM_ELEMENTS.forEach((meta) => {
+        const el = elems[meta.key];
+        if (!el || !el.visible) return;
+        const px = W * Number(el.x ?? 0.5);
+        const py = H * Number(el.y ?? 0.5);
+        const sz = Math.max(meta.minSize, Math.min(meta.maxSize, Number(el.size || 32)));
+
+        if (meta.isLogo) {
+          const logoH = sz;
+          const logoW = Math.round(logoH * 4.1);
+          const lx = Math.round(px - logoW / 2);
+          const ly = Math.round(py - logoH / 2);
+          drawTurLogoBadge(ctx, lx, ly, logoW, logoH, el.color || pal.accent);
+          hitBoxes.push({ key: meta.key, label: meta.label, x: lx - 8, y: ly - 8, w: logoW + 16, h: logoH + 16, cx: px, cy: py });
+          return;
+        }
+
+        const spec = textValues[meta.key];
+        if (!spec || !spec.text) return;
+        ctx.save();
+        ctx.font = `${spec.weight} ${Math.round(sz)}px ${spec.font}`;
+        ctx.textAlign = el.align || 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = el.color || '#ffffff';
+        ctx.shadowColor = 'rgba(0,0,0,0.52)';
+        ctx.shadowBlur = 10;
+        ctx.fillText(spec.text, px, py, W - 80);
+
+        const tw = Math.min(W - 80, Math.max(80, ctx.measureText(spec.text).width));
+        const th = Math.max(28, sz * 1.18);
+        let bx = px - tw / 2;
+        if (el.align === 'left') bx = px;
+        else if (el.align === 'right') bx = px - tw;
+        hitBoxes.push({ key: meta.key, label: meta.label, x: bx - 12, y: py - th / 2 - 6, w: tw + 24, h: th + 12, cx: px, cy: py });
+        ctx.restore();
+      });
+
       if (isCustomRunner && cfg.allowPublicPhotoQuote && String(userOpts.quote || '').trim()) {
-        ctx.font = `italic 700 ${Math.round(26 * fs)}px ${FF}`;
-        ctx.fillText(`「${String(userOpts.quote).trim().slice(0, 40)}」`, W * pos.resultX, H * Math.min(0.80, pos.resultY + 0.14));
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#fde68a';
+        ctx.shadowColor = 'rgba(0,0,0,0.55)';
+        ctx.shadowBlur = 8;
+        ctx.font = `italic 700 28px ${FF}`;
+        ctx.fillText(`「${String(userOpts.quote).trim().slice(0, 40)}」`, cx, H * 0.74, W - 120);
+        ctx.restore();
       }
-      ctx.shadowBlur = 0;
-      drawBottomLogoAndFooter(true);
-      return;
+
+      // 編輯模式高亮目前選中欄位的虛線框與座標標籤（匯出 PNG/PDF/ZIP 不帶 selectedElementKey 故完全乾淨）
+      if (selKey) {
+        const hb = hitBoxes.find((b) => b.key === selKey);
+        if (hb && selEl) {
+          ctx.save();
+          ctx.strokeStyle = '#38bdf8';
+          ctx.lineWidth = 3;
+          ctx.setLineDash([10, 6]);
+          ctx.strokeRect(hb.x, hb.y, hb.w, hb.h);
+          ctx.setLineDash([]);
+          const tagTxt = `${hb.label} · X:${Math.round(selEl.x * 100)}% Y:${Math.round(selEl.y * 100)}% · ${Math.round(selEl.size)}px`;
+          ctx.font = '700 18px "Noto Sans TC", sans-serif';
+          const tagW = ctx.measureText(tagTxt).width + 20;
+          const tagX = Math.max(12, Math.min(W - tagW - 12, hb.x));
+          const tagY = Math.max(12, hb.y - 34);
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+          roundRectPath(ctx, tagX, tagY, tagW, 28, 6);
+          ctx.fill();
+          ctx.fillStyle = '#38bdf8';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(tagTxt, tagX + 10, tagY + 14);
+          ctx.restore();
+        }
+      }
+
+      canvas._customHitBoxes = hitBoxes;
+      return hitBoxes;
     }
+
+    canvas._customHitBoxes = [];
 
     // 2. 內建 6 種底圖（漸層＋質感紋理）與 6 種樣式（版型）
     const grad = ctx.createLinearGradient(0, 0, W, H);
@@ -2414,7 +2569,7 @@
     isBundleOrderCode, generateBundleOrderCode, summarizeBundleOrders,
     FONT_SCALE_MODES, applyFontScale, getSavedFontScale, getRaceTypeWorkflow, getStationSopInfo,
     bindFastInput, ensureExternalLib, ensureCertFonts,
-    CERT_LAYOUTS, CERT_PALETTES, CERT_FONTS, renderCertificateCanvas,
+    CERT_LAYOUTS, CERT_PALETTES, CERT_FONTS, CERT_CUSTOM_ELEMENTS, defaultCustomBgElements, getMergedCustomBgElements, compressCustomBgImage, renderCertificateCanvas,
     buildFull5EventsSeed
   };
 })(window);
