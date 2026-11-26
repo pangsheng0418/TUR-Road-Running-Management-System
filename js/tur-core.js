@@ -8,7 +8,7 @@
   'use strict';
 
   // 若要部署至 GitHub Pages / Vercel 讓所有跑者與作業員免設定自動連線，請將 GAS /exec 網址貼於此處：
-  const DEFAULT_GAS_URL = '';
+  const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwPoUdjUz_jGTbATwsqTWbydoFW9ycoXb0jx0EY52GYLMRLJ81zUeqKZgKkb0lWwNOd/exec';
 
   /* --------------------------------------------------------------------------
    * 0. Official TUR Logo Preloader (Zero CORS Taint via Data URI)

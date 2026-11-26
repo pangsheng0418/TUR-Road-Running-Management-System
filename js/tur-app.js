@@ -60,7 +60,7 @@
   const State = {
     events: [], categories: [], stations: [], participants: [], timingLogs: [],
     historyResults: [], users: [], globalConfig: [], syncQueue: [],
-    gasUrl: localStorage.getItem('TUR_GAS_URL') || C.DEFAULT_GAS_URL || '',
+    gasUrl: (localStorage.getItem('TUR_GAS_URL') || '').trim() || C.DEFAULT_GAS_URL || '',
     currentUser: { username: 'public', displayName: '民眾 / 跑者', role: 'public', allowedStation: '' },
     activeView: 'public-home',
     regEventId: '',
