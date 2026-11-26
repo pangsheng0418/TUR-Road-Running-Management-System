@@ -4,18 +4,18 @@
 
 ---
 
-## 專案檔案架構
+## 專案檔案架構（v4.3 完整治理版）
 
 | 檔案 | 功能說明 |
 | :--- | :--- |
-| `Code.gs` | Google Apps Script 後端（8 張工作表 `setupSheets`、最高管理直通 `adminBatchUpdateSheet`、PAYUNi 自動銷帳配號、歷屆匯入、JSON + JSONP 雙協議） |
-| `index.html` | 單一入口主系統（公開前台報名、零紀錄登入、作業員鎖定站點、五大治理專區） |
-| `js/tur-core.js` | 共用核心（IndexedDB 9 Stores、GAS JSONP 備援、28 複姓拆併、SHA-256、雙賽制計時引擎、動態證書畫布引擎、5 場全情境測試資料） |
-| `js/tur-zones.js` | 專區 1~5 完整業務（3 表 Excel `.xlsx`、DUV 送審、800 壯士分流、批次 `.zip`/多頁 `.pdf`、歷屆金框清洗、最高管理直通 Data Grid） |
-| `js/tur-app.js` | 四層 RBAC、零紀錄登入與三步驟作業員登錄、14 項防呆、雙軌金流（`MANUAL_ATM` / `ONLINE_PAYUNi`）、離線 Web NFC 感應 |
-| `public.html` | 免登入公開平台（即時與結案成績、歷年查詢、八百壯士 100K+ 英雄榜、聯動承辦人開關之動態證書中心） |
+| `Code.gs` | Google Apps Script 後端（8 張工作表 `setupSheets`、活動金流模式伺服器端管制、報名／入帳／自改自動寄信、已繳費費用鎖定、最高管理直通 `adminBatchUpdateSheet`、PAYUNi 自動銷帳配號、JSON + JSONP 雙協議） |
+| `index.html` | 單一入口主系統（公開前台報名、`/lookup` 雙因子查改、全域字體 `A / A+ / A++` 切換、建立活動預填起跑時間／賽制／金流模式、作業員鎖定站點 SOP 與手動補登、五大治理專區） |
+| `js/tur-core.js` | 共用核心（IndexedDB 9 Stores、5 場 38 人全狀態測試資料、8 類型自訂欄位建置器、外部名單匯入解析器、五階段防呆檢核、完賽＋結案＋有成績證書三道管制 `isCertEligible`、雙模式 6×6×6 證書畫布引擎） |
+| `js/tur-zones.js` | 專區 1~5 完整業務（自訂報名表欄位、外部名單匯入精靈、分場晶片寫入／讀取查看／報到管制、4 工作表 Excel 含報名/報到/完賽比例總覽、DUV 送審、800 壯士分流、僅限完賽有成績之批次 `.zip`/`.pdf` 證書匯出） |
+| `js/tur-app.js` | 四層 RBAC、零紀錄登入與三步驟作業員登錄、活動層級金流管制（`MANUAL_ATM` / `ONLINE_PAYUNi`）、距離賽／繞圈賽作業 SOP、離線 Web NFC 感應與手動補登 |
+| `public.html` | 免登入公開平台（即時進度與統計分析、跨年度歷年成績查詢、八百壯士 100K+ 分年度／星等英雄榜、嚴格「完賽＋已結案＋有成績」雙模式證書中心） |
 | `lib/payuni.js` | PAYUNi 統一金流 AES-256-GCM 加解密與 SHA-256 `HashInfo` 工具模組 |
-| `api/payuni-webhook.js` | Vercel / Node.js Serverless Webhook（背景驗簽解密並觸發 GAS 秒級自動 `PAID` + 配號） |
+| `api/payuni-webhook.js` | Vercel / Node.js Serverless Webhook（背景驗簽解密並觸發 GAS 秒級自動 `PAID` + 配號 + 自動寄信） |
 
 ---
 

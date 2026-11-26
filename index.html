@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>TUR 一體化賽事管理與計時系統 v3.0 (全權責治理版)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;800&family=Noto+Sans+TC:wght@500;700;900&family=Noto+Serif+TC:wght@600;900&family=Oswald:wght@600;700&family=Zen+Maru+Gothic:wght@500;700;900&display=swap" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
@@ -36,8 +38,10 @@
 <!-- 頂部治理導覽列 -->
 <header class="sticky top-0 z-40 bg-slate-950 text-white shadow-lg">
   <div class="max-w-7xl mx-auto px-3 sm:px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
-    <div class="flex items-center gap-2.5">
-      <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-400 to-orange-600 flex items-center justify-center font-black text-slate-950 text-sm shadow">TUR</div>
+    <div class="flex items-center gap-3">
+      <div class="bg-white rounded-xl px-2.5 py-1 shadow flex items-center justify-center shrink-0">
+        <img src="assets/tur-logo.jpg" alt="TUR Taiwan Ultra Runners" class="h-7 sm:h-8 w-auto object-contain" />
+      </div>
       <div>
         <div class="font-bold text-sm sm:text-base leading-tight flex items-center gap-2">
           <span>TUR 一體化賽事治理系統 <span class="text-amber-400 text-xs">v3.0</span></span>
@@ -51,6 +55,12 @@
     </div>
 
     <div class="flex flex-wrap items-center gap-1.5 text-xs">
+      <!-- 全站字體大小即時調整器 -->
+      <div id="fontSizeSwitcher" class="flex items-center bg-slate-800 border border-slate-700 rounded-lg p-0.5" title="調整畫面字體大小">
+        <button type="button" data-font-scale="normal" class="px-2 py-1 rounded text-[11px] font-bold">A</button>
+        <button type="button" data-font-scale="large" class="px-2 py-1 rounded text-[11px] font-bold">A+</button>
+        <button type="button" data-font-scale="xlarge" class="px-2 py-1 rounded text-[11px] font-bold">A++</button>
+      </div>
       <button id="btnSyncUpload" class="hidden px-2.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 font-bold flex items-center gap-1">
         <span>☁️ 上傳</span><span id="pendingQueueCount" class="bg-slate-950/50 px-1.5 rounded-full mono">0</span>
       </button>
@@ -73,10 +83,15 @@
   <!-- ==================== 視圖 A：前台公開報名首頁 (/) ==================== -->
   <section id="view-public-home" class="app-view space-y-4">
     <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 shadow">
-      <div>
-        <div class="text-xs font-bold text-amber-400 tracking-wider">TAIWAN ULTRA RUNNERS · 官方線上報名平台</div>
-        <h1 class="text-xl sm:text-2xl font-black mt-1">開放報名賽事總覽（依月份分組）</h1>
-        <p class="text-xs text-slate-300 mt-1">支援個人 / 團體最多 50 人報名、預設銀行轉帳末五碼與自選 PAYUNi 統一金流秒級銷帳。</p>
+      <div class="flex flex-wrap items-center gap-4">
+        <div class="bg-white rounded-2xl px-4 py-2.5 shadow-lg shrink-0">
+          <img src="assets/tur-logo.jpg" alt="TUR Taiwan Ultra Runners" class="h-11 sm:h-14 w-auto object-contain" />
+        </div>
+        <div>
+          <div class="text-xs font-bold text-amber-400 tracking-wider">TAIWAN ULTRA RUNNERS · 官方線上報名平台</div>
+          <h1 class="text-xl sm:text-2xl font-black mt-1">開放報名賽事總覽（依月份分組）</h1>
+          <p class="text-xs text-slate-300 mt-1">支援個人 / 團體最多 50 人報名、預設銀行轉帳末五碼與自選 PAYUNi 統一金流秒級銷帳。</p>
+        </div>
       </div>
       <div class="flex flex-wrap gap-2 text-xs">
         <button id="btnGoLookupFromHome" class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 font-bold">🔍 雙因子報名查詢與修改 (/lookup)</button>
@@ -88,32 +103,70 @@
 
   <!-- ==================== 視圖 B：前台線上報名表單 (/register/:slug) ==================== -->
   <section id="view-public-register" class="app-view hidden space-y-4">
-    <div class="flex items-center justify-between bg-white p-3 rounded-xl border shadow-sm">
-      <div class="flex items-center gap-2">
-        <button id="btnBackToHome" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-bold">← 返回賽事列表</button>
-        <div>
-          <div id="regEventTitle" class="font-black text-sm sm:text-base text-slate-900">-</div>
-          <div id="regEventMeta" class="text-[11px] text-slate-500">-</div>
-        </div>
+    <!-- 賽事動感橫幅 Hero -->
+    <div id="regBannerHero" class="rounded-2xl overflow-hidden shadow-md text-white p-5 flex flex-wrap items-end justify-between gap-3 min-h-[132px]">
+      <div>
+        <button id="btnBackToHome" class="mb-2 px-3 py-1 rounded-lg bg-black/40 hover:bg-black/60 text-white text-xs font-bold backdrop-blur-sm">← 返回賽事列表</button>
+        <div id="regEventTitle" class="font-black text-lg sm:text-2xl drop-shadow">-</div>
+        <div id="regEventMeta" class="text-xs text-white/90 mt-0.5 drop-shadow">-</div>
       </div>
-      <button type="button" id="btnFillSampleRunner" class="text-xs px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold">✨ 帶入合法範例</button>
+      <button type="button" id="btnFillSampleRunner" class="text-xs px-3.5 py-2 rounded-xl bg-white/90 hover:bg-white text-slate-900 font-black shadow">✨ 帶入合法範例</button>
+    </div>
+
+    <!-- 賽制類型明確說明條（區分距離賽 vs 計時繞圈賽與作業流程） -->
+    <div id="regRaceTypeBanner" class="rounded-2xl border-2 p-3.5 text-xs shadow-sm"></div>
+
+    <!-- 📜 活動簡章與參賽須知展示區 -->
+    <details id="regBrochureBox" open class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <summary class="px-4 py-3 bg-slate-50 border-b cursor-pointer font-black text-sm text-slate-900 flex items-center justify-between">
+        <span>📜 活動簡章與參賽須知（報名前請詳閱）</span>
+        <span class="text-xs font-semibold text-sky-700">點擊展開 / 收合</span>
+      </summary>
+      <div id="regBrochureContent" class="p-4 text-xs sm:text-sm text-slate-700 leading-relaxed whitespace-pre-line"></div>
+    </details>
+
+    <!-- 明確區分「個人報名」與「團體報名」雙模式切換卡 -->
+    <div class="grid grid-cols-2 gap-3">
+      <button type="button" id="btnModeSolo" class="p-3.5 rounded-2xl border-2 border-slate-900 bg-slate-900 text-white text-left shadow transition">
+        <div class="font-black text-sm sm:text-base flex items-center gap-1.5"><span>🏃 個人報名</span><span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-400 text-slate-950">目前模式</span></div>
+        <div class="text-[11px] opacity-85 mt-0.5">單人填表直接送出，不顯示團報欄位，避免填錯。</div>
+      </button>
+      <button type="button" id="btnModeGroup" class="p-3.5 rounded-2xl border-2 border-slate-200 bg-white hover:border-amber-400 text-slate-800 text-left shadow-sm transition">
+        <div class="font-black text-sm sm:text-base flex items-center gap-1.5"><span>👥 團體報名（2～50 人）</span></div>
+        <div class="text-[11px] text-slate-500 mt-0.5">自動配發 GRP26 團報碼，支援整團統一匯款或各自匯款。</div>
+      </button>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
       <!-- 左 2 欄：14 項防呆表單 + 雙軌金流 -->
       <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-4">
         <form id="regForm" class="space-y-3" novalidate>
-          <!-- 團報資訊（選填） -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-xl bg-slate-50 border">
-            <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1">團體名稱（個人報名留空即可）</label>
-              <input id="regGroupName" type="text" placeholder="如：台北超馬跑團（團報自動配發 GRP26-XXXX）" class="w-full px-3 py-2 border rounded-lg text-xs" />
+          <!-- 團體報名專屬設定區塊（個人模式完全隱藏） -->
+          <div id="groupSettingsPanel" class="hidden p-3.5 rounded-xl bg-amber-50 border-2 border-amber-400 space-y-2.5">
+            <div class="flex flex-wrap items-center justify-between gap-1">
+              <div class="text-xs font-black text-amber-950">👥 團體報名設定（步驟 ① 填完每位團員後點「➕ 加入團報清單」→ 步驟 ② 右側按「送出整批團報」）</div>
             </div>
-            <div>
-              <label class="block text-xs font-bold text-slate-700 mb-1">1. 報名組別 *</label>
-              <select id="regCatId" class="w-full px-3 py-2 border rounded-lg text-sm"></select>
-              <p id="err-regCatId" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div>
+                <label class="block text-xs font-bold text-amber-950 mb-1">團體 / 跑團名稱（團報必填）*</label>
+                <input id="regGroupName" type="text" placeholder="例如：台北超馬跑團（自動配發 GRP26-XXXX）" class="w-full px-3 py-2 border rounded-lg text-xs bg-white" />
+                <p id="err-regGroupName" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
+              </div>
+              <div id="regGroupPayModeWrap">
+                <label class="block text-xs font-bold text-amber-950 mb-1">團報匯款方式</label>
+                <select id="regGroupPayMode" class="w-full px-3 py-2 border rounded-lg text-xs bg-white font-semibold">
+                  <option value="shared">整團統一匯款（共用第 1 位之末五碼）</option>
+                  <option value="split">團員各自匯款（每人各自填寫末五碼）</option>
+                </select>
+              </div>
             </div>
+          </div>
+
+          <!-- 1. 報名組別 -->
+          <div class="p-3 rounded-xl bg-slate-50 border">
+            <label class="block text-xs font-bold text-slate-700 mb-1">1. 報名組別 *</label>
+            <select id="regCatId" class="w-full px-3 py-2 border rounded-lg text-sm bg-white"></select>
+            <p id="err-regCatId" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -201,38 +254,53 @@
             </div>
           </div>
 
+          <!-- 承辦人專屬自訂擴充欄位（依活動動態生成 8 種類型，無設定時自動隱藏） -->
+          <div id="regCustomFieldsSection" class="hidden p-3.5 bg-indigo-50/70 rounded-xl border-2 border-indigo-200 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <div class="text-xs font-black text-indigo-950">📝 承辦人專屬擴充填列欄位（本活動附加調查）</div>
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 font-bold">承辦人動態設定</span>
+            </div>
+            <div id="regCustomFieldsContainer" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs"></div>
+          </div>
+
           <!-- 動態加購項目區 -->
           <div class="p-3 bg-slate-50 rounded-xl border">
             <div class="text-xs font-bold text-slate-700 mb-2">13. 加購服務（由承辦人於後台動態設定）</div>
             <div id="regAddonsContainer" class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs"></div>
           </div>
 
-          <!-- 雙軌金流選擇（預設軌道 B 實體轉帳高亮 ＋ 自選軌道 A PAYUNi） -->
+          <!-- 依承辦人於建立活動時選定之金流管制模式呈現（管制至報名結束） -->
           <div class="space-y-2.5 p-3.5 rounded-xl border-2 border-slate-200 bg-slate-50">
-            <div class="text-xs font-black text-slate-800">14. 選擇繳費方式（雙軌金流）</div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              <label id="payCardManual" class="p-3 rounded-xl border-2 border-amber-500 bg-amber-50/70 cursor-pointer block">
-                <div class="flex items-center gap-2">
-                  <input type="radio" name="payMethod" value="MANUAL_ATM" checked />
-                  <span class="font-black text-xs text-slate-900">🏦 實體銀行 ATM 轉帳（預設）</span>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div id="regPayModeHeader" class="text-xs font-black text-slate-800">14. 本活動指定繳費方式</div>
+              <span id="regPayModeBadge" class="text-[10px] px-2 py-0.5 rounded-full bg-slate-900 text-amber-300 font-bold">依活動設定管制</span>
+            </div>
+            <div id="payGridWrap" class="grid grid-cols-1 gap-2.5">
+              <label id="payCardManual" class="p-3.5 rounded-xl border-2 border-amber-500 bg-amber-50/70 block">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex items-center gap-2">
+                    <input type="radio" name="payMethod" value="MANUAL_ATM" checked />
+                    <span class="font-black text-xs text-slate-900">🏦 實體銀行 ATM 轉帳（核對帳號末五碼）</span>
+                  </div>
+                  <span class="text-[10px] px-2 py-0.5 rounded bg-amber-200 text-amber-950 font-bold">本活動唯一繳費方式</span>
                 </div>
                 <div id="bankAccountPreview" class="text-[11px] text-slate-600 mt-1.5 mono leading-relaxed"></div>
                 <div class="mt-2">
-                  <input id="regLast5" type="text" maxlength="5" placeholder="預填匯款帳號末五碼 (5碼純數字)" class="w-full px-2.5 py-1.5 border rounded-lg text-xs mono bg-white" />
+                  <input id="regLast5" type="text" maxlength="5" placeholder="預填匯款帳號末五碼 (5碼純數字，亦可報名後至 /lookup 補填)" class="w-full px-2.5 py-1.5 border rounded-lg text-xs mono bg-white" />
                   <p id="err-regLast5" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
                 </div>
               </label>
 
-              <label id="payCardPayuni" class="p-3 rounded-xl border-2 border-slate-200 bg-white cursor-pointer block">
+              <label id="payCardPayuni" class="p-3.5 rounded-xl border-2 border-emerald-500 bg-emerald-50/70 block">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center gap-2">
                     <input type="radio" name="payMethod" value="ONLINE_PAYUNi" />
-                    <span class="font-black text-xs text-slate-900">💳 統一金流 PAYUNi</span>
+                    <span class="font-black text-xs text-slate-900">💳 統一金流 PAYUNi（結合金流廠商自動銷帳）</span>
                   </div>
-                  <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold">⚡ 秒級自動銷帳</span>
+                  <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-600 text-white font-bold">⚡ 本活動唯一繳費方式・秒級配號</span>
                 </div>
-                <p class="text-[11px] text-slate-500 mt-1.5">支援信用卡 / 虛擬 ATM / 7-11 超商代碼，付款完成自動改 PAID 並連鎖配發號碼布。</p>
-                <select id="payuniTypeSelect" class="mt-2 w-full px-2.5 py-1.5 border rounded-lg text-xs bg-slate-50">
+                <p class="text-[11px] text-slate-600 mt-1.5">本活動已結合金流廠商，支援信用卡 / 虛擬 ATM / 7-11 超商代碼，付款完成自動改 PAID 並連鎖配發號碼布（免人工核對末五碼）。</p>
+                <select id="payuniTypeSelect" class="mt-2 w-full px-2.5 py-1.5 border rounded-lg text-xs bg-white font-semibold">
                   <option value="CREDIT">信用卡一次付清 (CREDIT)</option>
                   <option value="ATM">虛擬 ATM 轉帳 (ATM)</option>
                   <option value="CVS">7-11 超商代碼 (CVS)</option>
@@ -253,27 +321,33 @@
               <span id="regSingleTotal" class="text-xl font-black text-amber-600 mono">NT$ 0</span>
             </div>
             <div class="flex flex-wrap gap-2">
-              <button type="button" id="btnAddToGroup" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold">➕ 加入團報清單</button>
-              <button type="submit" id="btnSubmitSingle" class="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-black shadow">📝 確認送出報名資料（稍後轉帳）</button>
+              <button type="button" id="btnAddToGroup" class="hidden px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs sm:text-sm font-black shadow">➕ 加入團報清單（步驟 ①）</button>
+              <button type="submit" id="btnSubmitSingle" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-black shadow">📝 確認送出個人報名（稍後轉帳）</button>
             </div>
           </div>
         </form>
       </div>
 
-      <!-- 右 1 欄：團報清單 + 14 項即時防呆狀態 -->
+      <!-- 右 1 欄：依模式顯示「個人報名提示」或「團報暫存清單」+ 14 項即時防呆 -->
       <div class="space-y-4">
-        <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
+        <div id="soloGuideCard" class="bg-slate-900 text-white rounded-xl p-4 space-y-2 text-xs shadow-sm">
+          <div class="font-black text-amber-400 text-sm">🏃 個人報名模式</div>
+          <p class="text-slate-300 leading-relaxed">只需填寫左側 14 項檢核欄位（全亮綠框）即可一鍵送出報名，連網時立即寫入大會資料庫。</p>
+          <p class="text-slate-400 text-[11px]">若要幫 2 人以上跑團一起報名，請點上方「👥 團體報名」切換。</p>
+        </div>
+
+        <div id="groupCartCard" class="hidden bg-white rounded-xl border-2 border-amber-400 shadow-sm p-4">
           <div class="flex items-center justify-between mb-2">
-            <h3 class="font-bold text-sm">👥 團體報名暫存 (自動配 GRP26)</h3>
-            <span id="groupCountBadge" class="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold">0 / 50</span>
+            <h3 class="font-black text-sm text-amber-950">👥 團體報名成員清單 (步驟 ②)</h3>
+            <span id="groupCountBadge" class="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold">0 / 50</span>
           </div>
           <div id="groupCartList" class="space-y-2 max-h-60 overflow-y-auto text-xs"></div>
           <div class="border-t mt-3 pt-3 flex items-center justify-between">
             <div>
               <div class="text-[11px] text-slate-500">整團應繳總額</div>
-              <div id="groupGrandTotal" class="text-lg font-black mono">NT$ 0</div>
+              <div id="groupGrandTotal" class="text-lg font-black mono text-amber-700">NT$ 0</div>
             </div>
-            <button id="btnSubmitGroup" disabled class="px-3.5 py-2 rounded-lg bg-amber-500 disabled:bg-slate-200 disabled:text-slate-400 text-slate-950 font-black text-xs">送出整批團報</button>
+            <button id="btnSubmitGroup" disabled class="px-4 py-2 rounded-xl bg-emerald-600 disabled:bg-slate-200 disabled:text-slate-400 hover:bg-emerald-500 text-white font-black text-xs shadow">✅ 送出整批團報</button>
           </div>
         </div>
 
@@ -322,31 +396,78 @@
       </div>
     </div>
 
-    <!-- D1: WRITER 發卡組專屬鎖定畫面 -->
-    <div id="opWriterPanel" class="hidden grid grid-cols-1 lg:grid-cols-3 gap-4">
-      <div class="bg-white outdoor-card rounded-xl border p-4 space-y-3">
-        <div class="flex items-center justify-between">
-          <h3 class="font-bold text-sm">🔎 搜尋選手帶入寫卡</h3>
-          <span id="nfcSupportBadge" class="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">偵測中</span>
+    <!-- 管制點專屬 SOP 與晶片管制作為指引卡（依賽制與鎖定站點自動顯示） -->
+    <div id="opStationSopBanner" class="rounded-2xl border-2 p-4 text-xs space-y-2.5 shadow-sm"></div>
+
+    <!-- D1: WRITER 發卡組專屬鎖定畫面（依指定場次列選手名單・寫入・讀取查看・報到管制） -->
+    <div id="opWriterPanel" class="hidden space-y-4">
+      <!-- 指定場次切換 ＋ 寫卡與報到即時統計列 -->
+      <div class="bg-white outdoor-card rounded-xl border p-3.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="font-black text-slate-800">🏁 指定作業場次：</span>
+          <select id="writerEventSelect" class="px-3 py-1.5 border-2 border-indigo-300 rounded-lg font-bold bg-indigo-50/50 text-slate-900"></select>
+          <span id="writerRaceStartBadge" class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 mono font-bold">-</span>
         </div>
-        <input id="writerSearch" type="text" placeholder="姓名 / 身分證 / 號碼布" class="w-full px-3 py-2 border rounded-lg text-sm" />
-        <div id="writerSearchList" class="divide-y max-h-[420px] overflow-y-auto text-xs"></div>
+        <div id="writerStatsBar" class="flex flex-wrap gap-2 mono font-bold"></div>
       </div>
-      <div class="lg:col-span-2 bg-white outdoor-card rounded-xl border p-4 space-y-4">
-        <div id="writerSelectedCard" class="p-3.5 rounded-xl bg-slate-50 border border-dashed text-sm text-slate-500">請從左側點選選手「帶入寫卡」。</div>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <button id="btnNfcWriteNtag" class="p-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm">✍️ 寫入 NTAG + 回讀</button>
-          <button id="btnNfcBindUid" class="p-3 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-sm">🔗 綁定唯讀卡 UID</button>
-          <button id="btnNfcReadLegacy" class="p-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm">♻️ 讀卡核准共用晶片</button>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        <div class="lg:col-span-5 bg-white outdoor-card rounded-xl border p-4 space-y-3">
+          <div class="flex items-center justify-between gap-2">
+            <h3 class="font-bold text-sm">🔎 指定場次選手名單（選擇寫入 / 管制報到）</h3>
+            <span id="nfcSupportBadge" class="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">偵測中</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <input id="writerSearch" type="text" placeholder="搜尋姓名 / 號碼布 / 身分證 / UID" class="w-full px-3 py-2 border rounded-lg" />
+            <select id="writerFilter" class="w-full px-2.5 py-2 border rounded-lg bg-slate-50 font-bold">
+              <option value="all">全部已繳費選手</option>
+              <option value="no_chip">⏳ 尚未寫入晶片</option>
+              <option value="has_chip">✅ 已綁定晶片</option>
+              <option value="unchecked">📋 尚未報到人員</option>
+              <option value="checked">🟢 已報到人員</option>
+            </select>
+          </div>
+          <div id="writerSearchList" class="divide-y max-h-[460px] overflow-y-auto text-xs"></div>
         </div>
-        <div class="p-3 rounded-xl bg-indigo-50 border border-indigo-200 flex flex-wrap gap-2 text-xs">
-          <span class="font-bold text-indigo-900 w-full">🧪 電腦無實體晶片模擬測試：</span>
-          <button id="btnSimWriteNtag" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-bold">模擬 NTAG 寫入+回讀</button>
-          <button id="btnSimBindUid" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-bold">模擬綁定 UID</button>
-          <button id="btnSimReadLegacy" class="px-3 py-1.5 rounded-lg bg-amber-600 text-white font-bold">模擬舊晶片核准</button>
-          <button id="btnSimInvalidCard" class="px-3 py-1.5 rounded-lg bg-rose-600 text-white font-bold">模擬異常卡攔截</button>
+
+        <div class="lg:col-span-7 bg-white outdoor-card rounded-xl border p-4 space-y-3.5">
+          <div id="writerSelectedCard" class="p-3.5 rounded-xl bg-slate-50 border border-dashed text-sm text-slate-500">請從左側場次名單點選選手「帶入寫卡」或直接按「✅ 報到」。</div>
+
+          <!-- 報到管制選項 -->
+          <div class="p-3 rounded-xl bg-emerald-50/80 border border-emerald-300 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <label class="flex items-center gap-2 font-black text-emerald-950 cursor-pointer">
+              <input id="writerAutoCheckin" type="checkbox" checked />
+              <span>✅ 寫入晶片 / 核准舊卡時，同步標記為「現場已報到」</span>
+            </label>
+            <div class="flex gap-1.5">
+              <button type="button" id="btnWriterCheckin" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black">✅ 報到</button>
+              <button type="button" id="btnWriterUncheckin" class="px-3 py-1.5 rounded-lg bg-white hover:bg-rose-50 border border-rose-300 text-rose-700 font-bold">↩️ 取消報到</button>
+            </div>
+          </div>
+
+          <!-- 實體 Web NFC 寫入 / 綁定 / 讀取查看 -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+            <button id="btnNfcWriteNtag" class="p-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold">✍️ 寫入 NTAG + 回讀</button>
+            <button id="btnNfcBindUid" class="p-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold">🔗 綁定唯讀 UID</button>
+            <button id="btnNfcReadLegacy" class="p-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold">♻️ 核准共用舊卡</button>
+            <button id="btnNfcReadInspect" class="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 font-bold">🔍 讀取查看晶片</button>
+          </div>
+
+          <!-- 電腦模擬演練區 -->
+          <div class="p-3 rounded-xl bg-indigo-50 border border-indigo-200 flex flex-wrap gap-1.5 text-xs">
+            <span class="font-bold text-indigo-900 w-full">🧪 電腦無實體晶片模擬測試（含讀取查看）：</span>
+            <button id="btnSimWriteNtag" class="px-2.5 py-1.5 rounded-lg bg-indigo-600 text-white font-bold">模擬 NTAG 寫入+回讀</button>
+            <button id="btnSimBindUid" class="px-2.5 py-1.5 rounded-lg bg-indigo-600 text-white font-bold">模擬綁定 UID</button>
+            <button id="btnSimReadLegacy" class="px-2.5 py-1.5 rounded-lg bg-amber-600 text-white font-bold">模擬舊卡核准</button>
+            <button id="btnSimReadInspect" class="px-2.5 py-1.5 rounded-lg bg-slate-900 text-amber-300 font-bold">🔍 模擬讀取查看晶片</button>
+            <button id="btnSimInvalidCard" class="px-2.5 py-1.5 rounded-lg bg-rose-600 text-white font-bold">模擬異常卡攔截</button>
+          </div>
+
+          <!-- 🔍 晶片讀取查看結果顯示卡 -->
+          <div id="writerInspectCard" class="hidden p-3.5 rounded-xl bg-sky-50 border-2 border-sky-400 text-xs space-y-1"></div>
+
+          <div id="writerLogBox" class="bg-slate-950 text-emerald-400 mono text-xs p-3 rounded-xl h-40 overflow-y-auto space-y-1"></div>
         </div>
-        <div id="writerLogBox" class="bg-slate-950 text-emerald-400 mono text-xs p-3 rounded-xl h-44 overflow-y-auto space-y-1"></div>
       </div>
     </div>
 
@@ -372,13 +493,50 @@
         </div>
 
         <form id="manualScanForm" class="flex gap-2">
-          <input id="manualScanInput" type="text" autocomplete="off" placeholder="手動補登：輸入號碼布 / UID / 身分證 按 Enter" class="flex-1 px-4 py-3 border-2 rounded-xl text-base font-bold mono uppercase" />
+          <input id="manualScanInput" type="text" autocomplete="off" placeholder="快速掃碼/輸入號碼布、UID 或身分證 按 Enter" class="flex-1 px-4 py-3 border-2 rounded-xl text-base font-bold mono uppercase" />
           <button type="submit" class="px-5 py-3 rounded-xl bg-slate-900 text-white font-black">感應寫入</button>
         </form>
 
+        <!-- 🛠️ 晶片無法感應時：依目前鎖定活動選擇選手手動補登（含原因與時間） -->
+        <div id="opManualFallbackBox" class="p-3.5 rounded-xl bg-sky-50 border-2 border-sky-300 space-y-2.5 text-xs">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div class="font-black text-sm text-sky-950">🛠️ 晶片無法感應 — 選擇本活動選手手動補登</div>
+              <p class="text-[11px] text-sky-800">僅列出目前鎖定活動之已繳費配號選手；補登紀錄會自動標記異常原因並同步雲端。</p>
+            </div>
+            <span id="opFallbackStats" class="px-2.5 py-1 rounded-full bg-white border border-sky-200 font-bold text-sky-900 mono">-</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
+            <div class="sm:col-span-4">
+              <label class="font-bold block mb-1">1. 篩選本活動選手（姓名/號碼布/組別）</label>
+              <input id="opManualPickerSearch" type="text" placeholder="輸入號碼布或姓名篩選..." class="w-full px-2.5 py-2 border rounded-lg bg-white" />
+            </div>
+            <div class="sm:col-span-8">
+              <label class="font-bold block mb-1">2. 選擇欲補登之選手（顯示是否已過本站）</label>
+              <select id="opManualRunnerSelect" class="w-full px-2.5 py-2 border rounded-lg bg-white font-bold mono"></select>
+            </div>
+            <div class="sm:col-span-5">
+              <label class="font-bold block mb-1">3. 手動補登原因（留存稽核備註）</label>
+              <select id="opManualReason" class="w-full px-2.5 py-2 border rounded-lg bg-white">
+                <option value="晶片無法感應 / 消磁">晶片無法感應 / 消磁</option>
+                <option value="選手忘帶晶片卡">選手忘帶晶片卡</option>
+                <option value="NFC 讀取裝置暫時無反應">NFC 讀取裝置暫時無反應</option>
+                <option value="現場目視通過人工補登">現場目視通過人工補登</option>
+              </select>
+            </div>
+            <div class="sm:col-span-4">
+              <label class="font-bold block mb-1">4. 通過時間（留空自動帶入當下秒數）</label>
+              <input id="opManualTime" type="text" placeholder="留空=現在 (YYYY-MM-DD HH:mm:ss)" class="w-full px-2.5 py-2 border rounded-lg bg-white mono" />
+            </div>
+            <div class="sm:col-span-3">
+              <button type="button" id="btnOpManualFallback" class="w-full py-2 px-3 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-black shadow">✅ 確認手動補登</button>
+            </div>
+          </div>
+        </div>
+
         <div class="p-3 rounded-xl bg-amber-50 border border-amber-200 space-y-2">
           <div class="flex items-center justify-between text-xs">
-            <span class="font-bold text-amber-900">🎯 模擬感應測試 / 忘帶卡快速補登</span>
+            <span class="font-bold text-amber-900">🎯 快速點選選手感應測試（綠勾＝已過本站）</span>
             <button id="btnSimUnknownScan" class="px-2 py-1 rounded bg-rose-600 text-white font-bold">模擬非本場紅閃 🔴</button>
           </div>
           <div id="quickRunnerButtons" class="flex flex-wrap gap-1.5"></div>
@@ -406,21 +564,27 @@
       <div class="flex flex-wrap gap-1 text-xs">
         <button data-z1tab="setup" class="sub-pill active px-3 py-1.5 rounded-lg bg-slate-100">分頁1 活動與表單</button>
         <button data-z1tab="recon" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">分頁2 對帳・排號・CSV</button>
-        <button data-z1tab="gun" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">分頁3 起跑與站點</button>
-        <button data-z1tab="score" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">分頁4 成績核對與結案</button>
-        <button data-z1tab="ops" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">分頁5 名下作業員</button>
+        <button data-z1tab="chip" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">分頁3 📡 晶片與報到</button>
+        <button data-z1tab="gun" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">分頁4 起跑與站點</button>
+        <button data-z1tab="score" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">分頁5 成績與結案</button>
+        <button data-z1tab="ops" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">分頁6 名下作業員</button>
       </div>
     </div>
+
+    <!-- 五階段作業管制節點層層把關看板（報名 → 繳費 → 起跑整備 → 賽事進行 → 結案鎖定） -->
+    <div id="z1StageGateBar"></div>
 
     <!-- 分頁 1：活動基本資料、10款橫幅/上傳5MB、分組與動態加購 -->
     <div id="z1-setup" class="z1-panel space-y-4"></div>
     <!-- 分頁 2：雙軌對帳、整團一鍵入帳、配號、外部CSV/Excel雙向互通 -->
     <div id="z1-recon" class="z1-panel hidden space-y-4"></div>
-    <!-- 分頁 3：強制完整日期鳴槍與站點設定 -->
+    <!-- 分頁 3：晶片寫入・讀取查看與現場報到管制（後台直接作業） -->
+    <div id="z1-chip" class="z1-panel hidden space-y-4"></div>
+    <!-- 分頁 4：起跑時間微調與站點設定 -->
     <div id="z1-gun" class="z1-panel hidden space-y-4"></div>
-    <!-- 分頁 4：成績微調、逐圈補刪、結案鎖定移至專區 2 -->
+    <!-- 分頁 5：成績微調、逐圈補刪、完賽比例統計與結案鎖定移至專區 2 -->
     <div id="z1-score" class="z1-panel hidden space-y-4"></div>
-    <!-- 分頁 5：承辦人名下作業員帳號管理 -->
+    <!-- 分頁 6：承辦人名下作業員帳號管理 -->
     <div id="z1-ops" class="z1-panel hidden space-y-4"></div>
   </section>
 
@@ -442,9 +606,12 @@
 <div id="loginModal" class="hidden fixed inset-0 z-50 bg-slate-950/70 flex items-center justify-center p-4">
   <div class="bg-white rounded-2xl max-w-lg w-full p-5 space-y-4 shadow-2xl">
     <div class="flex items-center justify-between border-b pb-2.5">
-      <div>
-        <h3 class="font-black text-base text-slate-900">🔐 系統權責登入（零紀錄安全模式）</h3>
-        <p class="text-[11px] text-slate-500">無公開註冊管道；憑證僅存於當頁記憶體/Session，重新整理或登出即清除。</p>
+      <div class="flex items-center gap-3">
+        <img src="assets/tur-logo.jpg" alt="TUR" class="h-8 w-auto object-contain" />
+        <div>
+          <h3 class="font-black text-base text-slate-900">🔐 系統權責登入（零紀錄安全模式）</h3>
+          <p class="text-[11px] text-slate-500">無公開註冊管道；憑證僅存於當頁記憶體/Session，重新整理或登出即清除。</p>
+        </div>
       </div>
       <button id="btnCloseLogin" class="text-slate-400 hover:text-slate-800 text-lg">✕</button>
     </div>
@@ -496,8 +663,145 @@
   </div>
 </div>
 
-<script src="js/tur-core.js?v=3.1"></script>
-<script src="js/tur-zones.js?v=3.1"></script>
-<script src="js/tur-app.js?v=3.1"></script>
+<!-- 後台編輯已報名選手 Modal（最高管理員 & 承辦人專用） -->
+<div id="editParticipantModal" class="hidden fixed inset-0 z-50 bg-slate-950/70 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-2xl w-full p-5 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between border-b pb-2.5">
+      <div>
+        <h3 class="font-black text-base text-slate-900">✏️ 修改已報名選手資料</h3>
+        <p id="epSubtitle" class="text-[11px] text-slate-500 mono">-</p>
+      </div>
+      <button id="btnCloseEditPart" class="text-slate-400 hover:text-slate-800 text-lg">✕</button>
+    </div>
+    <form id="editParticipantForm" class="space-y-3 text-xs">
+      <input type="hidden" id="epId" />
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+        <div><label class="font-bold">姓名 *</label><input id="epName" required class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5" /></div>
+        <div><label class="font-bold">組別</label><select id="epCatId" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5"></select></div>
+        <div><label class="font-bold">參賽號碼布 (Bib)</label><input id="epBib" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5 mono uppercase" /></div>
+        <div><label class="font-bold">身分證 / 護照</label><input id="epIdCard" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5 mono uppercase" /></div>
+        <div><label class="font-bold">性別</label><select id="epGender" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5"><option value="M">M - 男</option><option value="F">F - 女</option></select></div>
+        <div><label class="font-bold">出生年月日</label><input id="epBirthday" type="date" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5" /></div>
+        <div><label class="font-bold">國籍 (3碼)</label><input id="epNat" maxlength="3" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5 mono uppercase" /></div>
+        <div><label class="font-bold">手機</label><input id="epPhone" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5 mono" /></div>
+        <div><label class="font-bold">Email</label><input id="epEmail" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5" /></div>
+        <div><label class="font-bold">縣市</label><input id="epCity" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5" /></div>
+        <div><label class="font-bold">飲食</label><select id="epDiet" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5"><option value="葷">葷食</option><option value="素">素食</option></select></div>
+        <div><label class="font-bold">團報名稱 / 代碼</label><input id="epGroupName" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5" /></div>
+        <div><label class="font-bold">緊急聯絡人</label><input id="epEmergName" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5" /></div>
+        <div><label class="font-bold">緊急電話</label><input id="epEmergPhone" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5 mono" /></div>
+        <div><label class="font-bold">晶片 UID</label><input id="epChipUid" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5 mono uppercase" /></div>
+        <div><label class="font-bold">應繳金額 (NT$)</label><input id="epAmount" type="number" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5 mono" /></div>
+        <div><label class="font-bold">匯款末五碼</label><input id="epLast5" maxlength="5" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5 mono" /></div>
+        <div><label class="font-bold">繳費狀態</label>
+          <select id="epPayStatus" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5 font-bold">
+            <option value="UNPAID">UNPAID (未繳費)</option>
+            <option value="PENDING_PAY">PENDING_PAY (待繳)</option>
+            <option value="PAID">PAID (已繳費)</option>
+            <option value="CANCELLED">CANCELLED (已取消)</option>
+          </select>
+        </div>
+        <div class="col-span-2 sm:col-span-3"><label class="font-bold">備註</label><input id="epRemark" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5" /></div>
+      </div>
+      <div id="epCustomFieldsBox" class="hidden p-3 rounded-xl bg-indigo-50/70 border border-indigo-200"></div>
+      <div class="flex justify-end gap-2 pt-2 border-t">
+        <button type="button" id="btnCancelEditPart" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold">取消</button>
+        <button type="submit" class="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black shadow">💾 儲存修改並同步雲端</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 建立新活動 Modal（明確區分：一般距離賽 vs 計時繞圈賽） -->
+<div id="newEventModal" class="hidden fixed inset-0 z-50 bg-slate-950/70 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl max-w-xl w-full p-5 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+    <div class="flex items-center justify-between border-b pb-2.5">
+      <div>
+        <h3 class="font-black text-base text-slate-900">➕ 建立新活動報名表（明確區分賽制類型）</h3>
+        <p class="text-[11px] text-slate-500">請先選擇賽制，系統將自動配置對應之分組結構、站點管制與計分流程。</p>
+      </div>
+      <button id="btnCloseNewEvent" class="text-slate-400 hover:text-slate-800 text-lg">✕</button>
+    </div>
+    <form id="newEventForm" class="space-y-3.5 text-xs">
+      <!-- 步驟 1：明確選擇賽制卡片 -->
+      <div class="space-y-1.5">
+        <div class="font-bold text-slate-800">步驟 1：選擇活動賽制類型 *</div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <button type="button" id="btnNewEvDistance" class="p-3 rounded-xl border-2 border-sky-600 bg-sky-50 text-left transition">
+            <div class="font-black text-sm text-sky-950">🏃 一般距離賽 (distance)</div>
+            <div class="text-[11px] text-sky-800 mt-1">固定里程完賽制（如 21K / 50K / 100K 八百壯士）；依序通過 CP 檢查點與終點，以完賽時間排名。</div>
+          </button>
+          <button type="button" id="btnNewEvLap" class="p-3 rounded-xl border-2 border-slate-200 bg-white text-left transition hover:border-indigo-400">
+            <div class="font-black text-sm text-slate-900">🔁 計時繞圈賽 (lap_timed)</div>
+            <div class="text-[11px] text-slate-600 mt-1">固定限時繞圈制（如 6H / 12H / 24H 跨夜賽）；通過 LAP 主拱門累圈，以有效總里程排名。</div>
+          </button>
+        </div>
+        <input type="hidden" id="newEvRaceType" value="distance" />
+      </div>
+
+      <!-- 步驟 2：決定本活動金流管制作業模式（管制至報名結束） -->
+      <div class="space-y-1.5">
+        <div class="font-bold text-slate-800">步驟 2：選擇本活動金流作業模式 *（選定後將統一管制前台與對帳至報名結束）</div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <button type="button" id="btnNewEvPayManual" class="p-3 rounded-xl border-2 border-amber-500 bg-amber-50 text-left transition">
+            <div class="font-black text-sm text-amber-950">🏦 轉帳核對末五碼</div>
+            <div class="text-[11px] text-amber-900 mt-1">前台僅顯示大會匯款帳號與末五碼欄位；承辦人於專區 1 核對入帳後自動配號與寄信。</div>
+          </button>
+          <button type="button" id="btnNewEvPayPayuni" class="p-3 rounded-xl border-2 border-slate-200 bg-white text-left transition hover:border-emerald-400">
+            <div class="font-black text-sm text-slate-900">💳 結合金流廠商 (PAYUNi)</div>
+            <div class="text-[11px] text-slate-600 mt-1">前台僅顯示線上金流（信用卡/虛擬ATM/超商代碼）；付款完成自動秒銷帳配號，免核對末五碼。</div>
+          </button>
+        </div>
+        <input type="hidden" id="newEvPayMode" value="MANUAL_ATM" />
+      </div>
+
+      <!-- 步驟 3：基本資料與賽制專屬預設分組 -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <div class="sm:col-span-2">
+          <label class="font-bold">中文活動名稱 *</label>
+          <input id="newEvNameZh" required placeholder="例如：2026 TUR 冬季 100K 挑戰賽" class="w-full px-3 py-2 border rounded-lg mt-0.5" />
+        </div>
+        <div class="sm:col-span-2 p-2.5 rounded-xl bg-amber-50 border border-amber-300">
+          <label class="font-black text-amber-950 block">🏁 活動起跑日期與時間 *（建立報名表即設定完成，直接作為計時基準）</label>
+          <input id="newEvRaceStart" type="datetime-local" step="1" required value="2026-12-20T05:00:00" class="w-full px-3 py-2 border border-amber-400 rounded-lg mt-1 bg-white mono font-bold" />
+        </div>
+        <div>
+          <label class="font-bold">活動地點</label>
+          <input id="newEvLocation" value="台北市" class="w-full px-3 py-2 border rounded-lg mt-0.5" />
+        </div>
+        <div>
+          <label class="font-bold">主辦單位</label>
+          <input id="newEvOrganizer" value="TUR 台灣超馬協會" class="w-full px-3 py-2 border rounded-lg mt-0.5" />
+        </div>
+      </div>
+
+      <!-- 距離賽專屬參數 -->
+      <div id="newEvDistanceFields" class="p-3 rounded-xl bg-sky-50/70 border border-sky-200 grid grid-cols-3 gap-2">
+        <div><label class="font-bold">預設組別名稱</label><input id="newEvDistCatName" value="50K 超馬組" class="w-full px-2 py-1.5 border rounded-lg bg-white mt-0.5" /></div>
+        <div><label class="font-bold">賽道距離 (km)</label><input id="newEvDistKm" type="number" step="0.1" value="50" class="w-full px-2 py-1.5 border rounded-lg bg-white mt-0.5 mono" /></div>
+        <div><label class="font-bold">關門限時 (小時)</label><input id="newEvDistHrs" type="number" value="8" class="w-full px-2 py-1.5 border rounded-lg bg-white mt-0.5 mono" /></div>
+        <div class="col-span-3 text-[11px] text-sky-900">📍 將自動建立距離賽標準站點：<b>CHECKIN（報到）→ CP1（中繼站）→ FINISH（終點）</b></div>
+      </div>
+
+      <!-- 計時繞圈賽專屬參數 -->
+      <div id="newEvLapFields" class="hidden p-3 rounded-xl bg-indigo-50/70 border border-indigo-200 grid grid-cols-3 gap-2">
+        <div><label class="font-bold">預設組別名稱</label><input id="newEvLapCatName" value="12H 繞圈組" class="w-full px-2 py-1.5 border rounded-lg bg-white mt-0.5" /></div>
+        <div><label class="font-bold">單圈里程 (km)</label><input id="newEvLapKm" type="number" step="0.05" value="1.0" class="w-full px-2 py-1.5 border rounded-lg bg-white mt-0.5 mono" /></div>
+        <div><label class="font-bold">賽事限時 (小時)</label><input id="newEvLapHrs" type="number" value="12" class="w-full px-2 py-1.5 border rounded-lg bg-white mt-0.5 mono" /></div>
+        <div class="col-span-3 text-[11px] text-indigo-900">📍 將自動建立繞圈賽標準站點：<b>CHECKIN（報到）→ LAP（主會場繞圈門，含超時圈自動過濾）</b></div>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-2 border-t">
+        <button type="button" id="btnCancelNewEvent" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 font-bold">取消</button>
+        <button type="submit" class="px-5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black shadow">✅ 建立活動並進入設定</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="js/tur-logo.js?v=4.3"></script>
+<script src="js/tur-core.js?v=4.3"></script>
+<script src="js/tur-zones.js?v=4.3"></script>
+<script src="js/tur-app.js?v=4.3"></script>
 </body>
 </html>

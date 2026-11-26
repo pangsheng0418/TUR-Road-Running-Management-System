@@ -3,7 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TUR 公開成績查詢・八百壯士英雄榜・客製化完賽證書 v3.0</title>
+  <title>TUR 公開成績查詢・八百壯士英雄榜・官方與客製化完賽證書 v3.0</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;800&family=Noto+Sans+TC:wght@500;700;900&family=Noto+Serif+TC:wght@600;900&family=Oswald:wght@600;700&family=Zen+Maru+Gothic:wght@500;700;900&display=swap" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <style>
@@ -17,41 +19,75 @@
 
 <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-30">
   <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-2">
-    <div class="flex items-center gap-2.5">
-      <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-400 to-orange-600 text-slate-950 font-black flex items-center justify-center text-sm">TUR</div>
+    <div class="flex items-center gap-3">
+      <div class="bg-white rounded-xl px-2.5 py-1 shadow flex items-center justify-center shrink-0">
+        <img src="assets/tur-logo.jpg" alt="TUR Taiwan Ultra Runners" class="h-7 sm:h-8 w-auto object-contain" />
+      </div>
       <div>
         <h1 class="font-bold text-sm sm:text-base">TUR 公開成績查詢・歷年歸併・八百壯士 ＆ 動態完賽證書</h1>
         <p class="text-[11px] text-slate-400">全面隱藏身分證與報到時間 · 遵循承辦人證書開關 · 3 款相框拖曳縮放 · 高解析 PNG / PDF</p>
       </div>
     </div>
-    <div class="flex items-center gap-2 text-xs">
-      <select id="pubEventSelect" class="bg-slate-800 border border-slate-700 text-amber-300 rounded-lg px-2.5 py-1.5"></select>
-      <a href="index.html" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700">← 返回報名/管理系統</a>
+    <div class="flex flex-wrap items-center gap-2 text-xs">
+      <!-- 全站字體大小即時調整器 -->
+      <div id="pubFontSizeSwitcher" class="flex items-center bg-slate-800 border border-slate-700 rounded-lg p-0.5" title="調整畫面字體大小">
+        <button type="button" data-font-scale="normal" class="px-2 py-1 rounded text-[11px] font-bold">A</button>
+        <button type="button" data-font-scale="large" class="px-2 py-1 rounded text-[11px] font-bold">A+</button>
+        <button type="button" data-font-scale="xlarge" class="px-2 py-1 rounded text-[11px] font-bold">A++</button>
+      </div>
+      <select id="pubEventSelect" class="bg-slate-800 border border-slate-700 text-amber-300 rounded-lg px-2.5 py-1.5 max-w-[260px] sm:max-w-xs"></select>
+      <button id="btnPubReloadDemo" title="載入最新 5 場 38 位全階段示範資料" class="px-2.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold whitespace-nowrap">⚡ 示範資料</button>
+      <a href="index.html" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 whitespace-nowrap">← 返回報名/管理系統</a>
     </div>
   </div>
   <div class="max-w-7xl mx-auto px-4 pb-2 flex gap-1.5 overflow-x-auto text-xs">
-    <button data-ptab="live" class="ptab active px-3.5 py-1.5 rounded-lg bg-slate-800">🏃 即時與結案成績</button>
-    <button data-ptab="history" class="ptab px-3.5 py-1.5 rounded-lg bg-slate-800">📚 歷年成績查詢</button>
-    <button data-ptab="warriors" class="ptab px-3.5 py-1.5 rounded-lg bg-slate-800">🏅 八百壯士 100K+ 英雄榜</button>
-    <button data-ptab="cert" class="ptab px-3.5 py-1.5 rounded-lg bg-slate-800">🏆 客製化完賽證書</button>
+    <button data-ptab="live" class="ptab active px-3.5 py-1.5 rounded-lg bg-slate-800 whitespace-nowrap">📊 賽事動態進度與統計分析</button>
+    <button data-ptab="history" class="ptab px-3.5 py-1.5 rounded-lg bg-slate-800 whitespace-nowrap">📚 歷年成績查詢</button>
+    <button data-ptab="warriors" class="ptab px-3.5 py-1.5 rounded-lg bg-slate-800 whitespace-nowrap">🏅 八百壯士 100K+ 英雄榜</button>
+    <button data-ptab="cert" class="ptab px-3.5 py-1.5 rounded-lg bg-slate-800 whitespace-nowrap">🏆 官方與客製化完賽證書</button>
   </div>
 </header>
 
 <main class="max-w-7xl w-full mx-auto px-4 py-5 flex-1">
 
-  <!-- 分頁 1：即時與結案成績（不含身分證與報到時間） -->
+  <!-- 分頁 1：賽事動態進度與詳細統計分析（不含身分證、電話、Email 與報到時間點） -->
   <section id="ptab-live" class="ppanel space-y-4">
-    <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-900 p-3.5 rounded-2xl border border-slate-800 text-xs">
-      <input id="liveSearch" type="text" placeholder="搜尋號碼布 / 選手姓名 / 國籍" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white w-64" />
-      <div id="liveStats" class="text-slate-300 font-bold"></div>
+    <!-- 1. 活動狀態摘要橫幅 -->
+    <div id="pubEventSummaryBanner" class="bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950 p-4 rounded-2xl border border-slate-800 flex flex-wrap items-center justify-between gap-3"></div>
+
+    <!-- 2. 全階段 6 張 KPI 統計卡（點擊卡片可直接篩選下方選手名單） -->
+    <div id="pubKpiGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs"></div>
+
+    <!-- 3. 雙欄詳細統計分析（左：各管制節點通過漏斗｜右：分組明細＋性別國籍分佈） -->
+    <div id="pubAnalyticsGrid" class="grid grid-cols-1 lg:grid-cols-12 gap-4 text-xs">
+      <div id="pubCheckpointFunnel" class="lg:col-span-6 bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3"></div>
+      <div id="pubCategoryBreakdown" class="lg:col-span-6 bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3"></div>
     </div>
+
+    <!-- 4. 搜尋、組別與階段快篩工具列 -->
+    <div class="bg-slate-900 p-3.5 rounded-2xl border border-slate-800 space-y-3 text-xs">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <input id="liveSearch" type="text" placeholder="搜尋號碼布 / 選手姓名 / 國籍 / 團報名稱" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white w-64" />
+          <select id="liveCatFilter" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200"></select>
+        </div>
+        <div id="liveStats" class="text-slate-300 font-bold"></div>
+      </div>
+      <div id="liveStagePills" class="flex flex-wrap gap-1.5"></div>
+    </div>
+
+    <!-- 5. 選手全階段動態進度表（報名 → 繳費 → 報到 → 各管制節點 → 完賽） -->
     <div class="bg-slate-900 rounded-2xl border border-slate-800 overflow-x-auto">
       <table class="w-full text-xs text-left">
         <thead class="bg-slate-800 text-slate-200">
           <tr>
-            <th class="p-3">總名次(組)</th><th class="p-3">號碼布</th><th class="p-3">選手 / 國籍</th>
-            <th class="p-3">組別</th><th class="p-3">有效距離 / 圈數</th><th class="p-3">完賽成績 (整數秒)</th>
-            <th class="p-3">均速</th><th class="p-3">操作</th>
+            <th class="p-3 whitespace-nowrap">名次 / 階段</th>
+            <th class="p-3 whitespace-nowrap">號碼布 / 組別</th>
+            <th class="p-3 whitespace-nowrap">選手 / 國籍 / 跑團</th>
+            <th class="p-3 min-w-[330px]">動態進度節點（報名 → 繳費 → 報到 → 各管制站 → 完賽）</th>
+            <th class="p-3 whitespace-nowrap">有效里程 / 成績</th>
+            <th class="p-3 whitespace-nowrap">均速</th>
+            <th class="p-3 whitespace-nowrap">操作</th>
           </tr>
         </thead>
         <tbody id="liveBody" class="divide-y divide-slate-800"></tbody>
@@ -59,30 +95,94 @@
     </div>
   </section>
 
-  <!-- 分頁 2：歷年成績查詢 -->
+  <!-- 分頁 2：歷年成績查詢（多維度統計分析 ＋ 任一完賽紀錄一鍵產製個人證書） -->
   <section id="ptab-history" class="ppanel hidden space-y-4">
-    <div class="bg-slate-900 p-3.5 rounded-2xl border border-slate-800 flex flex-wrap gap-2 items-center text-xs">
-      <input id="hisSearch" type="text" placeholder="輸入姓名或歷屆賽事名稱查詢" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white w-72" />
-      <span class="text-slate-400">已採 SHA-256 匿名歸併，完全不顯示身分證字號。</span>
+    <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-3 text-xs">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 class="font-black text-base text-white">📚 歷年成績多維度查詢與個人完賽證書中心</h2>
+          <p class="text-[11px] text-slate-400">整合歷屆歸併庫與本季完賽紀錄（採 SHA-256 匿名歸併，不含身分證）· 只要完賽即可一鍵製作個人官方/客製化證書！</p>
+        </div>
+        <button id="btnHisReset" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold">↺ 重設篩選</button>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+        <input id="hisSearch" type="text" placeholder="🔎 搜尋姓名 / 號碼布 / 賽事" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white" />
+        <select id="hisYearFilter" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200"></select>
+        <select id="hisEventFilter" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200"></select>
+        <select id="hisRunnerFilter" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200"></select>
+        <select id="hisBadgeFilter" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200">
+          <option value="all">全部紀錄</option>
+          <option value="finished">✅ 僅顯示完賽（可製證）</option>
+          <option value="warrior">★ 僅顯示八百壯士 100K+</option>
+        </select>
+      </div>
     </div>
+
+    <!-- 歷年查詢 4 張動態 KPI 卡 -->
+    <div id="hisKpiGrid" class="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs"></div>
+
+    <!-- 雙欄多維度統計分析（左：各年度統計｜右：選手累計排行 / 活動場次統計） -->
+    <div id="hisAnalyticsGrid" class="grid grid-cols-1 lg:grid-cols-12 gap-4 text-xs">
+      <div id="hisYearStats" class="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2.5"></div>
+      <div class="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2.5">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+          <h3 class="font-black text-sm text-amber-300">📊 歷年多維度排行統計（點擊即可快篩）</h3>
+          <div class="flex gap-1.5">
+            <button id="btnHisRankRunner" class="px-2.5 py-1 rounded-lg bg-amber-400 text-slate-950 font-black">🏃 依選手累計</button>
+            <button id="btnHisRankEvent" class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 font-bold">🏁 依活動統計</button>
+          </div>
+        </div>
+        <div id="hisRankingStats" class="space-y-1.5 max-h-60 overflow-y-auto"></div>
+      </div>
+    </div>
+
     <div class="bg-slate-900 rounded-2xl border border-slate-800 overflow-x-auto">
       <table class="w-full text-xs text-left">
         <thead class="bg-slate-800 text-slate-200">
-          <tr><th class="p-3">日期</th><th class="p-3">賽事名稱</th><th class="p-3">組別</th><th class="p-3">姓名</th><th class="p-3">距離</th><th class="p-3">成績</th><th class="p-3">標註</th></tr>
+          <tr>
+            <th class="p-3 whitespace-nowrap">年度 / 日期</th>
+            <th class="p-3">賽事名稱</th>
+            <th class="p-3 whitespace-nowrap">組別</th>
+            <th class="p-3 whitespace-nowrap">姓名 / 號碼布</th>
+            <th class="p-3 whitespace-nowrap">有效距離</th>
+            <th class="p-3 whitespace-nowrap">成績 / 均速</th>
+            <th class="p-3 whitespace-nowrap">榮譽標註</th>
+            <th class="p-3 whitespace-nowrap">個人證書</th>
+          </tr>
         </thead>
         <tbody id="hisBody" class="divide-y divide-slate-800"></tbody>
       </table>
     </div>
   </section>
 
-  <!-- 分頁 3：八百壯士 100K+ 英雄榜 -->
+  <!-- 分頁 3：八百壯士 100K+ 英雄榜（分年度查詢 ＋ 星等排行 ＋ 統計分析展開） -->
   <section id="ptab-warriors" class="ppanel hidden space-y-4">
-    <div class="bg-gradient-to-r from-rose-950 via-red-900 to-amber-900 p-5 rounded-2xl border border-amber-500/40">
-      <div class="text-xs font-bold text-amber-300">TUR 100K+ ULTRA HALL OF FAME</div>
-      <h2 class="text-xl font-black text-white mt-1">🏅 八百壯士 100K+ 超馬英雄榜</h2>
-      <p class="text-xs text-amber-100/80 mt-1">凡單場有效完賽里程 ≥ 100 km 或八百壯士系列賽事完賽者，自動彙整登錄榮譽榜！</p>
+    <div class="bg-gradient-to-r from-slate-900 via-amber-950/80 to-slate-900 p-5 rounded-2xl border border-amber-500/40 flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <div class="text-xs font-bold text-amber-300">TUR 100K+ ULTRA HALL OF FAME</div>
+        <h2 class="text-xl font-black text-white mt-1">🏅 八百壯士 100K+ 超馬英雄榜（分年度統計展開）</h2>
+        <p class="text-xs text-amber-100/80 mt-1">凡單場有效完賽里程 ≥ 100 km 或八百壯士系列賽事完賽者，自動跨年度歸併登錄並可隨時製作專屬完賽證書！</p>
+      </div>
+      <div class="flex gap-2 text-xs">
+        <button id="btnWarViewYear" class="px-3.5 py-2 rounded-xl bg-amber-400 text-slate-950 font-black">📅 分年度展開</button>
+        <button id="btnWarViewStars" class="px-3.5 py-2 rounded-xl bg-slate-800 text-slate-200 font-bold border border-slate-700">👑 選手星等排行</button>
+      </div>
     </div>
-    <div id="warriorsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs"></div>
+
+    <!-- 八百壯士 4 張統計 KPI 卡 -->
+    <div id="warKpiGrid" class="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs"></div>
+
+    <!-- 八百壯士歷年趨勢柱狀統計 + 年度快篩與搜尋 -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 text-xs">
+      <div id="warYearChart" class="space-y-2"></div>
+      <div class="pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
+        <div id="warYearPills" class="flex flex-wrap gap-1.5"></div>
+        <input id="warSearch" type="text" placeholder="🔎 搜尋八百壯士姓名或賽事名稱" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-white w-64" />
+      </div>
+    </div>
+
+    <!-- 可收合展開之年度/星等榮譽區塊 -->
+    <div id="warriorsGrid" class="space-y-4 text-xs"></div>
   </section>
 
   <!-- 分頁 4：動態完賽證書中心（聯動承辦人開關） -->
@@ -96,7 +196,7 @@
     <div class="lg:col-span-8 bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 class="font-bold text-base text-white">🏆 完賽證書即時合成（自動套用本場承辦人開關設定）</h2>
+          <h2 class="font-bold text-base text-white">🏆 活動完賽證書中心（官方證書 ＆ 選手客製化證書）</h2>
           <p id="certConfigHint" class="text-[11px] text-slate-400"></p>
         </div>
         <div class="flex gap-2">
@@ -105,14 +205,49 @@
         </div>
       </div>
 
+      <!-- 明確區分：官方證書（無個人照）vs 選手客製化證書（可上傳個人照） -->
+      <div class="grid grid-cols-2 gap-2.5 text-xs">
+        <button id="btnPubModeOfficial" class="p-3 rounded-xl border-2 border-amber-400 bg-amber-400 text-slate-950 text-left font-bold transition">
+          <div class="font-black text-sm">🏛️ 官方證書（正式無個人照）</div>
+          <div class="text-[11px] opacity-85 mt-0.5">6 樣式 × 6 底圖 × 直/橫式 × 6 字型（純淨大會正式成績版）</div>
+        </button>
+        <button id="btnPubModeCustom" class="p-3 rounded-xl border-2 border-slate-700 bg-slate-950 text-slate-300 text-left font-bold transition hover:border-amber-400">
+          <div class="font-black text-sm">📸 選手客製化證書（可放個人照片）</div>
+          <div class="text-[11px] opacity-80 mt-0.5">比照官方全部樣式與字型，額外上傳個人完賽照（3 相框拖曳）與 40 字感言</div>
+        </button>
+      </div>
+
       <div class="bg-slate-950 p-2 rounded-xl border border-slate-800 flex items-center justify-center">
         <canvas id="pubCertCanvas" class="max-w-full max-h-[540px] w-auto h-auto rounded-lg shadow-2xl cursor-grab active:cursor-grabbing"></canvas>
       </div>
 
-      <!-- 選手自助個人化區塊（依承辦人 allowPublicPhotoQuote 開關動態啟閉） -->
-      <div id="pubPhotoQuoteControls" class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs bg-slate-950/70 p-3.5 rounded-xl border border-slate-800">
+      <!-- 官方與客製化共用：直/橫式 × 6樣式 × 6底圖 × 6字型 -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs bg-slate-950/70 p-3 rounded-xl border border-slate-800">
+        <div>
+          <label class="block text-[11px] text-slate-400 mb-1">方向（橫式 / 直式）</label>
+          <select id="pubOrientPick" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white">
+            <option value="landscape">A4 橫式</option>
+            <option value="portrait">A4 直式</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-[11px] text-slate-400 mb-1">樣式（6 種）</label>
+          <select id="pubLayoutPick" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white"></select>
+        </div>
+        <div>
+          <label class="block text-[11px] text-slate-400 mb-1">底圖（6 種）</label>
+          <select id="pubPalettePick" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white"></select>
+        </div>
+        <div>
+          <label class="block text-[11px] text-slate-400 mb-1">字型變化（6 種）</label>
+          <select id="pubFontPick" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white"></select>
+        </div>
+      </div>
+
+      <!-- 僅「選手客製化證書」模式顯示：個人照片上傳＋3 相框＋拖曳縮放＋40 字感言 -->
+      <div id="pubPhotoQuoteControls" class="hidden grid grid-cols-1 md:grid-cols-2 gap-4 text-xs bg-slate-950/70 p-3.5 rounded-xl border border-amber-500/40">
         <div class="space-y-2">
-          <div class="font-bold text-slate-300">📸 上傳個人衝線照片（畫布可拖曳＋3 款相框）</div>
+          <div class="font-bold text-amber-300">📸 上傳個人衝線照片（畫布可拖曳＋3 款相框）</div>
           <div class="flex items-center gap-2">
             <input id="pubPhotoFile" type="file" accept="image/*" class="text-[11px] flex-1" />
             <button id="btnPubClearPhoto" class="px-2 py-1 rounded bg-slate-800">移除</button>
@@ -129,22 +264,20 @@
           </div>
         </div>
         <div class="space-y-2">
-          <div class="flex justify-between font-bold text-slate-300">
+          <div class="flex justify-between font-bold text-amber-300">
             <span>💬 完賽感言（最多 40 字）</span>
             <span id="pubQuoteCnt" class="mono text-slate-400">0 / 40</span>
           </div>
           <input id="pubQuoteInput" type="text" maxlength="40" value="突破極限，感謝每一站熱情的志工！" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white" />
-          <div class="grid grid-cols-2 gap-2 pt-1">
-            <select id="pubLayoutPick" class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs"></select>
-            <select id="pubPalettePick" class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs"></select>
-          </div>
+          <p class="text-[11px] text-slate-400">💡 切換為「🏛️ 官方證書」將自動隱藏個人照片與感言，輸出正式無照公版。</p>
         </div>
       </div>
     </div>
   </section>
 </main>
 
-<script src="js/tur-core.js?v=3.1"></script>
+<script src="js/tur-logo.js?v=4.3"></script>
+<script src="js/tur-core.js?v=4.3"></script>
 <script>
 (() => {
   'use strict';
@@ -156,65 +289,104 @@
     events: [], categories: [], stations: [], participants: [], timingLogs: [], historyResults: [],
     activeEventId: '',
     rows: [],
+    analytics: null,
+    unifiedHistory: [],
+    hisYear: 'all', hisEvent: 'all', hisRunner: 'all', hisBadge: 'all', hisRankMode: 'runner',
+    warYear: 'all', warView: 'year',
+    stageFilter: 'all',
+    catFilter: 'all',
     selectedRow: null,
+    selectedIsExternalCert: false,
     photoImg: null, customBgImg: null,
     photoFrame: 'rounded', photoZoom: 1, photoOffsetX: 0, photoOffsetY: 0,
     quote: '突破極限，感謝每一站熱情的志工！',
-    overrideLayout: '', overridePalette: '',
+    certMode: 'official', // 'official' | 'custom_runner'
+    overrideOrient: '', overrideLayout: '', overridePalette: '', overrideFont: '',
     dragging: false, dx0: 0, dy0: 0
   };
 
-  async function loadAll() {
+  function stripToPublicData(raw) {
+    return {
+      events: raw.events || [],
+      categories: raw.categories || [],
+      stations: (raw.stations || []).filter((s) => String(s.stationCode).toUpperCase() !== 'CHECKIN'),
+      participants: (raw.participants || []).map((p) => ({
+        participantId: p.participantId, eventId: p.eventId, catId: p.catId, bibNumber: p.bibNumber || '',
+        groupName: p.groupName || '', name: p.name, gender: p.gender || '', nationality: p.nationality || 'TWN',
+        payStatus: p.payStatus || 'UNPAID',
+        checkinStatus: String(p.checkinStatus || '').toLowerCase() === 'checked_in' ? 'checked_in' : 'pending',
+        raceStatus: p.raceStatus || 'dns', penaltySeconds: Number(p.penaltySeconds || 0)
+      })),
+      timingLogs: (raw.timingLogs || []).filter((l) => String(l.stationCode).toUpperCase() !== 'CHECKIN'),
+      historyResults: raw.historyResults || []
+    };
+  }
+
+  async function loadAll(forceDemo = false) {
     const gasUrl = (localStorage.getItem('TUR_GAS_URL') || C.DEFAULT_GAS_URL || '').trim();
     let ok = false;
-    if (gasUrl && navigator.onLine) {
+
+    if (!forceDemo && gasUrl && navigator.onLine) {
       try {
         const res = await C.gasGet(gasUrl, { action: 'publicLookup' });
-        if (res && res.ok && res.data && res.data.events?.length) {
-          Object.assign(Pub, res.data);
+        if (res && res.ok && res.data && res.data.events?.length && (res.data.participants?.length || 0) > 0) {
+          Object.assign(Pub, stripToPublicData(res.data));
           ok = true;
         }
       } catch (_) {}
     }
 
-    if (!ok) {
+    if (!forceDemo && !ok) {
       await C.TurDB.open();
       const [events, categories, stations, participants, timingLogs, historyResults] = await Promise.all([
         C.TurDB.getAll('events'), C.TurDB.getAll('categories'), C.TurDB.getAll('stations'),
         C.TurDB.getAll('participants'), C.TurDB.getAll('timingLogs'), C.TurDB.getAll('historyResults')
       ]);
-      if (events.length) {
-        // 公開頁強制剝離身分證、電話、Email 與 CHECKIN 報到時間
-        Pub.events = events;
-        Pub.categories = categories;
-        Pub.stations = stations.filter((s) => String(s.stationCode).toUpperCase() !== 'CHECKIN');
-        Pub.participants = participants.map((p) => ({
-          participantId: p.participantId, eventId: p.eventId, catId: p.catId, bibNumber: p.bibNumber,
-          name: p.name, gender: p.gender, nationality: p.nationality || 'TWN',
-          payStatus: p.payStatus, raceStatus: p.raceStatus, penaltySeconds: p.penaltySeconds || 0
-        }));
-        Pub.timingLogs = timingLogs.filter((l) => String(l.stationCode).toUpperCase() !== 'CHECKIN');
-        Pub.historyResults = historyResults;
+      const oldSeedIds = new Set(['TUR-20260001', 'TUR-20260002', 'TUR-20260003', 'TUR-20260004', 'TUR-20260005', 'TUR-FIN-001', 'TUR-FIN-002', 'TUR-FIN-003', 'TUR-F24-001']);
+      const isOldSeed = events.length > 0 && participants.length <= 9 && participants.every((p) => oldSeedIds.has(p.participantId));
+      if (events.length && !isOldSeed) {
+        Object.assign(Pub, stripToPublicData({ events, categories, stations, participants, timingLogs, historyResults }));
         ok = true;
       }
     }
 
     if (!ok) {
       const seed = C.buildFull5EventsSeed();
-      Object.assign(Pub, seed);
+      Object.assign(Pub, stripToPublicData(seed));
     }
 
-    // 優先選取已結案或有成績之賽事
-    const finEv = Pub.events.find((e) => e.status === 'finished') || Pub.events[0];
-    Pub.activeEventId = finEv ? finEv.eventId : '';
+    // 優先選取「已開賽進行中」之賽事讓大家直接看到全階段動態進度，其次已結案
+    const liveActiveEv = Pub.events.find((e) => e.status !== 'finished' && e.raceStart);
+    const finEv = Pub.events.find((e) => e.status === 'finished');
+    const chosen = liveActiveEv || finEv || Pub.events[0];
+    Pub.activeEventId = chosen ? chosen.eventId : '';
+    Pub.unifiedHistory = C.buildUnifiedHistoryRecords({
+      events: Pub.events, categories: Pub.categories, stations: Pub.stations,
+      participants: Pub.participants, timingLogs: Pub.timingLogs, historyResults: Pub.historyResults
+    });
+    populateHistoryFilterSelects();
     renderEventSelect();
     recomputeEvent();
     renderHistory();
     renderWarriors();
   }
 
+  function populateHistoryFilterSelects() {
+    const all = Pub.unifiedHistory;
+    const years = [...new Set(all.map((r) => r.year))].sort((a, b) => String(b).localeCompare(String(a)));
+    const evNames = [...new Set(all.map((r) => r.eventName))].sort();
+    const runners = [...new Set(all.map((r) => r.name))].sort((a, b) => a.localeCompare(b, 'zh-Hant'));
+    $('#hisYearFilter').innerHTML = `<option value="all">📅 全部年度 (${years.length} 年)</option>` + years.map((y) => `<option value="${y}">${y} 年度</option>`).join('');
+    $('#hisEventFilter').innerHTML = `<option value="all">🏁 全部活動 (${evNames.length} 場)</option>` + evNames.map((n) => `<option value="${C.escapeHtml(n)}">${C.escapeHtml(n)}</option>`).join('');
+    $('#hisRunnerFilter').innerHTML = `<option value="all">🏃 全部選手 (${runners.length} 位)</option>` + runners.map((n) => `<option value="${C.escapeHtml(n)}">${C.escapeHtml(n)}</option>`).join('');
+  }
+
   function renderEventSelect() {
-    $('#pubEventSelect').innerHTML = Pub.events.map((e) => `<option value="${e.eventId}" ${e.eventId === Pub.activeEventId ? 'selected' : ''}>${C.escapeHtml(e.nameZh)} ${e.status === 'finished' ? '(已結案)' : ''}</option>`).join('');
+    $('#pubEventSelect').innerHTML = Pub.events.map((e) => {
+      const cnt = Pub.participants.filter((p) => p.eventId === e.eventId).length;
+      const tag = e.status === 'finished' ? '已結案' : (e.raceStart ? '賽事進行中' : '開放報名中');
+      return `<option value="${e.eventId}" ${e.eventId === Pub.activeEventId ? 'selected' : ''}>[${tag}] ${C.escapeHtml(e.nameZh)} (${cnt}人)</option>`;
+    }).join('');
   }
 
   function getActiveEvent() {
@@ -224,42 +396,333 @@
   function recomputeEvent() {
     const ev = getActiveEvent();
     if (!ev) return;
+    Pub.stageFilter = 'all';
+    Pub.catFilter = 'all';
     Pub.rows = C.computeLeaderboard({
       event: ev, categories: Pub.categories, stations: Pub.stations,
       participants: Pub.participants, timingLogs: Pub.timingLogs
     });
+    Pub.analytics = C.computeEventProgressAnalytics({
+      event: ev, categories: Pub.categories, stations: Pub.stations,
+      participants: Pub.participants, timingLogs: Pub.timingLogs
+    });
+
+    const evCats = Pub.categories.filter((c) => c.eventId === ev.eventId);
+    $('#liveCatFilter').innerHTML = `<option value="all">全部組別 (${evCats.length} 組)</option>` +
+      evCats.map((c) => `<option value="${c.catId}">${C.escapeHtml(c.name)}</option>`).join('');
+
     const cfg = C.parseJsonSafe(ev.certConfigJson, C.defaultCertConfig());
+    Pub.certMode = cfg.certMode || 'official';
+    Pub.overrideOrient = cfg.orientation || 'landscape';
     Pub.overrideLayout = cfg.layoutId;
     Pub.overridePalette = cfg.paletteId;
+    Pub.overrideFont = cfg.fontId || 'sans-modern';
+    $('#pubOrientPick').value = Pub.overrideOrient;
     $('#pubLayoutPick').innerHTML = C.CERT_LAYOUTS.map((l) => `<option value="${l.id}" ${l.id === cfg.layoutId ? 'selected' : ''}>${l.name}</option>`).join('');
     $('#pubPalettePick').innerHTML = C.CERT_PALETTES.map((p) => `<option value="${p.id}" ${p.id === cfg.paletteId ? 'selected' : ''}>${p.name}</option>`).join('');
+    $('#pubFontPick').innerHTML = C.CERT_FONTS.map((f) => `<option value="${f.id}" ${f.id === Pub.overrideFont ? 'selected' : ''}>${f.name}</option>`).join('');
 
     Pub.customBgImg = null;
     if (cfg.customBgDataUrl) {
       const im = new Image(); im.onload = () => { Pub.customBgImg = im; drawCert(); }; im.src = cfg.customBgDataUrl;
     }
 
-    Pub.selectedRow = Pub.rows[0] || null;
+    const eligRows = Pub.rows.filter((r) => C.isCertEligible(ev, r).ok);
+    Pub.selectedRow = eligRows[0] || null;
+    Pub.selectedIsExternalCert = false;
+    renderAnalyticsDashboard();
     renderLiveTable();
     renderCertRunnerList();
     drawCert();
   }
 
+  function renderAnalyticsDashboard() {
+    const ev = getActiveEvent();
+    const A = Pub.analytics;
+    if (!ev || !A) return;
+    const S = A.summary;
+
+    const statusBadge = ev.status === 'finished'
+      ? '<span class="px-2.5 py-1 rounded-full bg-slate-700 text-slate-200 font-black text-[11px]">📦 已結案賽事</span>'
+      : (ev.raceStart
+        ? '<span class="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-black text-[11px]">🟢 賽事鳴槍進行中</span>'
+        : '<span class="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-black text-[11px]">📝 開放報名階段（尚未開賽）</span>');
+
+    $('#pubEventSummaryBanner').innerHTML = `
+      <div class="space-y-1">
+        <div class="flex flex-wrap items-center gap-2">
+          ${statusBadge}
+          <span class="px-2 py-0.5 rounded bg-slate-800 text-sky-300 text-[11px] font-bold">${ev.raceType === 'lap_timed' ? `🔁 繞圈限時賽 (${ev.lapDistanceKm || 1}km/圈)` : '🏃 距離挑戰賽'}</span>
+          ${S.warriors800 > 0 ? `<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[11px] font-bold">★ 八百壯士 100K+ 達標 ${S.warriors800} 人</span>` : ''}
+        </div>
+        <h2 class="text-lg sm:text-xl font-black text-white">${C.escapeHtml(ev.nameZh)}</h2>
+        <div class="text-[11px] text-slate-400">📍 ${C.escapeHtml(ev.location || '-')} ｜ 主辦：${C.escapeHtml(ev.organizerZh || 'TUR')} ｜ 開賽起跑時間：<span class="mono text-amber-300">${ev.raceStart || '尚未鳴槍'}</span></div>
+      </div>
+      <div class="flex gap-3 text-right mono">
+        <div class="px-3 py-2 rounded-xl bg-slate-950/70 border border-slate-800">
+          <div class="text-[10px] text-slate-400">全場累計有效里程</div>
+          <div class="text-lg font-black text-amber-400">${S.totalKmAll.toLocaleString()} <span class="text-xs">km</span></div>
+        </div>
+        <div class="px-3 py-2 rounded-xl bg-slate-950/70 border border-slate-800">
+          <div class="text-[10px] text-slate-400">完賽率（已報到）</div>
+          <div class="text-lg font-black text-emerald-400">${S.finishRate}<span class="text-xs">%</span></div>
+        </div>
+      </div>`;
+
+    const kpis = [
+      { key: 'all', label: '📋 總報名人數', val: S.total, sub: `有效 ${S.activeTotal}｜取消 ${S.cancelled}`, cls: 'border-slate-700 text-white' },
+      { key: 'paid_all', label: '💳 已繳費 / 配號', val: S.paid, sub: `繳費率 ${S.payRate}%｜待繳 ${S.unpaid}`, cls: 'border-amber-500/40 text-amber-300' },
+      { key: 'checked_in_all', label: '✅ 現場已報到', val: S.checkedIn, sub: `報到率 ${S.checkinRate}%（不含時間點）`, cls: 'border-indigo-500/40 text-indigo-300' },
+      { key: 'on_track', label: '🏃 賽道進行中', val: S.onTrack, sub: '已通過節點／繞圈中', cls: 'border-sky-500/40 text-sky-300' },
+      { key: 'finished', label: '🏁 已完賽人數', val: S.finished, sub: `完賽率 ${S.finishRate}%｜百K ${S.warriors800}人`, cls: 'border-emerald-500/40 text-emerald-400' },
+      { key: 'issue', label: '🛑 DNF / 未報到 / 待繳', val: S.dnf + S.unpaid + (S.paid - S.checkedIn), sub: `DNF ${S.dnf}｜未報到 ${Math.max(0, S.paid - S.checkedIn)}｜待繳 ${S.unpaid}`, cls: 'border-rose-500/40 text-rose-300' }
+    ];
+
+    $('#pubKpiGrid').innerHTML = kpis.map((k) => {
+      const isAct = Pub.stageFilter === k.key;
+      return `
+        <button data-kpi-filter="${k.key}" class="text-left p-3 rounded-2xl bg-slate-900 border ${isAct ? 'ring-2 ring-amber-400 border-amber-400' : k.cls} hover:bg-slate-800/80 transition">
+          <div class="text-[11px] text-slate-400 font-bold">${k.label}</div>
+          <div class="text-2xl font-black mono mt-1 ${k.cls.split(' ').pop()}">${k.val}</div>
+          <div class="text-[10px] text-slate-400 mt-0.5 truncate">${k.sub}</div>
+        </button>`;
+    }).join('');
+    $$('[data-kpi-filter]').forEach((b) => {
+      b.onclick = () => {
+        Pub.stageFilter = b.dataset.kpiFilter;
+        renderAnalyticsDashboard();
+        renderLiveTable();
+      };
+    });
+
+    // 左欄：各管制節點通過進度漏斗
+    const baseDenom = Math.max(1, S.activeTotal);
+    const funnelRows = [
+      { title: '1. 有效報名完成', sub: `總報名 ${S.total} 人（含取消 ${S.cancelled}）`, count: S.activeTotal, pct: 100, color: 'bg-slate-400', extra: '' },
+      { title: '2. 已完成繳費與配號', sub: `待繳費 ${S.unpaid} 人`, count: S.paid, pct: Math.round((S.paid / baseDenom) * 100), color: 'bg-amber-400', extra: '' },
+      { title: '3. 起點現場已報到檢錄', sub: `已繳未報到 ${Math.max(0, S.paid - S.checkedIn)} 人`, count: S.checkedIn, pct: Math.round((S.checkedIn / baseDenom) * 100), color: 'bg-indigo-400', extra: S.checkedIn - S.onTrack - S.finished - S.dnf > 0 ? `目前待出發 ${Math.max(0, S.checkedIn - S.onTrack - S.finished - S.dnf)} 人` : '' }
+    ];
+    if (ev.raceType === 'lap_timed') {
+      const lapSt = A.stations[0];
+      funnelRows.push({
+        title: `4. ${lapSt ? lapSt.name : '繞圈感應門'}（已刷圈上賽道）`,
+        sub: `最高 ${S.maxLaps} 圈 ｜ 平均 ${S.avgLaps} 圈`,
+        count: lapSt ? lapSt.passedCount : (S.onTrack + S.finished),
+        pct: Math.round(((lapSt ? lapSt.passedCount : (S.onTrack + S.finished)) / baseDenom) * 100),
+        color: 'bg-sky-400',
+        extra: S.onTrack > 0 ? `賽道繞圈中 ${S.onTrack} 人` : ''
+      });
+      funnelRows.push({
+        title: '5. 🏁 已達標完賽',
+        sub: `中途退賽 DNF ${S.dnf} 人`,
+        count: S.finished,
+        pct: Math.round((S.finished / baseDenom) * 100),
+        color: 'bg-emerald-400',
+        extra: ''
+      });
+    } else {
+      A.stations.forEach((st, idx) => {
+        const isFin = String(st.stationCode).toUpperCase() === 'FINISH';
+        funnelRows.push({
+          title: `${idx + 4}. ${isFin ? '🏁' : '🚩'} ${st.stationCode} ${st.name}${st.distanceKm ? ` (${st.distanceKm}km)` : ''}`,
+          sub: `佔已報到選手 ${st.passRate}%`,
+          count: st.passedCount,
+          pct: Math.round((st.passedCount / baseDenom) * 100),
+          color: isFin ? 'bg-emerald-400' : 'bg-sky-400',
+          extra: !isFin && st.currentAtCount > 0 ? `🏃 目前停留此區間 ${st.currentAtCount} 人` : ''
+        });
+      });
+    }
+
+    $('#pubCheckpointFunnel').innerHTML = `
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+        <h3 class="font-black text-sm text-amber-300">📍 賽事全階段與各管制節點通過分析</h3>
+        <span class="text-[11px] text-slate-400">以有效報名 ${S.activeTotal} 人為基準</span>
+      </div>
+      <div class="space-y-2.5">
+        ${funnelRows.map((fr) => `
+          <div class="space-y-1">
+            <div class="flex items-center justify-between gap-2">
+              <div class="font-bold text-slate-200">${C.escapeHtml(fr.title)} ${fr.extra ? `<span class="ml-1 px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 text-[10px]">${fr.extra}</span>` : ''}</div>
+              <div class="mono font-black text-white shrink-0">${fr.count} 人 <span class="text-slate-400 font-normal">(${fr.pct}%)</span></div>
+            </div>
+            <div class="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
+              <div class="h-full ${fr.color} rounded-full transition-all" style="width:${Math.min(100, fr.pct)}%"></div>
+            </div>
+            <div class="text-[10px] text-slate-500">${C.escapeHtml(fr.sub)}</div>
+          </div>`).join('')}
+      </div>`;
+
+    // 右欄：分組統計表 ＋ 性別與國籍分佈
+    const gTotal = Math.max(1, A.byGender.M + A.byGender.F + A.byGender.other);
+    const mPct = Math.round((A.byGender.M / gTotal) * 100);
+    const fPct = Math.round((A.byGender.F / gTotal) * 100);
+
+    $('#pubCategoryBreakdown').innerHTML = `
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+        <h3 class="font-black text-sm text-amber-300">📊 分組進度明細 ＆ 選手輪廓統計</h3>
+        <span class="text-[11px] text-slate-400">${A.byCategory.length} 個組別</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-[11px] text-left">
+          <thead class="text-slate-400 border-b border-slate-800">
+            <tr>
+              <th class="py-1.5 pr-2">組別</th>
+              <th class="py-1.5 px-1.5 text-right">報名</th>
+              <th class="py-1.5 px-1.5 text-right">已繳</th>
+              <th class="py-1.5 px-1.5 text-right">已報到(率)</th>
+              <th class="py-1.5 px-1.5 text-right text-sky-300">進行中</th>
+              <th class="py-1.5 px-1.5 text-right text-emerald-400">已完賽</th>
+              <th class="py-1.5 px-1.5 text-right text-orange-300">DNF</th>
+              <th class="py-1.5 pl-1.5 text-right">完賽率(報到/報名)</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-800/70 mono">
+            ${A.byCategory.map((c) => {
+              const chkRate = c.paid > 0 ? Math.round((c.checkedIn / c.paid) * 100) : 0;
+              const finOfReg = c.active > 0 ? Math.round((c.finished / c.active) * 100) : 0;
+              return `
+              <tr>
+                <td class="py-2 pr-2 font-sans font-bold text-white">${C.escapeHtml(c.name)}</td>
+                <td class="py-2 px-1.5 text-right">${c.active}</td>
+                <td class="py-2 px-1.5 text-right text-amber-300">${c.paid}</td>
+                <td class="py-2 px-1.5 text-right text-indigo-300">${c.checkedIn} <span class="text-[10px] opacity-75">(${chkRate}%)</span></td>
+                <td class="py-2 px-1.5 text-right text-sky-300 font-bold">${c.onTrack}</td>
+                <td class="py-2 px-1.5 text-right text-emerald-400 font-bold">${c.finished}</td>
+                <td class="py-2 px-1.5 text-right text-orange-300">${c.dnf}</td>
+                <td class="py-2 pl-1.5 text-right font-bold text-slate-200">${c.finishRate}% <span class="text-[10px] text-slate-400">/${finOfReg}%</span></td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div class="pt-2 border-t border-slate-800 space-y-2">
+        <div class="flex items-center justify-between text-[11px]">
+          <span class="font-bold text-slate-300">性別比例（有效報名）</span>
+          <span class="mono text-slate-300">♂ 男 ${A.byGender.M}人 (${mPct}%) ｜ ♀ 女 ${A.byGender.F}人 (${fPct}%)</span>
+        </div>
+        <div class="w-full h-2.5 rounded-full bg-slate-800 overflow-hidden flex">
+          <div class="bg-sky-500 h-full" style="width:${mPct}%"></div>
+          <div class="bg-pink-500 h-full" style="width:${fPct}%"></div>
+        </div>
+        <div class="pt-1">
+          <div class="text-[11px] font-bold text-slate-300 mb-1.5">🌍 參賽國籍分佈</div>
+          <div class="flex flex-wrap gap-1.5">
+            ${A.byNationality.map((n) => `<span class="px-2 py-1 rounded-lg bg-slate-800 border border-slate-700 mono text-[11px]"><b class="text-amber-300">${C.escapeHtml(n.code)}</b> ${n.count}人 (${n.pct}%)</span>`).join('') || '<span class="text-slate-500">-</span>'}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function renderStagePills() {
+    const A = Pub.analytics;
+    if (!A) return;
+    const S = A.summary;
+    const pills = [
+      ['all', `全部 (${S.total})`],
+      ['finished', `🏁 已完賽 (${S.finished})`],
+      ['on_track', `🏃 賽道進行中 (${S.onTrack})`],
+      ['checked_in', `✅ 已報到待出發 (${A.runners.filter((r) => r.stage === 'checked_in').length})`],
+      ['paid_not_checked', `🏷️ 已繳未報到 (${A.runners.filter((r) => r.stage === 'paid_not_checked').length})`],
+      ['unpaid', `⏳ 待繳費 (${S.unpaid})`],
+      ['dnf', `🛑 DNF 退賽 (${S.dnf})`],
+      ['cancelled', `✕ 已取消 (${S.cancelled})`]
+    ];
+    $('#liveStagePills').innerHTML = pills.map(([key, txt]) => {
+      const act = Pub.stageFilter === key;
+      return `<button data-stage-pill="${key}" class="px-2.5 py-1 rounded-lg font-bold transition ${act ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'}">${txt}</button>`;
+    }).join('');
+    $$('[data-stage-pill]').forEach((b) => {
+      b.onclick = () => {
+        Pub.stageFilter = b.dataset.stagePill;
+        renderAnalyticsDashboard();
+        renderLiveTable();
+      };
+    });
+  }
+
   function renderLiveTable() {
+    renderStagePills();
+    const A = Pub.analytics;
+    if (!A) return;
     const q = ($('#liveSearch').value || '').trim().toUpperCase();
-    const list = Pub.rows.filter((r) => !q || `${r.participant.bibNumber} ${r.participant.name} ${r.participant.nationality}`.toUpperCase().includes(q));
-    $('#liveStats').textContent = `共 ${Pub.rows.length} 位參賽選手｜完賽 ${Pub.rows.filter((r) => r.status === 'finished').length} 人`;
+    const catF = Pub.catFilter;
+    const stF = Pub.stageFilter;
+
+    const list = A.runners.filter((r) => {
+      if (catF !== 'all' && r.participant.catId !== catF) return false;
+      if (stF === 'paid_all' && !r.isPaid) return false;
+      else if (stF === 'checked_in_all' && !r.isCheckedIn) return false;
+      else if (stF === 'issue' && !['dnf', 'unpaid', 'paid_not_checked'].includes(r.stage)) return false;
+      else if (!['all', 'paid_all', 'checked_in_all', 'issue'].includes(stF) && r.stage !== stF) return false;
+
+      if (!q) return true;
+      return `${r.participant.bibNumber} ${r.participant.name} ${r.participant.nationality} ${r.participant.groupName} ${r.category.name} ${r.stageLabel}`.toUpperCase().includes(q);
+    });
+
+    const badgeClasses = {
+      finished: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40',
+      on_track: 'bg-sky-500/20 text-sky-300 border border-sky-500/40',
+      checked_in: 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40',
+      paid_not_checked: 'bg-amber-500/20 text-amber-300 border border-amber-500/40',
+      unpaid: 'bg-rose-500/20 text-rose-300 border border-rose-500/40',
+      dnf: 'bg-orange-500/20 text-orange-300 border border-orange-500/40',
+      cancelled: 'bg-slate-800 text-slate-400 border border-slate-700'
+    };
+
+    const stepDot = {
+      done: 'bg-emerald-500/20 border-emerald-500/60 text-emerald-300',
+      active: 'bg-sky-500/25 border-sky-400 text-sky-200 ring-1 ring-sky-400/50',
+      pending: 'bg-slate-900 border-slate-700 text-slate-500',
+      fail: 'bg-rose-500/20 border-rose-500/60 text-rose-300'
+    };
+
+    $('#liveStats').textContent = `顯示 ${list.length} / 共 ${A.runners.length} 位｜完賽 ${A.summary.finished}｜進行中 ${A.summary.onTrack}｜已報到 ${A.summary.checkedIn}`;
     $('#liveBody').innerHTML = list.map((r) => `
-      <tr class="hover:bg-slate-800/60">
-        <td class="p-3 font-black mono text-amber-400">#${r.overallRank} <span class="text-slate-400 text-[10px]">(${r.catRank})</span></td>
-        <td class="p-3 mono font-bold">${r.participant.bibNumber}</td>
-        <td class="p-3 font-bold text-white">${C.escapeHtml(r.participant.name)} <span class="px-1.5 py-0.5 rounded bg-sky-900 text-sky-300 text-[10px]">${r.participant.nationality}</span> ${r.isWarrior800 ? '<span class="px-1.5 py-0.5 rounded bg-rose-600 text-white text-[10px]">🏅100K+</span>' : ''}</td>
-        <td class="p-3">${C.escapeHtml(r.category.name)}</td>
-        <td class="p-3 mono">${r.totalDistanceKm} km ${r.lapCount ? `(${r.lapCount}圈)` : ''}</td>
-        <td class="p-3 mono font-black text-emerald-400">${C.formatDuration(r.elapsedSec)}</td>
-        <td class="p-3 mono">${r.avgPace}</td>
-        <td class="p-3"><button data-go-cert="${r.participant.participantId}" class="px-2.5 py-1 rounded-lg bg-amber-400 text-slate-950 font-black">🏅 印證書</button></td>
-      </tr>`).join('') || '<tr><td colspan="8" class="p-8 text-center text-slate-500">本場尚無公開成績</td></tr>';
+      <tr class="hover:bg-slate-800/50 align-middle">
+        <td class="p-3 whitespace-nowrap">
+          ${r.overallRank ? `<div class="font-black mono text-amber-400 text-sm">#${r.overallRank} <span class="text-slate-400 text-[10px]">(組#${r.catRank})</span></div>` : '<div class="text-slate-500 mono text-[11px]">-</div>'}
+          <span class="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${badgeClasses[r.stage] || badgeClasses.cancelled}">${r.stageLabel}</span>
+        </td>
+        <td class="p-3 whitespace-nowrap">
+          <div class="mono font-black text-white">${r.participant.bibNumber || '<span class="text-slate-500 font-normal">未配號</span>'}</div>
+          <div class="text-[11px] text-slate-400">${C.escapeHtml(r.category.name)}</div>
+        </td>
+        <td class="p-3 whitespace-nowrap">
+          <div class="font-bold text-white">
+            ${C.escapeHtml(r.participant.name)}
+            <span class="px-1.5 py-0.5 rounded bg-sky-900 text-sky-300 text-[10px]">${C.escapeHtml(r.participant.nationality)}</span>
+          </div>
+          <div class="flex flex-wrap gap-1 mt-1">
+            ${r.participant.groupName ? `<span class="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px]">👥 ${C.escapeHtml(r.participant.groupName)}</span>` : ''}
+            ${r.isWarrior800 ? '<span class="px-1.5 py-0.5 rounded bg-amber-500/25 text-amber-300 border border-amber-400/40 text-[10px] font-bold">★ 八百壯士 100K+</span>' : ''}
+          </div>
+        </td>
+        <td class="p-3">
+          <div class="flex flex-wrap items-center gap-1">
+            ${r.steps.map((st, idx) => `
+              ${idx > 0 ? '<span class="text-slate-600 text-[10px]">→</span>' : ''}
+              <div class="px-2 py-1 rounded-lg border text-[10px] leading-tight ${stepDot[st.state] || stepDot.pending}">
+                <div class="font-bold">${C.escapeHtml(st.label)}</div>
+                <div class="mono text-[9px] opacity-85">${C.escapeHtml(st.detail)}</div>
+              </div>`).join('')}
+          </div>
+        </td>
+        <td class="p-3 whitespace-nowrap mono">
+          <div class="font-bold text-slate-200">${r.totalDistanceKm > 0 ? `${r.totalDistanceKm} km` : '-'} ${r.lapCount ? `(${r.lapCount}圈)` : ''}</div>
+          <div class="font-black text-emerald-400">${r.elapsedSec !== null ? C.formatDuration(r.elapsedSec) : (r.lastStationTime ? `最新 ${r.lastStationTime}` : '--:--:--')}</div>
+        </td>
+        <td class="p-3 mono whitespace-nowrap">${r.avgPace}</td>
+        <td class="p-3 whitespace-nowrap">
+          ${(() => {
+            const ev = getActiveEvent();
+            const chk = C.isCertEligible(ev, r.leaderboardRow);
+            if (chk.ok) return `<button data-go-cert="${r.participant.participantId}" class="px-2.5 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black">🏅 印證書</button>`;
+            if (ev && ev.status !== 'finished') return '<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 text-[10px]" title="活動尚未結案鎖定">⏳ 結案後開放</span>';
+            return '<span class="text-slate-600 text-[11px]">須完賽有成績</span>';
+          })()}
+        </td>
+      </tr>`).join('') || '<tr><td colspan="7" class="p-8 text-center text-slate-500">無符合篩選條件之選手</td></tr>';
 
     $$('[data-go-cert]').forEach((b) => {
       b.onclick = () => {
@@ -271,50 +734,324 @@
     });
   }
 
+  function openCertFromRecord(certRow) {
+    if (!certRow) return;
+    const chk = C.isCertEligible(certRow.event, certRow);
+    if (!chk.ok) {
+      alert(`🔒 無法列印證書：${chk.reason}`);
+      return;
+    }
+    Pub.selectedRow = certRow;
+    Pub.selectedIsExternalCert = true;
+    switchPubTab('cert');
+    renderCertRunnerList();
+    drawCert();
+  }
+
   function renderHistory() {
+    const all = Pub.unifiedHistory || [];
     const q = ($('#hisSearch').value || '').trim().toUpperCase();
-    const list = Pub.historyResults.filter((h) => !q || `${h.name} ${h.eventName} ${h.categoryName}`.toUpperCase().includes(q));
+    const list = all.filter((h) => {
+      if (Pub.hisYear !== 'all' && h.year !== Pub.hisYear) return false;
+      if (Pub.hisEvent !== 'all' && h.eventName !== Pub.hisEvent) return false;
+      if (Pub.hisRunner !== 'all' && h.name !== Pub.hisRunner) return false;
+      if (Pub.hisBadge === 'finished' && !h.canCert) return false;
+      if (Pub.hisBadge === 'warrior' && !h.isWarrior800) return false;
+      if (!q) return true;
+      return `${h.year} ${h.name} ${h.bibNumber} ${h.eventName} ${h.categoryName} ${h.remark}`.toUpperCase().includes(q);
+    });
+
+    // 1. 動態 KPI 卡
+    const uniqRunners = new Set(list.map((x) => x.name)).size;
+    const totalKm = Number(list.reduce((s, x) => s + Number(x.distanceKm || 0), 0).toFixed(1));
+    const w800Cnt = list.filter((x) => x.isWarrior800).length;
+    const maxKm = list.reduce((m, x) => Math.max(m, Number(x.distanceKm || 0)), 0);
+    $('#hisKpiGrid').innerHTML = `
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3.5"><div class="text-slate-400 font-bold">📋 查詢命中完賽場次</div><div class="text-2xl font-black mono text-white mt-1">${list.length} <span class="text-xs font-normal text-slate-400">筆（${uniqRunners} 位選手）</span></div></div>
+      <div class="bg-slate-900 border border-amber-500/30 rounded-2xl p-3.5"><div class="text-slate-400 font-bold">🛣️ 累計完賽總里程</div><div class="text-2xl font-black mono text-amber-400 mt-1">${totalKm.toLocaleString()} <span class="text-xs">km</span></div></div>
+      <div class="bg-slate-900 border border-emerald-500/30 rounded-2xl p-3.5"><div class="text-slate-400 font-bold">★ 八百壯士 100K+ 達標</div><div class="text-2xl font-black mono text-emerald-400 mt-1">${w800Cnt} <span class="text-xs">人次</span></div></div>
+      <div class="bg-slate-900 border border-sky-500/30 rounded-2xl p-3.5"><div class="text-slate-400 font-bold">🏆 單場最長里程紀錄</div><div class="text-2xl font-black mono text-sky-300 mt-1">${maxKm} <span class="text-xs">km</span></div></div>`;
+
+    // 2. 左欄：各年度統計分析（以全庫或目前搜尋條件按年度彙整）
+    const byYear = new Map();
+    all.forEach((h) => {
+      if (!byYear.has(h.year)) byYear.set(h.year, { year: h.year, count: 0, km: 0, w800: 0 });
+      const y = byYear.get(h.year);
+      y.count++; y.km += Number(h.distanceKm || 0); if (h.isWarrior800) y.w800++;
+    });
+    const yearArr = [...byYear.values()].sort((a, b) => String(b.year).localeCompare(String(a.year)));
+    const maxYCnt = Math.max(1, ...yearArr.map((y) => y.count));
+    $('#hisYearStats').innerHTML = `
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+        <h3 class="font-black text-sm text-amber-300">📅 各年度完賽與里程統計（點擊年度快篩）</h3>
+        <span class="text-[10px] text-slate-400">${yearArr.length} 個年度</span>
+      </div>
+      <div class="space-y-2">
+        ${yearArr.map((y) => {
+          const act = Pub.hisYear === y.year;
+          const pct = Math.round((y.count / maxYCnt) * 100);
+          return `
+            <button data-his-pick-year="${y.year}" class="w-full text-left p-2 rounded-xl border transition ${act ? 'bg-amber-500/20 border-amber-400' : 'bg-slate-950/60 border-slate-800 hover:border-slate-600'}">
+              <div class="flex items-center justify-between mono">
+                <span class="font-black text-white">${y.year} 年</span>
+                <span class="text-slate-300"><b>${y.count}</b> 場次 ｜ <b class="text-amber-300">${Number(y.km.toFixed(1))} km</b> ｜ ★百K <b>${y.w800}</b></span>
+              </div>
+              <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden mt-1.5">
+                <div class="h-full bg-amber-400 rounded-full" style="width:${pct}%"></div>
+              </div>
+            </button>`;
+        }).join('')}
+      </div>`;
+    $$('[data-his-pick-year]').forEach((b) => {
+      b.onclick = () => {
+        Pub.hisYear = Pub.hisYear === b.dataset.hisPickYear ? 'all' : b.dataset.hisPickYear;
+        $('#hisYearFilter').value = Pub.hisYear;
+        renderHistory();
+      };
+    });
+
+    // 3. 右欄：依選手累計排行 或 依活動場次統計
+    $('#btnHisRankRunner').className = `px-2.5 py-1 rounded-lg font-bold ${Pub.hisRankMode === 'runner' ? 'bg-amber-400 text-slate-950 font-black' : 'bg-slate-800 text-slate-300'}`;
+    $('#btnHisRankEvent').className = `px-2.5 py-1 rounded-lg font-bold ${Pub.hisRankMode === 'event' ? 'bg-amber-400 text-slate-950 font-black' : 'bg-slate-800 text-slate-300'}`;
+
+    if (Pub.hisRankMode === 'runner') {
+      const byR = new Map();
+      list.forEach((h) => {
+        if (!byR.has(h.name)) byR.set(h.name, { name: h.name, count: 0, km: 0, w800: 0 });
+        const o = byR.get(h.name);
+        o.count++; o.km += Number(h.distanceKm || 0); if (h.isWarrior800) o.w800++;
+      });
+      const rArr = [...byR.values()].sort((a, b) => b.km - a.km || b.count - a.count);
+      $('#hisRankingStats').innerHTML = rArr.map((r, i) => `
+        <button data-his-pick-runner="${C.escapeHtml(r.name)}" class="w-full text-left px-3 py-2 rounded-xl border flex items-center justify-between gap-2 transition ${Pub.hisRunner === r.name ? 'bg-amber-500/20 border-amber-400' : 'bg-slate-950/60 border-slate-800 hover:border-slate-600'}">
+          <div class="flex items-center gap-2">
+            <span class="mono font-black text-amber-400 w-6">#${i + 1}</span>
+            <span class="font-bold text-white">${C.escapeHtml(r.name)}</span>
+            ${r.w800 > 0 ? `<span class="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold">★×${r.w800}</span>` : ''}
+          </div>
+          <div class="mono text-slate-300"><b>${r.count}</b> 場 ｜ <b class="text-emerald-400">${Number(r.km.toFixed(1))} km</b></div>
+        </button>`).join('') || '<p class="text-slate-500 text-center py-4">無統計資料</p>';
+      $$('[data-his-pick-runner]').forEach((b) => {
+        b.onclick = () => {
+          const nm = b.dataset.hisPickRunner;
+          Pub.hisRunner = Pub.hisRunner === nm ? 'all' : nm;
+          $('#hisRunnerFilter').value = Pub.hisRunner;
+          renderHistory();
+        };
+      });
+    } else {
+      const byE = new Map();
+      list.forEach((h) => {
+        if (!byE.has(h.eventName)) byE.set(h.eventName, { eventName: h.eventName, year: h.year, count: 0, km: 0, w800: 0 });
+        const o = byE.get(h.eventName);
+        o.count++; o.km += Number(h.distanceKm || 0); if (h.isWarrior800) o.w800++;
+      });
+      const eArr = [...byE.values()].sort((a, b) => String(b.year).localeCompare(String(a.year)) || b.count - a.count);
+      $('#hisRankingStats').innerHTML = eArr.map((e) => `
+        <button data-his-pick-ev="${C.escapeHtml(e.eventName)}" class="w-full text-left px-3 py-2 rounded-xl border flex items-center justify-between gap-2 transition ${Pub.hisEvent === e.eventName ? 'bg-amber-500/20 border-amber-400' : 'bg-slate-950/60 border-slate-800 hover:border-slate-600'}">
+          <div class="min-w-0 truncate">
+            <span class="mono text-amber-400 font-bold mr-1.5">[${e.year}]</span>
+            <span class="font-bold text-white">${C.escapeHtml(e.eventName)}</span>
+          </div>
+          <div class="mono text-slate-300 shrink-0"><b>${e.count}</b> 人完賽 ｜ <b class="text-amber-300">${Number(e.km.toFixed(1))} km</b></div>
+        </button>`).join('') || '<p class="text-slate-500 text-center py-4">無統計資料</p>';
+      $$('[data-his-pick-ev]').forEach((b) => {
+        b.onclick = () => {
+          const evn = b.dataset.hisPickEv;
+          Pub.hisEvent = Pub.hisEvent === evn ? 'all' : evn;
+          $('#hisEventFilter').value = Pub.hisEvent;
+          renderHistory();
+        };
+      });
+    }
+
+    // 4. 明細表格（凡完賽均可一鍵製作個人證書）
     $('#hisBody').innerHTML = list.map((h) => `
       <tr class="hover:bg-slate-800/60">
-        <td class="p-3 mono text-slate-400">${h.eventDate}</td>
-        <td class="p-3 font-semibold">${C.escapeHtml(h.eventName)}</td>
-        <td class="p-3">${C.escapeHtml(h.categoryName)}</td>
-        <td class="p-3 font-black text-white">${C.escapeHtml(h.name)}</td>
-        <td class="p-3 mono font-bold text-amber-300">${h.distanceKm} km</td>
-        <td class="p-3 mono text-emerald-400">${h.finishTime}</td>
-        <td class="p-3">${h.isWarrior800 ? '<span class="px-2 py-0.5 rounded-full bg-rose-600 text-white font-bold">🏅 八百壯士</span>' : '-'}</td>
-      </tr>`).join('') || '<tr><td colspan="7" class="p-8 text-center text-slate-500">查無歷年成績</td></tr>';
+        <td class="p-3 mono whitespace-nowrap"><span class="px-1.5 py-0.5 rounded bg-slate-800 text-amber-300 font-bold mr-1">${h.year}</span><span class="text-slate-400">${h.eventDate}</span></td>
+        <td class="p-3 font-semibold text-white">${C.escapeHtml(h.eventName)}</td>
+        <td class="p-3 whitespace-nowrap">${C.escapeHtml(h.categoryName)}</td>
+        <td class="p-3 whitespace-nowrap"><div class="font-black text-white">${C.escapeHtml(h.name)}</div><div class="text-[10px] mono text-slate-400">BIB ${C.escapeHtml(h.bibNumber)} · ${C.escapeHtml(h.nationality)}</div></td>
+        <td class="p-3 mono font-bold text-amber-300 whitespace-nowrap">${h.distanceKm} km ${h.lapCount ? `<span class="text-[10px] text-slate-400">(${h.lapCount}圈)</span>` : ''}</td>
+        <td class="p-3 mono whitespace-nowrap"><div class="font-black text-emerald-400">${h.finishTime}</div><div class="text-[10px] text-slate-400">${h.avgPace}</div></td>
+        <td class="p-3 whitespace-nowrap">${h.isWarrior800 ? '<span class="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-400/40 font-bold">★ 八百壯士 100K+</span>' : `<span class="text-slate-400 text-[11px]">${C.escapeHtml(h.remark || '完賽認證')}</span>`}</td>
+        <td class="p-3 whitespace-nowrap">
+          ${h.canCert
+            ? `<button data-his-cert="${C.escapeHtml(h.recordId)}" class="px-2.5 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black">🏅 製作證書</button>`
+            : `<span class="px-2 py-1 rounded bg-slate-800 text-slate-400 text-[10px]">${h.source === 'live' ? '⏳ 待活動結案' : '無正式完賽成績'}</span>`}
+        </td>
+      </tr>`).join('') || '<tr><td colspan="8" class="p-8 text-center text-slate-500">查無符合條件之歷年成績</td></tr>';
+
+    $$('[data-his-cert]').forEach((b) => {
+      b.onclick = () => {
+        const rec = Pub.unifiedHistory.find((x) => x.recordId === b.dataset.hisCert);
+        if (rec) openCertFromRecord(rec.certRow);
+      };
+    });
   }
 
   function renderWarriors() {
-    // 結合歷屆 HistoryResults 與今年度所有 100K+ 完賽者
-    const entries = Pub.historyResults.filter((h) => h.isWarrior800).map((h) => ({
-      name: h.name, eventName: h.eventName, date: h.eventDate, dist: h.distanceKm, time: h.finishTime, badge: '歷屆認證'
-    }));
-    Pub.events.forEach((ev) => {
-      const rs = C.computeLeaderboard({ event: ev, categories: Pub.categories, stations: Pub.stations, participants: Pub.participants, timingLogs: Pub.timingLogs });
-      rs.filter((r) => r.isWarrior800).forEach((r) => {
-        entries.push({ name: r.participant.name, eventName: ev.nameZh, date: (ev.raceStart || '').slice(0, 10), dist: r.totalDistanceKm, time: C.formatDuration(r.elapsedSec), badge: '本季新科' });
-      });
+    const allW = (Pub.unifiedHistory || []).filter((h) => h.isWarrior800);
+    const years = [...new Set(allW.map((w) => w.year))].sort((a, b) => String(b).localeCompare(String(a)));
+    const q = ($('#warSearch').value || '').trim().toUpperCase();
+
+    const filtered = allW.filter((w) => {
+      if (Pub.warYear !== 'all' && w.year !== Pub.warYear) return false;
+      if (!q) return true;
+      return `${w.year} ${w.name} ${w.eventName} ${w.categoryName}`.toUpperCase().includes(q);
     });
 
-    $('#warriorsGrid').innerHTML = entries.map((w, i) => `
-      <div class="bg-slate-900 border border-amber-500/30 rounded-2xl p-4 flex items-center justify-between gap-3">
-        <div>
-          <div class="text-[10px] text-amber-400 font-bold">WARRIOR #${i + 1} · ${w.badge}</div>
-          <div class="text-lg font-black text-white mt-0.5">${C.escapeHtml(w.name)}</div>
-          <div class="text-[11px] text-slate-400 mt-0.5">${C.escapeHtml(w.eventName)} (${w.date || '-'})</div>
-        </div>
-        <div class="text-right mono">
-          <div class="text-xl font-black text-amber-400">${w.dist} km</div>
-          <div class="text-xs text-emerald-400">${w.time}</div>
-        </div>
-      </div>`).join('') || '<div class="text-slate-500 col-span-3 text-center py-8">尚無八百壯士紀錄</div>';
+    // 1. 4 張八百壯士 KPI 卡
+    const runnerMap = new Map();
+    filtered.forEach((w) => {
+      if (!runnerMap.has(w.name)) runnerMap.set(w.name, []);
+      runnerMap.get(w.name).push(w);
+    });
+    const multiStarCount = [...runnerMap.values()].filter((arr) => arr.length >= 2).length;
+    const totalKm = Number(filtered.reduce((s, w) => s + Number(w.distanceKm || 0), 0).toFixed(1));
+    const maxKm = filtered.reduce((m, w) => Math.max(m, Number(w.distanceKm || 0)), 0);
+
+    $('#warKpiGrid').innerHTML = `
+      <div class="bg-slate-900 border border-amber-500/30 rounded-2xl p-3.5"><div class="text-slate-400 font-bold">🏅 達標總人次</div><div class="text-2xl font-black mono text-amber-400 mt-1">${filtered.length} <span class="text-xs">人次</span></div></div>
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3.5"><div class="text-slate-400 font-bold">👑 不重複壯士人數</div><div class="text-2xl font-black mono text-white mt-1">${runnerMap.size} <span class="text-xs font-normal text-amber-300">人（多星老將 ${multiStarCount} 位）</span></div></div>
+      <div class="bg-slate-900 border border-emerald-500/30 rounded-2xl p-3.5"><div class="text-slate-400 font-bold">🛣️ 百K 累計總征程</div><div class="text-2xl font-black mono text-emerald-400 mt-1">${totalKm.toLocaleString()} <span class="text-xs">km</span></div></div>
+      <div class="bg-slate-900 border border-sky-500/30 rounded-2xl p-3.5"><div class="text-slate-400 font-bold">🚀 單場最長百K紀錄</div><div class="text-2xl font-black mono text-sky-300 mt-1">${maxKm} <span class="text-xs">km</span></div></div>`;
+
+    // 2. 分年度趨勢柱狀分析條
+    const yStats = years.map((y) => {
+      const arr = allW.filter((w) => w.year === y);
+      return { year: y, count: arr.length, km: Number(arr.reduce((s, x) => s + Number(x.distanceKm || 0), 0).toFixed(1)) };
+    });
+    const maxY = Math.max(1, ...yStats.map((y) => y.count));
+    $('#warYearChart').innerHTML = `
+      <div class="font-black text-sm text-amber-300">📊 八百壯士各年度達標趨勢與里程統計</div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+        ${yStats.map((y) => `
+          <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1">
+            <div class="flex justify-between mono">
+              <span class="font-black text-white">${y.year} 年</span>
+              <span class="text-amber-300 font-bold">${y.count} 人次</span>
+            </div>
+            <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+              <div class="h-full bg-gradient-to-r from-amber-400 to-orange-500 rounded-full" style="width:${Math.round((y.count / maxY) * 100)}%"></div>
+            </div>
+            <div class="text-[10px] text-slate-400 mono">年度百K總里程：${y.km.toLocaleString()} km</div>
+          </div>`).join('')}
+      </div>`;
+
+    // 3. 年度快篩按鈕
+    $('#warYearPills').innerHTML = `<button data-war-year="all" class="px-3 py-1 rounded-lg font-bold ${Pub.warYear === 'all' ? 'bg-amber-400 text-slate-950 font-black' : 'bg-slate-800 text-slate-300'}">全部年度 (${allW.length})</button>` +
+      yStats.map((y) => `<button data-war-year="${y.year}" class="px-3 py-1 rounded-lg font-bold ${Pub.warYear === y.year ? 'bg-amber-400 text-slate-950 font-black' : 'bg-slate-800 text-slate-300'}">${y.year} 年 (${y.count})</button>`).join('');
+    $$('[data-war-year]').forEach((b) => { b.onclick = () => { Pub.warYear = b.dataset.warYear; renderWarriors(); }; });
+
+    $('#btnWarViewYear').className = `px-3.5 py-2 rounded-xl font-bold ${Pub.warView === 'year' ? 'bg-amber-400 text-slate-950 font-black' : 'bg-slate-800 text-slate-200 border border-slate-700'}`;
+    $('#btnWarViewStars').className = `px-3.5 py-2 rounded-xl font-bold ${Pub.warView === 'stars' ? 'bg-amber-400 text-slate-950 font-black' : 'bg-slate-800 text-slate-200 border border-slate-700'}`;
+
+    // 4. 展開區塊：分年度展開 OR 選手星等排行展開
+    if (Pub.warView === 'year') {
+      const groupedYears = [...new Set(filtered.map((w) => w.year))].sort((a, b) => String(b).localeCompare(String(a)));
+      $('#warriorsGrid').innerHTML = groupedYears.map((yr) => {
+        const list = filtered.filter((w) => w.year === yr);
+        const yrKm = Number(list.reduce((s, x) => s + Number(x.distanceKm || 0), 0).toFixed(1));
+        return `
+          <details open class="bg-slate-900 border border-amber-500/30 rounded-2xl overflow-hidden">
+            <summary class="cursor-pointer px-4 py-3 bg-slate-800/80 flex flex-wrap items-center justify-between gap-2 select-none">
+              <div class="font-black text-base text-amber-300">📅 ${yr} 年度八百壯士 100K+ 榮譽榜</div>
+              <div class="mono text-xs text-slate-300">達標 <b class="text-white">${list.length}</b> 人次 ｜ 年度總里程 <b class="text-amber-300">${yrKm.toLocaleString()} km</b></div>
+            </summary>
+            <div class="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              ${list.map((w, i) => `
+                <div class="bg-slate-950/70 border border-slate-800 hover:border-amber-400/50 rounded-xl p-3.5 flex items-center justify-between gap-3 transition">
+                  <div class="min-w-0">
+                    <div class="text-[10px] text-amber-400 font-bold">${yr} WARRIOR #${i + 1} · ${w.source === 'live' ? '本季認證' : '歷屆歸併'}</div>
+                    <div class="text-base font-black text-white mt-0.5">${C.escapeHtml(w.name)}</div>
+                    <div class="text-[11px] text-slate-400 truncate mt-0.5">${C.escapeHtml(w.eventName)}</div>
+                    <div class="text-[10px] text-slate-500 mono">${w.eventDate} · ${C.escapeHtml(w.categoryName)}</div>
+                  </div>
+                  <div class="text-right shrink-0 space-y-1">
+                    <div class="text-lg font-black text-amber-400 mono">${w.distanceKm} km</div>
+                    <div class="text-[11px] text-emerald-400 mono">${w.finishTime}</div>
+                    ${w.canCert
+                      ? `<button data-war-cert="${C.escapeHtml(w.recordId)}" class="px-2 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-[10px]">🏅 製證</button>`
+                      : '<span class="inline-block px-2 py-0.5 rounded bg-slate-800 text-slate-400 text-[10px]">⏳ 待結案</span>'}
+                  </div>
+                </div>`).join('')}
+            </div>
+          </details>`;
+      }).join('') || '<div class="text-slate-500 text-center py-8 bg-slate-900 rounded-2xl border border-slate-800">查無符合條件之八百壯士紀錄</div>';
+    } else {
+      const starRows = [...runnerMap.entries()].map(([name, recs]) => ({
+        name,
+        stars: recs.length,
+        totalKm: Number(recs.reduce((s, r) => s + Number(r.distanceKm || 0), 0).toFixed(1)),
+        bestKm: recs.reduce((m, r) => Math.max(m, Number(r.distanceKm || 0)), 0),
+        years: [...new Set(recs.map((r) => r.year))].sort().join(' / '),
+        recs: recs.sort((a, b) => String(b.eventDate).localeCompare(String(a.eventDate)))
+      })).sort((a, b) => b.stars - a.stars || b.totalKm - a.totalKm);
+
+      $('#warriorsGrid').innerHTML = starRows.map((sr, i) => `
+        <details open class="bg-slate-900 border border-amber-500/30 rounded-2xl overflow-hidden">
+          <summary class="cursor-pointer px-4 py-3 bg-slate-800/80 flex flex-wrap items-center justify-between gap-2 select-none">
+            <div class="flex items-center gap-2">
+              <span class="mono font-black text-amber-400">#${i + 1}</span>
+              <span class="font-black text-base text-white">${C.escapeHtml(sr.name)}</span>
+              <span class="px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[11px]">${'★'.repeat(Math.min(5, sr.stars))} ${sr.stars} 星八百壯士</span>
+            </div>
+            <div class="mono text-xs text-slate-300">累計 <b class="text-amber-300">${sr.totalKm} km</b> ｜ 達標年度：${sr.years}</div>
+          </summary>
+          <div class="p-3.5 divide-y divide-slate-800">
+            ${sr.recs.map((r) => `
+              <div class="py-2 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <span class="mono text-amber-300 font-bold mr-2">${r.eventDate}</span>
+                  <span class="font-bold text-white">${C.escapeHtml(r.eventName)}</span>
+                  <span class="text-slate-400 ml-1.5">(${C.escapeHtml(r.categoryName)})</span>
+                </div>
+                <div class="flex items-center gap-3 mono">
+                  <span class="text-amber-400 font-bold">${r.distanceKm} km</span>
+                  <span class="text-emerald-400 font-bold">${r.finishTime}</span>
+                  ${r.canCert
+                    ? `<button data-war-cert="${C.escapeHtml(r.recordId)}" class="px-2.5 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-[11px]">🏅 製作證書</button>`
+                    : '<span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 text-[10px]">⏳ 待結案</span>'}
+                </div>
+              </div>`).join('')}
+          </div>
+        </details>`).join('') || '<div class="text-slate-500 text-center py-8 bg-slate-900 rounded-2xl border border-slate-800">查無符合條件之八百壯士紀錄</div>';
+    }
+
+    $$('[data-war-cert]').forEach((b) => {
+      b.onclick = () => {
+        const rec = Pub.unifiedHistory.find((x) => x.recordId === b.dataset.warCert);
+        if (rec) openCertFromRecord(rec.certRow);
+      };
+    });
   }
 
   function renderCertRunnerList() {
+    const ev = getActiveEvent();
     const q = ($('#certSearch').value || '').trim().toUpperCase();
-    const list = Pub.rows.filter((r) => !q || `${r.participant.bibNumber} ${r.participant.name}`.toUpperCase().includes(q));
+    const eligibleAll = Pub.rows.filter((r) => C.isCertEligible(ev, r).ok);
+
+    if (ev && ev.status !== 'finished') {
+      const finEv = Pub.events.find((e) => e.status === 'finished');
+      $('#certRunnerList').innerHTML = `
+        <div class="p-4 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-200 space-y-2.5 text-xs">
+          <div class="font-black text-amber-300">🔒 本活動尚未結案鎖定</div>
+          <p class="leading-relaxed text-slate-300">依大會管制規定，必須「<b>完賽 ＋ 活動已結案 ＋ 具正式有效成績</b>」方可列印證書。</p>
+          ${finEv ? `<button id="btnJumpFinishedEv" class="w-full py-2 px-3 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black">📦 切換至已結案活動：${C.escapeHtml(finEv.nameZh)}</button>` : ''}
+        </div>`;
+      const jumpBtn = document.getElementById('btnJumpFinishedEv');
+      if (jumpBtn && finEv) {
+        jumpBtn.onclick = () => {
+          Pub.activeEventId = finEv.eventId;
+          $('#pubEventSelect').value = finEv.eventId;
+          recomputeEvent();
+        };
+      }
+      return;
+    }
+
+    const list = eligibleAll.filter((r) => !q || `${r.participant.bibNumber} ${r.participant.name}`.toUpperCase().includes(q));
     $('#certRunnerList').innerHTML = list.map((r) => {
       const active = Pub.selectedRow?.participant.participantId === r.participant.participantId;
       return `
@@ -325,11 +1062,12 @@
           </div>
           <div class="mono font-bold text-emerald-400">${C.formatDuration(r.elapsedSec)}</div>
         </button>`;
-    }).join('') || '<p class="text-slate-500 text-center py-6">查無選手</p>';
+    }).join('') || '<p class="text-slate-500 text-center py-6">本場尚無「已結案完賽有成績」之合格選手</p>';
 
     $$('[data-pick-cert]').forEach((b) => {
       b.onclick = () => {
-        Pub.selectedRow = Pub.rows.find((r) => r.participant.participantId === b.dataset.pickCert);
+        Pub.selectedRow = eligibleAll.find((r) => r.participant.participantId === b.dataset.pickCert) || null;
+        Pub.selectedIsExternalCert = false;
         renderCertRunnerList();
         drawCert();
       };
@@ -340,19 +1078,57 @@
     const ev = getActiveEvent();
     if (!ev) return;
     const baseCfg = C.parseJsonSafe(ev.certConfigJson, C.defaultCertConfig());
-    const cfg = { ...baseCfg, layoutId: Pub.overrideLayout || baseCfg.layoutId, paletteId: Pub.overridePalette || baseCfg.paletteId };
-    $('#pubPhotoQuoteControls').classList.toggle('hidden', !cfg.allowPublicPhotoQuote);
-    $('#certConfigHint').textContent = `引擎：${cfg.engine === 'custom' ? '大會自訂底圖' : '官方 6×6'} · 方向：${cfg.orientation === 'portrait' ? '直式' : '橫式'} · ${cfg.allowPublicPhotoQuote ? '已開放上傳照片與40字感言' : '承辦人已鎖定公版無感言'}`;
+    const isCustom = Pub.certMode === 'custom_runner';
+    const cfg = {
+      ...baseCfg,
+      certMode: Pub.certMode,
+      orientation: Pub.overrideOrient || baseCfg.orientation,
+      layoutId: Pub.overrideLayout || baseCfg.layoutId,
+      paletteId: Pub.overridePalette || baseCfg.paletteId,
+      fontId: Pub.overrideFont || baseCfg.fontId
+    };
+
+    const targetEv = Pub.selectedRow?.event || ev;
+    const eligibility = C.isCertEligible(targetEv, Pub.selectedRow);
+    const canPrint = eligibility.ok;
+
+    $('#btnDlPng').disabled = !canPrint;
+    $('#btnDlPdf').disabled = !canPrint;
+    $('#btnDlPng').className = `px-4 py-2 rounded-xl font-black text-xs ${canPrint ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`;
+    $('#btnDlPdf').className = `px-4 py-2 rounded-xl font-black text-xs ${canPrint ? 'bg-amber-400 hover:bg-amber-300 text-slate-950' : 'bg-slate-800 text-slate-500 cursor-not-allowed'}`;
+
+    $('#btnPubModeOfficial').className = `p-3 rounded-xl border-2 text-left font-bold transition ${!isCustom ? 'border-amber-400 bg-amber-400 text-slate-950' : 'border-slate-700 bg-slate-950 text-slate-300 hover:border-amber-400'}`;
+    $('#btnPubModeCustom').className = `p-3 rounded-xl border-2 text-left font-bold transition ${isCustom ? 'border-amber-400 bg-amber-400 text-slate-950' : 'border-slate-700 bg-slate-950 text-slate-300 hover:border-amber-400'}`;
+    $('#pubPhotoQuoteControls').classList.toggle('hidden', !(canPrint && isCustom && cfg.allowPublicPhotoQuote));
+    $('#certConfigHint').textContent = canPrint
+      ? `${Pub.selectedIsExternalCert ? '📚 歷年/跨場個人證書模式｜' : ''}目前模式：${isCustom ? '📸 選手客製化證書（含個人照片）' : '🏛️ 官方證書（不含個人照片）'} · ${cfg.orientation === 'portrait' ? 'A4 直式' : 'A4 橫式'} · ${Pub.customBgImg ? '大會自訂設計底圖套印' : '官方 6×6 內建底圖'}`
+      : `🔒 管制鎖定：${eligibility.reason}（須完賽＋已結案＋有正式成績方開放下載列印）`;
+
+    if (!canPrint) {
+      const cEl = $('#pubCertCanvas');
+      cEl.width = 1200; cEl.height = 520;
+      const g = cEl.getContext('2d');
+      g.fillStyle = '#0f172a'; g.fillRect(0, 0, cEl.width, cEl.height);
+      g.strokeStyle = '#f59e0b'; g.lineWidth = 4; g.strokeRect(24, 24, cEl.width - 48, cEl.height - 48);
+      g.fillStyle = '#fbbf24'; g.textAlign = 'center'; g.font = '900 36px "Noto Sans TC", sans-serif';
+      g.fillText('🔒 尚未符合證書列印資格', cEl.width / 2, 225);
+      g.fillStyle = '#cbd5e1'; g.font = '600 24px "Noto Sans TC", sans-serif';
+      g.fillText(eligibility.reason, cEl.width / 2, 285);
+      g.fillStyle = '#94a3b8'; g.font = '500 19px "Noto Sans TC", sans-serif';
+      g.fillText('請切換至已結案活動，或由「歷年成績查詢 / 八百壯士英雄榜」點選已結案完賽紀錄製作證書。', cEl.width / 2, 340);
+      return;
+    }
 
     C.renderCertificateCanvas($('#pubCertCanvas'), Pub.selectedRow, cfg, {
+      certMode: Pub.certMode,
       customBgImg: Pub.customBgImg,
-      photoImg: Pub.photoImg,
-      showPhotoPlaceholder: cfg.allowPublicPhotoQuote,
+      photoImg: isCustom ? Pub.photoImg : null,
+      showPhotoPlaceholder: isCustom && cfg.allowPublicPhotoQuote,
       photoFrame: Pub.photoFrame,
       photoZoom: Pub.photoZoom,
       photoOffsetX: Pub.photoOffsetX,
       photoOffsetY: Pub.photoOffsetY,
-      quote: Pub.quote
+      quote: isCustom ? Pub.quote : ''
     });
   }
 
@@ -363,12 +1139,33 @@
   }
 
   $$('.ptab').forEach((b) => { b.onclick = () => switchPubTab(b.dataset.ptab); });
-  $('#pubEventSelect').onchange = (e) => { Pub.activeEventId = e.target.value; recomputeEvent(); };
+  $('#pubEventSelect').onchange = (e) => { Pub.activeEventId = e.target.value; Pub.selectedIsExternalCert = false; recomputeEvent(); };
+  $('#btnPubReloadDemo').onclick = () => loadAll(true);
   $('#liveSearch').oninput = renderLiveTable;
+  $('#liveCatFilter').onchange = (e) => { Pub.catFilter = e.target.value; renderLiveTable(); };
   $('#hisSearch').oninput = renderHistory;
+  $('#hisYearFilter').onchange = (e) => { Pub.hisYear = e.target.value; renderHistory(); };
+  $('#hisEventFilter').onchange = (e) => { Pub.hisEvent = e.target.value; renderHistory(); };
+  $('#hisRunnerFilter').onchange = (e) => { Pub.hisRunner = e.target.value; renderHistory(); };
+  $('#hisBadgeFilter').onchange = (e) => { Pub.hisBadge = e.target.value; renderHistory(); };
+  $('#btnHisReset').onclick = () => {
+    Pub.hisYear = 'all'; Pub.hisEvent = 'all'; Pub.hisRunner = 'all'; Pub.hisBadge = 'all';
+    $('#hisSearch').value = ''; $('#hisYearFilter').value = 'all'; $('#hisEventFilter').value = 'all';
+    $('#hisRunnerFilter').value = 'all'; $('#hisBadgeFilter').value = 'all';
+    renderHistory();
+  };
+  $('#btnHisRankRunner').onclick = () => { Pub.hisRankMode = 'runner'; renderHistory(); };
+  $('#btnHisRankEvent').onclick = () => { Pub.hisRankMode = 'event'; renderHistory(); };
+  $('#warSearch').oninput = renderWarriors;
+  $('#btnWarViewYear').onclick = () => { Pub.warView = 'year'; renderWarriors(); };
+  $('#btnWarViewStars').onclick = () => { Pub.warView = 'stars'; renderWarriors(); };
   $('#certSearch').oninput = renderCertRunnerList;
+  $('#btnPubModeOfficial').onclick = () => { Pub.certMode = 'official'; drawCert(); };
+  $('#btnPubModeCustom').onclick = () => { Pub.certMode = 'custom_runner'; drawCert(); };
+  $('#pubOrientPick').onchange = (e) => { Pub.overrideOrient = e.target.value; drawCert(); };
   $('#pubLayoutPick').onchange = (e) => { Pub.overrideLayout = e.target.value; drawCert(); };
   $('#pubPalettePick').onchange = (e) => { Pub.overridePalette = e.target.value; drawCert(); };
+  $('#pubFontPick').onchange = (e) => { Pub.overrideFont = e.target.value; drawCert(); };
   $('#pubQuoteCnt').textContent = `${Pub.quote.length} / 40`;
   $('#pubQuoteInput').oninput = (e) => { Pub.quote = e.target.value.slice(0, 40); $('#pubQuoteCnt').textContent = `${Pub.quote.length} / 40`; drawCert(); };
   $('#pubZoom').oninput = (e) => { Pub.photoZoom = Number(e.target.value); $('#pubZoomTxt').textContent = `${Pub.photoZoom.toFixed(1)}x`; drawCert(); };
@@ -397,11 +1194,15 @@
   cv.onpointerup = () => { Pub.dragging = false; };
 
   $('#btnDlPng').onclick = () => {
+    const chk = C.isCertEligible(Pub.selectedRow?.event || getActiveEvent(), Pub.selectedRow);
+    if (!chk.ok) return alert(`🔒 無法下載證書：${chk.reason}`);
     const a = document.createElement('a');
     a.download = `TUR_Cert_${Pub.selectedRow?.participant.bibNumber || 'FINISHER'}.png`;
     a.href = cv.toDataURL('image/png', 1.0); a.click();
   };
   $('#btnDlPdf').onclick = () => {
+    const chk = C.isCertEligible(Pub.selectedRow?.event || getActiveEvent(), Pub.selectedRow);
+    if (!chk.ok) return alert(`🔒 無法匯出證書：${chk.reason}`);
     const orient = cv.height > cv.width ? 'portrait' : 'landscape';
     if (window.jspdf?.jsPDF) {
       const pdf = new window.jspdf.jsPDF({ orientation: orient, unit: 'mm', format: 'a4' });
@@ -410,6 +1211,18 @@
     } else window.print();
   };
 
+  const syncPubFontButtons = (mode) => {
+    $$('[data-font-scale]').forEach((b) => {
+      const act = b.dataset.fontScale === mode;
+      b.className = `px-2 py-1 rounded text-[11px] font-bold transition ${act ? 'bg-amber-400 text-slate-950 font-black' : 'text-slate-300 hover:bg-slate-700'}`;
+    });
+  };
+  syncPubFontButtons(C.applyFontScale(C.getSavedFontScale()));
+  $$('[data-font-scale]').forEach((b) => {
+    b.onclick = () => syncPubFontButtons(C.applyFontScale(b.dataset.fontScale));
+  });
+
+  C.onLogoReady(() => drawCert());
   loadAll();
 })();
 </script>

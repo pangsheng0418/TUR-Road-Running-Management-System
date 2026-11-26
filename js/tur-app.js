@@ -64,6 +64,7 @@
     currentUser: { username: 'public', displayName: '民眾 / 跑者', role: 'public', allowedStation: '' },
     activeView: 'public-home',
     regEventId: '',
+    regMode: 'solo', // 'solo' | 'group'
     z1EventId: '',
     z2EventId: '',
     opEventId: '',
@@ -373,6 +374,10 @@
             const regCnt = State.participants.filter((p) => p.eventId === ev.eventId && String(p.payStatus).toUpperCase() !== 'CANCELLED').length;
             const quotaTxt = Number(ev.maxQuota) > 0 ? `${regCnt} / ${ev.maxQuota} 人` : `${regCnt} 人（不限額）`;
             const cats = State.categories.filter((c) => c.eventId === ev.eventId);
+            const evPayMode = C.getEventPaymentMode(ev);
+            const payBadge = evPayMode === 'ONLINE_PAYUNi'
+              ? '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">💳 結合金流廠商 (PAYUNi)</span>'
+              : '<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-[10px]">🏦 轉帳核對末五碼</span>';
             return `
               <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col hover:shadow-md transition">
                 <div class="h-32 p-4 flex flex-col justify-between text-white" style="${C.getBannerStyle(ev.bannerUrl)}">
@@ -386,13 +391,18 @@
                   </div>
                 </div>
                 <div class="p-4 flex-1 flex flex-col justify-between space-y-3 text-xs">
-                  <div class="space-y-1">
+                  <div class="space-y-1.5">
+                    <div class="flex justify-between items-center text-slate-600"><span>繳費管制方式</span>${payBadge}</div>
+                    <div class="flex justify-between text-slate-600"><span>🏁 起跑時間</span><b class="mono text-indigo-800">${ev.raceStart ? ev.raceStart.slice(0, 16) : '待公告'}</b></div>
                     <div class="flex justify-between text-slate-600"><span>已報名 / 限額</span><b class="mono text-slate-900">${quotaTxt}</b></div>
                     <div class="flex flex-wrap gap-1 pt-1">
                       ${cats.map((c) => `<span class="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold">${C.escapeHtml(c.name)} $${c.fee}</span>`).join('')}
                     </div>
                   </div>
-                  <button data-open-reg="${ev.eventId}" class="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black">📝 立即報名（支援團報 / 雙軌金流）</button>
+                  <div class="grid grid-cols-2 gap-2">
+                    <button data-open-reg="${ev.eventId}" data-reg-mode="solo" class="py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black">🏃 個人報名</button>
+                    <button data-open-reg="${ev.eventId}" data-reg-mode="group" class="py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black">👥 團體報名</button>
+                  </div>
                 </div>
               </div>`;
           }).join('')}
@@ -402,6 +412,7 @@
     $$('[data-open-reg]').forEach((b) => {
       b.onclick = () => {
         State.regEventId = b.dataset.openReg;
+        State.regMode = b.dataset.regMode === 'group' ? 'group' : 'solo';
         State.groupCart = [];
         rebuildIndices(State.regEventId);
         switchView('public-register');
@@ -409,11 +420,62 @@
     });
   }
 
+  function setRegMode(mode) {
+    State.regMode = mode === 'group' ? 'group' : 'solo';
+    const isGroup = State.regMode === 'group';
+
+    $('#btnModeSolo').className = isGroup
+      ? 'p-3.5 rounded-2xl border-2 border-slate-200 bg-white hover:border-slate-400 text-slate-800 text-left shadow-sm transition'
+      : 'p-3.5 rounded-2xl border-2 border-slate-900 bg-slate-900 text-white text-left shadow transition';
+    $('#btnModeSolo').innerHTML = `
+      <div class="font-black text-sm sm:text-base flex items-center gap-1.5"><span>🏃 個人報名</span>${!isGroup ? '<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-400 text-slate-950">目前模式</span>' : ''}</div>
+      <div class="text-[11px] ${!isGroup ? 'opacity-85' : 'text-slate-500'} mt-0.5">單人填表直接送出，不顯示團報欄位，避免填錯。</div>`;
+
+    $('#btnModeGroup').className = isGroup
+      ? 'p-3.5 rounded-2xl border-2 border-amber-500 bg-amber-500 text-slate-950 text-left shadow transition'
+      : 'p-3.5 rounded-2xl border-2 border-slate-200 bg-white hover:border-amber-400 text-slate-800 text-left shadow-sm transition';
+    $('#btnModeGroup').innerHTML = `
+      <div class="font-black text-sm sm:text-base flex items-center gap-1.5"><span>👥 團體報名（2～50 人）</span>${isGroup ? '<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-900 text-amber-300">目前模式</span>' : ''}</div>
+      <div class="text-[11px] ${isGroup ? 'text-slate-900/80' : 'text-slate-500'} mt-0.5">自動配發 GRP26 團報碼，支援整團統一匯款或各自匯款。</div>`;
+
+    $('#groupSettingsPanel').classList.toggle('hidden', !isGroup);
+    $('#btnAddToGroup').classList.toggle('hidden', !isGroup);
+    $('#btnSubmitSingle').classList.toggle('hidden', isGroup);
+    $('#soloGuideCard').classList.toggle('hidden', isGroup);
+    $('#groupCartCard').classList.toggle('hidden', !isGroup);
+
+    if (!isGroup) {
+      $('#regGroupName').value = '';
+      $('#err-regGroupName').textContent = '';
+    }
+    updatePayMethodUI();
+    renderGroupCart();
+    validateRegForm();
+  }
+
   function renderPublicRegister() {
     const ev = State.events.find((e) => e.eventId === State.regEventId) || State.events[0];
     if (!ev) return;
+    $('#regBannerHero').setAttribute('style', C.getBannerStyle(ev.bannerUrl));
     $('#regEventTitle').textContent = ev.nameZh;
-    $('#regEventMeta').textContent = `${ev.nameEn || ''} · ${ev.location || ''} · 主辦：${ev.organizerZh || 'TUR'}`;
+    $('#regEventMeta').textContent = `${ev.nameEn || ''} · ${ev.location || ''} · 🏁 起跑：${ev.raceStart || '待公告'} · 主辦：${ev.organizerZh || 'TUR'}`;
+    $('#regBrochureContent').textContent = (ev.brochureText || '').trim() || C.DEFAULT_BROCHURE_TEMPLATE;
+
+    // 明確顯示本活動屬於「一般距離賽」或「計時繞圈賽」與賽制計分說明
+    const wf = C.getRaceTypeWorkflow(ev, State.stations, State.categories);
+    const isLap = ev.raceType === 'lap_timed';
+    const rtBox = $('#regRaceTypeBanner');
+    if (rtBox) {
+      rtBox.className = `rounded-2xl border-2 p-3.5 text-xs shadow-sm ${isLap ? 'bg-indigo-50 border-indigo-300 text-indigo-950' : 'bg-sky-50 border-sky-300 text-sky-950'}`;
+      rtBox.innerHTML = `
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <span class="px-2.5 py-0.5 rounded-full font-black ${isLap ? 'bg-indigo-700 text-white' : 'bg-sky-700 text-white'}">${wf.badge}</span>
+            <span class="font-black">本場賽事賽制與計時方式</span>
+          </div>
+          <span class="font-bold opacity-90">${C.escapeHtml(wf.shortRule)}</span>
+        </div>`;
+    }
 
     const cats = State.categories.filter((c) => c.eventId === ev.eventId);
     const prevCat = $('#regCatId').value;
@@ -424,6 +486,62 @@
     if (cats.some((c) => c.catId === prevCat)) $('#regCatId').value = prevCat;
 
     const schema = C.parseJsonSafe(ev.formSchemaJson, C.defaultFormSchema());
+    const customFields = Array.isArray(schema.customFields) ? schema.customFields : [];
+    const cfSec = $('#regCustomFieldsSection');
+    const cfBox = $('#regCustomFieldsContainer');
+    if (cfSec && cfBox) {
+      if (!customFields.length) {
+        cfSec.classList.add('hidden');
+        cfBox.innerHTML = '';
+      } else {
+        cfSec.classList.remove('hidden');
+        cfBox.innerHTML = customFields.map((f) => {
+          const reqMark = f.required ? ' <span class="text-rose-600">*</span>' : '';
+          const ph = C.escapeHtml(f.placeholder || '');
+          const kAttr = C.escapeHtml(f.key);
+          let ctrl = '';
+          if (f.type === 'textarea') {
+            ctrl = `<textarea data-cf-key="${kAttr}" data-cf-type="textarea" rows="2" placeholder="${ph}" class="reg-cf-input w-full px-3 py-2 border rounded-lg text-xs bg-white"></textarea>`;
+          } else if (f.type === 'select') {
+            ctrl = `<select data-cf-key="${kAttr}" data-cf-type="select" class="reg-cf-input w-full px-3 py-2 border rounded-lg text-xs bg-white">
+              <option value="">${ph || '請選擇'}</option>
+              ${(f.options || []).map((opt) => `<option value="${C.escapeHtml(opt)}">${C.escapeHtml(opt)}</option>`).join('')}
+            </select>`;
+          } else if (f.type === 'radio') {
+            ctrl = `<div class="flex flex-wrap gap-2 pt-1">
+              ${(f.options || []).map((opt, idx) => `
+                <label class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white border cursor-pointer hover:border-indigo-400">
+                  <input type="radio" name="cf_radio_${kAttr}" value="${C.escapeHtml(opt)}" data-cf-key="${kAttr}" data-cf-type="radio" class="reg-cf-input" ${idx === 0 && !f.required ? '' : ''} />
+                  <span>${C.escapeHtml(opt)}</span>
+                </label>`).join('')}
+            </div>`;
+          } else if (f.type === 'checkbox') {
+            ctrl = `<div class="flex flex-wrap gap-2 pt-1">
+              ${(f.options || []).map((opt) => `
+                <label class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white border cursor-pointer hover:border-indigo-400">
+                  <input type="checkbox" value="${C.escapeHtml(opt)}" data-cf-key="${kAttr}" data-cf-type="checkbox" class="reg-cf-input" />
+                  <span>${C.escapeHtml(opt)}</span>
+                </label>`).join('')}
+            </div>`;
+          } else {
+            const htmlType = ['number', 'date', 'url'].includes(f.type) ? f.type : 'text';
+            ctrl = `<input type="${htmlType}" data-cf-key="${kAttr}" data-cf-type="${f.type}" placeholder="${ph}" class="reg-cf-input w-full px-3 py-2 border rounded-lg text-xs bg-white" />`;
+          }
+          const spanClass = (f.type === 'textarea' || f.type === 'radio' || f.type === 'checkbox') ? 'sm:col-span-2' : '';
+          return `
+            <div class="${spanClass}">
+              <label class="block text-xs font-bold text-slate-700 mb-1">${C.escapeHtml(f.label)}${reqMark}</label>
+              ${ctrl}
+              <p id="err-cf-${kAttr}" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
+            </div>`;
+        }).join('');
+        $$('.reg-cf-input').forEach((el) => {
+          el.addEventListener('input', validateRegForm);
+          el.addEventListener('change', validateRegForm);
+        });
+      }
+    }
+
     $('#regAddonsContainer').innerHTML = (schema.addons || []).map((a) => `
       <label class="flex items-center gap-2 p-2 bg-white border rounded-lg cursor-pointer hover:border-amber-400">
         <input type="checkbox" class="reg-addon" data-name="${C.escapeHtml(a.name)}" data-price="${a.price}" />
@@ -432,20 +550,36 @@
 
     $('#bankAccountPreview').innerHTML = `銀行：(${getConfigVal('bankCode', '004')}) ${C.escapeHtml(getConfigVal('bankName', '台灣銀行'))}<br>帳號：<b>${C.escapeHtml(getConfigVal('bankAccount', '004-001-234567-8'))}</b><br>戶名：${C.escapeHtml(getConfigVal('bankAccountName', '台灣超馬協會'))}`;
 
-    renderGroupCart();
-    validateRegForm();
+    setRegMode(State.regMode);
   }
 
   function getSelectedPayMethod() {
+    const ev = State.events.find((e) => e.eventId === State.regEventId);
+    if (ev) return C.getEventPaymentMode(ev);
     return document.querySelector('input[name="payMethod"]:checked')?.value || 'MANUAL_ATM';
   }
 
   function updatePayMethodUI() {
     const method = getSelectedPayMethod();
     const isManual = method === 'MANUAL_ATM';
-    $('#payCardManual').className = `p-3 rounded-xl border-2 cursor-pointer block ${isManual ? 'border-amber-500 bg-amber-50/70' : 'border-slate-200 bg-white'}`;
-    $('#payCardPayuni').className = `p-3 rounded-xl border-2 cursor-pointer block ${!isManual ? 'border-emerald-500 bg-emerald-50/70' : 'border-slate-200 bg-white'}`;
-    $('#btnSubmitSingle').textContent = isManual ? '📝 確認送出報名資料（稍後轉帳）' : '🔒 前往統一金流線上付款（秒級自動配號）';
+    const rManual = document.querySelector('input[name="payMethod"][value="MANUAL_ATM"]');
+    const rPayuni = document.querySelector('input[name="payMethod"][value="ONLINE_PAYUNi"]');
+    if (rManual) rManual.checked = isManual;
+    if (rPayuni) rPayuni.checked = !isManual;
+
+    $('#payCardManual').classList.toggle('hidden', !isManual);
+    $('#payCardPayuni').classList.toggle('hidden', isManual);
+    if ($('#regGroupPayModeWrap')) $('#regGroupPayModeWrap').classList.toggle('hidden', !isManual);
+    if ($('#regPayModeHeader')) {
+      $('#regPayModeHeader').textContent = isManual
+        ? '14. 本活動指定繳費方式：🏦 實體銀行轉帳（核對帳號末五碼）'
+        : '14. 本活動指定繳費方式：💳 結合金流廠商（PAYUNi 線上自動銷帳）';
+    }
+    if ($('#regPayModeBadge')) {
+      $('#regPayModeBadge').textContent = isManual ? '🔒 轉帳核對末五碼管制' : '🔒 金流廠商自動銷帳管制';
+      $('#regPayModeBadge').className = `text-[10px] px-2 py-0.5 rounded-full font-bold ${isManual ? 'bg-amber-200 text-amber-950' : 'bg-emerald-600 text-white'}`;
+    }
+    $('#btnSubmitSingle').textContent = isManual ? '📝 確認送出個人報名（轉帳核對末五碼）' : '🔒 前往統一金流 PAYUNi 線上付款（秒級配號）';
   }
 
   function validateRegForm() {
@@ -500,6 +634,14 @@
     checks.last5 = (payMethod === 'ONLINE_PAYUNi' || !last5 || /^\d{5}$/.test(last5)) ? '' : '末五碼限 5 位純數字';
     checks.consent = !consent ? '須勾選同意切結書' : (State.groupCart.length >= 50 ? '團報上限 50 人' : '');
 
+    // 團體模式額外檢核：團體名稱必填
+    const isGroupMode = State.regMode === 'group';
+    const grpName = $('#regGroupName').value.trim();
+    const grpErr = isGroupMode && grpName.length < 2 ? '團體報名請填寫團體名稱（至少 2 字）' : '';
+    $('#err-regGroupName').textContent = grpErr;
+    $('#regGroupName').classList.remove('input-valid', 'input-invalid');
+    if (isGroupMode) $('#regGroupName').classList.add(grpErr ? 'input-invalid' : 'input-valid');
+
     const map = [
       ['#regCatId', 'cat', '#err-regCatId'], ['#regNationality', 'nat', '#err-regNationality'],
       ['#regName', 'name', '#err-regName'], ['#regIdCard', 'idCard', '#err-regIdCard'],
@@ -521,27 +663,60 @@
     const totalAmount = (cat ? Number(cat.fee) : 0) + addons.reduce((s, a) => s + a.price, 0);
     $('#regSingleTotal').textContent = `NT$ ${totalAmount.toLocaleString()}`;
 
+    // 承辦人自訂擴充欄位取值與即時防呆檢核
+    const evObj = State.events.find((e) => e.eventId === evId);
+    const evSchema = C.parseJsonSafe(evObj?.formSchemaJson, C.defaultFormSchema());
+    const customFieldDefs = Array.isArray(evSchema.customFields) ? evSchema.customFields : [];
+    const customValues = {};
+    let cfHasErr = false;
+    customFieldDefs.forEach((f) => {
+      let val = '';
+      if (f.type === 'radio') {
+        const checked = document.querySelector(`input[name="cf_radio_${f.key}"]:checked`);
+        val = checked ? checked.value : '';
+      } else if (f.type === 'checkbox') {
+        val = Array.from(document.querySelectorAll(`.reg-cf-input[data-cf-key="${f.key}"]:checked`)).map((x) => x.value);
+      } else {
+        const inp = document.querySelector(`.reg-cf-input[data-cf-key="${f.key}"]`);
+        val = inp ? inp.value.trim() : '';
+      }
+      customValues[f.key] = val;
+      let err = '';
+      if (f.required) {
+        if (Array.isArray(val) ? val.length === 0 : !String(val).trim()) err = `請填寫「${f.label}」`;
+      }
+      if (!err && f.type === 'url' && val && !/^https?:\/\/.+/i.test(val)) {
+        err = '請輸入 http:// 或 https:// 開頭之有效網址';
+      }
+      if (err) cfHasErr = true;
+      const errEl = document.getElementById(`err-cf-${f.key}`);
+      if (errEl) errEl.textContent = err;
+    });
+    checks.customFields = cfHasErr ? '尚有活動自訂必填欄位未完成' : '';
+
     const labels = [
       ['1. 組別名額', 'cat'], ['2. 國籍三碼', 'nat'], ['3. 姓名格式', 'name'], ['4. 身分證防重', 'idCard'],
       ['5. 性別聯動', 'gender'], ['6. 10~80歲', 'birthday'], ['7. 手機09開頭', 'phone'], ['8. Email', 'email'],
       ['9. 居住縣市', 'city'], ['10. 飲食', 'diet'], ['11. 緊急不同名', 'emergName'], ['12. 緊急不同號', 'emergPhone'],
-      ['13. 末五碼', 'last5'], ['14. 切結/上限', 'consent']
+      [payMethod === 'ONLINE_PAYUNi' ? '13. 金流廠商結帳' : '13. 匯款末五碼', 'last5'], ['14. 切結/上限', 'consent']
     ];
+    if (customFieldDefs.length) labels.push(['15. 活動自訂欄位', 'customFields']);
     $('#validationSummaryList').innerHTML = labels.map(([lbl, k]) => {
       const ok = !checks[k];
       return `<div class="px-2 py-1 rounded border ${ok ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-700'}">${ok ? '✓' : '✕'} ${lbl}</div>`;
     }).join('');
 
     const split = C.splitFullName(name);
-    const isValid = Object.values(checks).every((e) => e === '');
+    const isValid = Object.values(checks).every((e) => e === '') && !grpErr;
     return {
       isValid,
       runner: {
         participantId: `TUR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(10000 + Math.random() * 90000)}`,
-        eventId: evId, catId, bibNumber: '', groupCode: '', groupName: $('#regGroupName').value.trim(),
+        eventId: evId, catId, bibNumber: '', groupCode: '', groupName: isGroupMode ? grpName : '',
         name, lastName: split.lastName, firstName: split.firstName, idCard, gender, birthday, age, nationality: nat,
         phone, email, city, emergencyName: emergName, emergencyPhone: emergPhone, diet, remark: $('#regRemark').value.trim(),
         totalAmount, addonsDetail: JSON.stringify(addons.map((a) => a.name)),
+        customFieldsJson: JSON.stringify(customValues),
         payMethod, remittanceLast5: payMethod === 'MANUAL_ATM' ? last5 : '',
         merTradeNo: payMethod === 'ONLINE_PAYUNi' ? `PU${Date.now()}` : '',
         payStatus: payMethod === 'ONLINE_PAYUNi' ? 'PAID' : 'UNPAID',
@@ -568,21 +743,35 @@
         <div><b>${i + 1}. ${C.escapeHtml(r.name)}</b> [${r.nationality}] · NT$${r.totalAmount}</div>
         <button data-rm-cart="${i}" class="text-rose-600 font-bold px-1.5">✕</button>
       </div>`).join('');
-    $('#groupGrandTotal').textContent = `NT$ ${State.groupCart.reduce((s, r) => s + Number(r.totalAmount), 0).toLocaleString()}`;
+    const grandTotal = State.groupCart.reduce((s, r) => s + Number(r.totalAmount), 0);
+    $('#groupGrandTotal').textContent = `NT$ ${grandTotal.toLocaleString()}`;
+    $('#btnSubmitGroup').textContent = `✅ 送出整批團報 (${State.groupCart.length} 人)`;
     $('#btnSubmitGroup').disabled = false;
   }
 
   async function commitRunners(runners) {
-    const isGroup = runners.length > 1 || Boolean(runners[0].groupName);
-    const grpCode = isGroup ? `GRP26-${Math.floor(1000 + Math.random() * 8999)}` : '';
-    const sharedLast5 = runners[0].remittanceLast5;
     const evId = runners[0].eventId;
+    const evObj = State.events.find((e) => e.eventId === evId);
+    if (!evObj || (evObj.status !== 'open' && evObj.status !== 'auto')) {
+      toast('🔒 階段 1 報名管制：本活動目前未開放報名（已截止或已結案）', 'error');
+      return;
+    }
+    const curActiveCnt = State.participants.filter((p) => p.eventId === evId && String(p.payStatus).toUpperCase() !== 'CANCELLED').length;
+    if (Number(evObj.maxQuota) > 0 && curActiveCnt + runners.length > Number(evObj.maxQuota)) {
+      toast(`🔒 階段 1 名額管制：本場總限額 ${evObj.maxQuota} 人，目前剩餘名額不足！`, 'error');
+      return;
+    }
+
+    const isGroup = State.regMode === 'group' || runners.length > 1 || Boolean(runners[0].groupName);
+    const grpCode = isGroup ? `GRP26-${Math.floor(1000 + Math.random() * 8999)}` : '';
+    const isSharedPay = $('#regGroupPayMode')?.value === 'shared';
+    const sharedLast5 = runners[0].remittanceLast5;
     const usedBibs = new Set(State.participants.filter((p) => p.eventId === evId && p.bibNumber).map((p) => String(p.bibNumber).toUpperCase()));
     const assignedBibs = [];
 
     for (const r of runners) {
       if (grpCode) r.groupCode = grpCode;
-      if (r.payMethod === 'MANUAL_ATM' && !r.remittanceLast5 && sharedLast5) r.remittanceLast5 = sharedLast5;
+      if (r.payMethod === 'MANUAL_ATM' && isSharedPay && sharedLast5) r.remittanceLast5 = sharedLast5;
 
       // 若為 PAYUNi 秒級自動銷帳，於寫入雲端前直接配好號碼布，單次寫入到位
       if (r.payMethod === 'ONLINE_PAYUNi' && !r.bibNumber) {
@@ -625,9 +814,9 @@
     }
 
     if (assignedBibs.length) {
-      toast(`⚡ PAYUNi 銷帳配號成功 (${assignedBibs.join(', ')})${cloudNote}`, toastType);
+      toast(`⚡ PAYUNi 銷帳配號成功 (${assignedBibs.join(', ')})｜✉️ 已自動寄發報名＋繳費入帳確認信${cloudNote}`, toastType);
     } else {
-      toast(`📝 報名成功！序號 ${runners[0].participantId}${grpCode ? `｜團報 ${grpCode}` : ''}${cloudNote}`, toastType);
+      toast(`📝 報名成功！序號 ${runners[0].participantId}${grpCode ? `｜團報 ${grpCode}` : ''}｜✉️ 已自動寄發報名確認信（含反向查改說明）${cloudNote}`, toastType);
     }
   }
 
@@ -638,8 +827,43 @@
     const ev = State.events.find((e) => e.eventId === State.opEventId) || State.events[0];
     if (!ev) return;
     const stCode = State.opLockedStation;
-    $('#opStationTitle').textContent = stCode === 'WRITER' ? '📡 晶片寫入與發卡專區（WRITER 鎖定）' : `⏱️ ${stCode} 站點感應控制台（單站嚴格鎖定）`;
-    $('#opEventSubtitle').textContent = `${ev.nameZh} · 執勤帳號：${State.currentUser.username}`;
+    const sop = C.getStationSopInfo(ev, stCode, State.stations);
+    const paid = State.participants.filter((p) => p.eventId === ev.eventId && String(p.payStatus).toUpperCase() === 'PAID' && p.bibNumber);
+    const stLogs = State.timingLogs.filter((l) => l.eventId === ev.eventId && l.stationCode === stCode && l.isValid !== false);
+    const passedBibSet = new Set(stLogs.map((l) => String(l.bibNumber).toUpperCase()));
+    const passedCount = stCode === 'CHECKIN'
+      ? paid.filter((p) => p.checkinStatus === 'checked_in').length
+      : (stCode === 'WRITER' ? paid.filter((p) => Boolean(p.chipUid)).length : passedBibSet.size);
+    const pct = paid.length ? Math.round((passedCount / paid.length) * 100) : 0;
+    const needsGun = stCode !== 'WRITER' && stCode !== 'CHECKIN' && !ev.raceStart;
+
+    $('#opStationTitle').textContent = stCode === 'WRITER' ? '📡 晶片寫入與發卡專區（WRITER 鎖定）' : `⏱️ ${stCode} ${sop.stationName} — 管制點控制台`;
+    $('#opEventSubtitle').textContent = `${sop.raceTypeLabel} · ${ev.nameZh} · 執勤帳號：${State.currentUser.username}`;
+
+    // 渲染管制點專屬 SOP 與晶片處置指引卡
+    const sopBox = $('#opStationSopBanner');
+    if (sopBox) {
+      sopBox.className = `rounded-2xl border-2 p-4 text-xs space-y-2.5 shadow-sm outdoor-card ${needsGun ? 'bg-amber-50 border-amber-400' : (ev.status === 'finished' ? 'bg-rose-50 border-rose-400' : 'bg-white border-indigo-200')}`;
+      sopBox.innerHTML = `
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="px-2.5 py-0.5 rounded-full bg-slate-900 text-amber-400 font-black mono">${sop.code}</span>
+            <span class="font-black text-sm text-slate-900">${C.escapeHtml(sop.roleLabel)}</span>
+            <span class="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-900 font-bold">${sop.raceTypeLabel}</span>
+            ${needsGun ? '<span class="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black">⏳ 尚未鳴槍（目前鎖定計時）</span>' : (ev.status === 'finished' ? '<span class="px-2 py-0.5 rounded-full bg-rose-600 text-white font-black">🔒 活動已結案鎖定</span>' : '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-black">🟢 管制站執勤中</span>')}
+          </div>
+          <div class="mono font-bold text-slate-700">本站進度：<b>${passedCount} / ${paid.length} 人</b> (${pct}%)</div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+          <div class="p-2.5 rounded-xl bg-slate-50 border"><b class="text-slate-800">📡 本站晶片管制作為：</b><div class="mt-0.5 text-slate-600 leading-relaxed">${C.escapeHtml(sop.action)}</div></div>
+          <div class="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200"><b class="text-amber-900">🛡️ 系統自動防呆攔截：</b><div class="mt-0.5 text-amber-900/90 leading-relaxed">${C.escapeHtml(sop.guard)}</div></div>
+          <div class="p-2.5 rounded-xl bg-sky-50/70 border border-sky-200"><b class="text-sky-900">🛠️ 晶片無法感應處置：</b><div class="mt-0.5 text-sky-900/90 leading-relaxed">${C.escapeHtml(sop.fallback)}</div></div>
+        </div>
+        <div class="flex flex-wrap items-center gap-1.5 text-[11px] pt-1">
+          <span class="font-bold text-slate-500">賽道管制鏈：</span>
+          ${sop.routeNodes.map((n, i) => `${i > 0 ? '<span class="text-slate-400">→</span>' : ''}<span class="px-2 py-0.5 rounded-lg mono font-bold ${n === stCode ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-500' : 'bg-slate-100 text-slate-600'}">${n}</span>`).join('')}
+        </div>`;
+    }
 
     const isWriter = stCode === 'WRITER';
     $('#opWriterPanel').classList.toggle('hidden', !isWriter);
@@ -647,39 +871,152 @@
 
     if (isWriter) {
       $('#nfcSupportBadge').textContent = 'NDEFReader' in window ? '🟢 支援 Web NFC' : '🟡 模擬演練模式';
+      const u = State.currentUser;
+      const availEvs = State.events.filter((e) => e.status !== 'finished' && (u.allowedEventId === 'ALL' || !u.allowedEventId || e.eventId === u.allowedEventId || e.eventId === State.opEventId));
+      const listEvs = availEvs.length ? availEvs : State.events.filter((e) => e.status !== 'finished');
+      const selEv = $('#writerEventSelect');
+      if (selEv) {
+        selEv.innerHTML = listEvs.map((e) => `<option value="${e.eventId}" ${e.eventId === ev.eventId ? 'selected' : ''}>${C.escapeHtml(e.nameZh)} (${e.raceType === 'lap_timed' ? '繞圈賽' : '距離賽'})</option>`).join('');
+      }
+      if ($('#writerRaceStartBadge')) {
+        $('#writerRaceStartBadge').textContent = `🏁 起跑：${ev.raceStart || '尚未設定'}`;
+      }
+      const chippedCnt = paid.filter((p) => Boolean(p.chipUid)).length;
+      const checkedCnt = paid.filter((p) => p.checkinStatus === 'checked_in').length;
+      const chipPct = paid.length ? Math.round((chippedCnt / paid.length) * 100) : 0;
+      const chkPct = paid.length ? Math.round((checkedCnt / paid.length) * 100) : 0;
+      if ($('#writerStatsBar')) {
+        $('#writerStatsBar').innerHTML = `
+          <span class="px-2 py-1 rounded bg-slate-100 text-slate-800">已繳配號 ${paid.length} 人</span>
+          <span class="px-2 py-1 rounded bg-sky-100 text-sky-900">已寫卡 ${chippedCnt} (${chipPct}%)</span>
+          <span class="px-2 py-1 rounded bg-emerald-100 text-emerald-900">已報到 ${checkedCnt} (${chkPct}%)</span>`;
+      }
       renderWriterList();
       renderWriterSelected();
     } else {
       $('#lockedStationCodeBadge').textContent = stCode;
       $('#opCooldownSec').value = ev.debounceSeconds || 15;
-      const paid = State.participants.filter((p) => p.eventId === ev.eventId && String(p.payStatus).toUpperCase() === 'PAID' && p.bibNumber);
-      $('#quickRunnerButtons').innerHTML = paid.map((p) => `
-        <button data-op-scan="${p.bibNumber}" class="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-900 hover:text-white border border-amber-300 text-xs font-bold mono">
-          ${p.bibNumber} ${C.escapeHtml(p.name)}
-        </button>`).join('') || '<span class="text-xs text-amber-800">本場尚無已配號選手</span>';
+      renderOpFallbackPicker(ev, stCode, paid, passedBibSet, stLogs);
+      $('#quickRunnerButtons').innerHTML = paid.map((p) => {
+        const done = stCode === 'CHECKIN' ? p.checkinStatus === 'checked_in' : passedBibSet.has(String(p.bibNumber).toUpperCase());
+        return `
+          <button data-op-scan="${p.bibNumber}" class="px-2.5 py-1 rounded-lg border text-xs font-bold mono transition ${done ? 'bg-emerald-50 border-emerald-400 text-emerald-900 hover:bg-emerald-600 hover:text-white' : 'bg-white border-amber-300 hover:bg-slate-900 hover:text-white'}">
+            ${done ? '✓ ' : ''}${p.bibNumber} ${C.escapeHtml(p.name)}
+          </button>`;
+      }).join('') || '<span class="text-xs text-amber-800">本場尚無已配號選手</span>';
       renderOpLogs();
     }
   }
 
+  function renderOpFallbackPicker(ev, stCode, paid, passedBibSet, stLogs) {
+    const sel = $('#opManualRunnerSelect');
+    const searchEl = $('#opManualPickerSearch');
+    const statsEl = $('#opFallbackStats');
+    if (!sel) return;
+    const catMap = new Map(State.categories.map((c) => [c.catId, c.name]));
+    const q = (searchEl?.value || '').trim().toUpperCase();
+    const filtered = paid.filter((p) => !q || `${p.bibNumber} ${p.name} ${catMap.get(p.catId) || ''}`.toUpperCase().includes(q));
+    if (statsEl) statsEl.textContent = `本活動已配號 ${paid.length} 人｜符合 ${filtered.length} 人`;
+
+    const prevVal = sel.value;
+    sel.innerHTML = filtered.map((p) => {
+      const bibU = String(p.bibNumber).toUpperCase();
+      const lapCnt = stCode === 'LAP' ? stLogs.filter((l) => String(l.bibNumber).toUpperCase() === bibU).length : 0;
+      const done = stCode === 'CHECKIN' ? p.checkinStatus === 'checked_in' : passedBibSet.has(bibU);
+      const statusTxt = stCode === 'LAP' ? `(目前已 ${lapCnt} 圈)` : (done ? '[已過本站 ✓]' : '[尚未通過]');
+      return `<option value="${C.escapeHtml(p.bibNumber)}">${p.bibNumber}｜${C.escapeHtml(p.name)}｜${C.escapeHtml(catMap.get(p.catId) || '')} ${statusTxt}</option>`;
+    }).join('') || '<option value="">（無符合之本活動已配號選手）</option>';
+    if (filtered.some((p) => p.bibNumber === prevVal)) sel.value = prevVal;
+  }
+
   function renderWriterList() {
     const q = ($('#writerSearch').value || '').trim().toUpperCase();
-    const list = State.participants.filter((p) => p.eventId === State.opEventId && (!q || `${p.name} ${p.idCard} ${p.bibNumber}`.toUpperCase().includes(q)));
-    $('#writerSearchList').innerHTML = list.map((p) => `
-      <div class="py-2 flex items-center justify-between gap-2">
-        <div>
-          <div class="font-bold">${p.bibNumber || '未配號'} · ${C.escapeHtml(p.name)} [${p.nationality || 'TWN'}]</div>
-          <div class="text-[11px] text-slate-500 mono">${p.idCard} · UID:${p.chipUid || '未綁'}</div>
+    const flt = $('#writerFilter')?.value || 'all';
+    const catMap = new Map(State.categories.map((c) => [c.catId, c.name]));
+    const list = State.participants.filter((p) => {
+      if (p.eventId !== State.opEventId) return false;
+      if (String(p.payStatus).toUpperCase() !== 'PAID') return false;
+      if (flt === 'no_chip' && p.chipUid) return false;
+      if (flt === 'has_chip' && !p.chipUid) return false;
+      if (flt === 'unchecked' && p.checkinStatus === 'checked_in') return false;
+      if (flt === 'checked' && p.checkinStatus !== 'checked_in') return false;
+      if (!q) return true;
+      return `${p.name} ${p.idCard} ${p.bibNumber} ${p.chipUid || ''} ${catMap.get(p.catId) || ''}`.toUpperCase().includes(q);
+    });
+    $('#writerSearchList').innerHTML = list.map((p) => {
+      const isPicked = p.participantId === State.selectedWriterPid;
+      const isChecked = p.checkinStatus === 'checked_in';
+      return `
+      <div class="py-2.5 px-1.5 flex items-center justify-between gap-2 ${isPicked ? 'bg-indigo-50 rounded-lg' : ''}">
+        <div class="min-w-0">
+          <div class="font-bold flex flex-wrap items-center gap-1">
+            <span class="mono">${p.bibNumber || '未配號'}</span>
+            <span>${C.escapeHtml(p.name)}</span>
+            <span class="px-1 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px]">${C.escapeHtml(catMap.get(p.catId) || '')}</span>
+          </div>
+          <div class="text-[10px] text-slate-500 mono mt-0.5 flex flex-wrap items-center gap-1.5">
+            <span>${p.chipUid ? `✅ UID:${p.chipUid}` : '⏳ 未寫卡'}</span>
+            <span class="px-1.5 py-0.5 rounded font-sans font-bold ${isChecked ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">${isChecked ? '✅ 已報到' : '⏳ 未報到'}</span>
+          </div>
         </div>
-        <button data-pick-writer="${p.participantId}" class="px-2.5 py-1 rounded-lg bg-slate-900 text-white font-bold">帶入寫卡</button>
-      </div>`).join('') || '<p class="text-slate-400 text-center py-4">查無選手</p>';
+        <div class="flex items-center gap-1 shrink-0">
+          <button data-pick-writer="${p.participantId}" class="px-2 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-[11px]">帶入寫卡</button>
+          <button data-writer-toggle-chk="${p.participantId}" class="px-2 py-1 rounded-lg font-bold text-[11px] ${isChecked ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-emerald-600 text-white'}">${isChecked ? '取消報到' : '✅ 報到'}</button>
+        </div>
+      </div>`;
+    }).join('') || '<p class="text-slate-400 text-center py-6">此場次無符合條件之已繳費選手</p>';
   }
 
   function renderWriterSelected() {
     const p = State.idxById.get(State.selectedWriterPid);
     const box = $('#writerSelectedCard');
-    if (!p) { box.textContent = '請從左側點選選手「帶入寫卡」。'; return; }
-    box.className = 'p-3.5 rounded-xl bg-emerald-50 border-2 border-emerald-400 text-sm';
-    box.innerHTML = `<div class="font-black text-slate-900">${p.bibNumber || '未配號'} · ${C.escapeHtml(p.name)}</div><div class="text-xs mono text-slate-600 mt-1">NDEF 字串：<b>${C.escapeHtml(p.name)}|${p.idCard}</b> · UID：<b>${p.chipUid || '未綁定'}</b></div>`;
+    if (!p || p.eventId !== State.opEventId) {
+      box.className = 'p-3.5 rounded-xl bg-slate-50 border border-dashed text-sm text-slate-500';
+      box.textContent = '請從左側場次名單點選選手「帶入寫卡」或直接按「✅ 報到」。';
+      return;
+    }
+    const cat = State.categories.find((c) => c.catId === p.catId);
+    const isChecked = p.checkinStatus === 'checked_in';
+    box.className = 'p-3.5 rounded-xl bg-emerald-50 border-2 border-emerald-400 text-sm space-y-1';
+    box.innerHTML = `
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="font-black text-slate-900">${p.bibNumber || '未配號'} · ${C.escapeHtml(p.name)} <span class="text-xs font-bold text-slate-600">(${C.escapeHtml(cat?.name || '')})</span></div>
+        <span class="px-2 py-0.5 rounded-full text-xs font-black ${isChecked ? 'bg-emerald-600 text-white' : 'bg-amber-200 text-amber-950'}">${isChecked ? '✅ 已完成現場報到' : '⏳ 尚未報到'}</span>
+      </div>
+      <div class="text-xs mono text-slate-700">NDEF 字串：<b>${C.escapeHtml(p.name)}|${p.idCard}</b> ｜ UID：<b>${p.chipUid || '尚未綁定'}</b></div>`;
+  }
+
+  async function setWriterRunnerCheckin(p, checked) {
+    if (!p) return toast('請先從左側名單選取一位選手', 'warn');
+    if (String(p.payStatus).toUpperCase() !== 'PAID') return toast('未繳費選手禁止辦理現場報到！', 'error');
+    p.checkinStatus = checked ? 'checked_in' : 'pending';
+    await C.TurDB.put('participants', p);
+    await enqueueSync('updateParticipant', { participantId: p.participantId, checkinStatus: p.checkinStatus });
+    appendWriterLog(`${checked ? '✅ [報到管制] 已標記報到' : '↩️ [報到管制] 已改為未報到'}：${p.bibNumber} ${p.name}`);
+    renderOperatorStation();
+    toast(`${checked ? '✅ 已完成現場報到' : '↩️ 已取消報到'}：${p.bibNumber} ${p.name}`, checked ? 'success' : 'info');
+  }
+
+  function showChipInspectResult(p, rawUid, rawPayload) {
+    const card = $('#writerInspectCard');
+    if (!card) return;
+    card.classList.remove('hidden');
+    if (!p) {
+      card.className = 'p-3.5 rounded-xl bg-rose-50 border-2 border-rose-400 text-xs space-y-1';
+      card.innerHTML = `<div class="font-black text-rose-800">🔴 讀取結果：查無本場次對應選手（非本場晶片）</div><div class="mono text-rose-700">UID：${C.escapeHtml(rawUid || '-')} ｜ NDEF：${C.escapeHtml(rawPayload || '空')}</div>`;
+      return;
+    }
+    const cat = State.categories.find((c) => c.catId === p.catId);
+    const logs = State.timingLogs.filter((l) => l.eventId === State.opEventId && l.bibNumber === p.bibNumber && l.isValid !== false);
+    const passedTxt = logs.length ? logs.map((l) => `${l.stationCode}(${String(l.sensedTime).slice(11)})`).join(' → ') : '尚無賽道感應紀錄';
+    card.className = 'p-3.5 rounded-xl bg-sky-50 border-2 border-sky-400 text-xs space-y-1';
+    card.innerHTML = `
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <span class="font-black text-sky-950 text-sm">🔍 晶片讀取檢視：${p.bibNumber || '未配號'} ${C.escapeHtml(p.name)} (${C.escapeHtml(cat?.name || '-')})</span>
+        <span class="px-2 py-0.5 rounded-full font-bold ${p.checkinStatus === 'checked_in' ? 'bg-emerald-600 text-white' : 'bg-amber-200 text-amber-950'}">${p.checkinStatus === 'checked_in' ? '✅ 已報到' : '⏳ 未報到'}</span>
+      </div>
+      <div class="mono text-slate-700">UID：<b>${C.escapeHtml(rawUid || p.chipUid || '-')}</b> ｜ NDEF：<b>${C.escapeHtml(rawPayload || `${p.name}|${p.idCard}`)}</b> ｜ 繳費：<b>${p.payStatus}</b></div>
+      <div class="text-slate-600">賽道紀錄：<span class="mono">${C.escapeHtml(passedTxt)}</span></div>`;
   }
 
   function appendWriterLog(msg) {
@@ -689,20 +1026,69 @@
   }
 
   async function runChipWrite(mode, sim = false) {
+    const ev = State.events.find((e) => e.eventId === State.opEventId);
+    if (mode !== 'inspect' && ev && ev.status === 'finished') {
+      Feedback.error();
+      return toast('🔒 階段 5 結案鎖定：本活動已結案，禁止寫入或異動晶片！', 'error');
+    }
     const p = State.idxById.get(State.selectedWriterPid);
-    if (mode !== 'legacy' && !p) return toast('請先帶入一位選手', 'warn');
+    const autoChk = Boolean($('#writerAutoCheckin')?.checked);
+    if (mode !== 'legacy' && mode !== 'inspect' && !p) return toast('請先從左側場次名單帶入一位選手', 'warn');
+    if (mode !== 'legacy' && mode !== 'inspect' && p && (String(p.payStatus).toUpperCase() !== 'PAID' || !p.bibNumber)) {
+      Feedback.error();
+      appendWriterLog(`🔴 [階段 2 繳費防呆攔截] ${p.name} 尚未繳費(PAID)或未配發號碼布，禁止發卡寫入晶片！`);
+      return toast('🔒 階段 2 防呆管制：未繳費或未配號選手禁止寫入晶片！', 'error');
+    }
     if (!sim && !('NDEFReader' in window)) return toast('請使用 Android Chrome 或點擊下方模擬按鈕', 'warn');
+
+    const applyPostWrite = async (target, uidVal) => {
+      if (uidVal) target.chipUid = uidVal;
+      if (autoChk) target.checkinStatus = 'checked_in';
+      await C.TurDB.put('participants', target);
+      rebuildIndices(State.opEventId);
+      await enqueueSync('updateParticipant', { participantId: target.participantId, chipUid: target.chipUid, checkinStatus: target.checkinStatus });
+      renderOperatorStation();
+    };
+
+    if (mode === 'inspect') {
+      if (sim) {
+        const target = (p && p.eventId === State.opEventId) ? p : State.participants.find((x) => x.eventId === State.opEventId && x.chipUid) || State.participants.find((x) => x.eventId === State.opEventId && x.payStatus === 'PAID');
+        if (!target) return toast('本場次尚無可模擬讀取之選手晶片', 'warn');
+        State.selectedWriterPid = target.participantId;
+        Feedback.success();
+        showChipInspectResult(target, target.chipUid || 'SIM-UID-READ', `${target.name}|${target.idCard}`);
+        appendWriterLog(`🔍 [模擬讀取查看] ${target.bibNumber} ${target.name}｜UID=${target.chipUid || '未綁'}｜報到=${target.checkinStatus}`);
+        renderWriterSelected(); renderWriterList();
+        return;
+      }
+      try {
+        const ndef = new NDEFReader();
+        await ndef.scan();
+        appendWriterLog('🔍 請將晶片貼近感應區進行讀取查看...');
+        ndef.onreading = (e) => {
+          const uid = String(e.serialNumber || '').toUpperCase();
+          const dec = new TextDecoder(); let txt = '';
+          for (const rec of e.message.records) if (rec.recordType === 'text') txt = dec.decode(rec.data);
+          const idPart = txt.includes('|') ? txt.split('|')[1].trim().toUpperCase() : '';
+          const m = (idPart && State.idxByIdCard.get(idPart)) || State.idxByUid.get(uid);
+          if (m) { Feedback.success(); State.selectedWriterPid = m.participantId; renderWriterSelected(); renderWriterList(); }
+          else Feedback.error();
+          showChipInspectResult(m, uid, txt);
+          appendWriterLog(`🔍 [讀取查看] UID=${uid} NDEF="${txt}" -> ${m ? `${m.bibNumber} ${m.name}` : '非本場卡片'}`);
+          ndef.onreading = null;
+        };
+      } catch (err) { Feedback.error(); appendWriterLog(`🔴 讀取失敗：${err.message}`); }
+      return;
+    }
 
     if (mode === 'write') {
       const payload = `${p.name}|${p.idCard}`;
       if (sim) {
-        p.chipUid = p.chipUid || `04:${Math.random().toString(16).slice(2, 4).toUpperCase()}:9F:22`;
-        await C.TurDB.put('participants', p);
-        rebuildIndices(State.opEventId);
-        await enqueueSync('updateParticipant', { participantId: p.participantId, chipUid: p.chipUid });
+        const newUid = p.chipUid || `04:${Math.random().toString(16).slice(2, 4).toUpperCase()}:9F:22`;
+        await applyPostWrite(p, newUid);
         Feedback.writeOk();
-        appendWriterLog(`✅ [模擬寫入+回讀驗證通過] NDEF="${payload}" (${payload.length}B) UID=${p.chipUid}`);
-        renderWriterSelected(); renderWriterList();
+        appendWriterLog(`✅ [模擬寫入+回讀驗證通過] NDEF="${payload}" (${payload.length}B) UID=${p.chipUid}${autoChk ? '｜已同步報到' : ''}`);
+        showChipInspectResult(p, p.chipUid, payload);
         return;
       }
       try {
@@ -713,33 +1099,28 @@
         await ndef.scan();
         ndef.onreading = async (e) => {
           const uid = String(e.serialNumber || '').toUpperCase();
-          if (uid) p.chipUid = uid;
-          await C.TurDB.put('participants', p);
-          rebuildIndices(State.opEventId);
-          await enqueueSync('updateParticipant', { participantId: p.participantId, chipUid: p.chipUid });
-          appendWriterLog(`🟢 回讀驗證通過！UID=${uid}`);
-          renderWriterSelected(); ndef.onreading = null;
+          await applyPostWrite(p, uid);
+          appendWriterLog(`🟢 回讀驗證通過！UID=${uid}${autoChk ? '｜已同步報到' : ''}`);
+          showChipInspectResult(p, uid, payload);
+          ndef.onreading = null;
         };
       } catch (err) { Feedback.error(); appendWriterLog(`🔴 寫入失敗：${err.message}`); }
     } else if (mode === 'uid') {
       if (sim) {
-        p.chipUid = `MF:${Math.random().toString(16).slice(2, 4).toUpperCase()}:AA:11`;
-        await C.TurDB.put('participants', p);
-        rebuildIndices(State.opEventId);
-        await enqueueSync('updateParticipant', { participantId: p.participantId, chipUid: p.chipUid });
+        const newUid = `MF:${Math.random().toString(16).slice(2, 4).toUpperCase()}:AA:11`;
+        await applyPostWrite(p, newUid);
         Feedback.writeOk();
-        appendWriterLog(`🔗 [模擬 UID 綁定] ${p.name} -> ${p.chipUid}`);
-        renderWriterSelected(); renderWriterList();
+        appendWriterLog(`🔗 [模擬 UID 綁定] ${p.name} -> ${p.chipUid}${autoChk ? '｜已同步報到' : ''}`);
+        showChipInspectResult(p, p.chipUid, `${p.name}|${p.idCard}`);
       } else {
         const ndef = new NDEFReader();
         await ndef.scan();
         ndef.onreading = async (e) => {
-          p.chipUid = String(e.serialNumber || '').toUpperCase();
-          await C.TurDB.put('participants', p);
-          rebuildIndices(State.opEventId);
-          await enqueueSync('updateParticipant', { participantId: p.participantId, chipUid: p.chipUid });
-          Feedback.writeOk(); appendWriterLog(`🔗 UID 綁定成功：${p.chipUid}`);
-          renderWriterSelected(); ndef.onreading = null;
+          const uid = String(e.serialNumber || '').toUpperCase();
+          await applyPostWrite(p, uid);
+          Feedback.writeOk(); appendWriterLog(`🔗 UID 綁定成功：${uid}${autoChk ? '｜已同步報到' : ''}`);
+          showChipInspectResult(p, uid, `${p.name}|${p.idCard}`);
+          ndef.onreading = null;
         };
       }
     } else if (mode === 'legacy') {
@@ -747,19 +1128,25 @@
       if (sim && sample) {
         Feedback.success();
         State.selectedWriterPid = sample.participantId;
+        if (autoChk) await applyPostWrite(sample, sample.chipUid);
         renderWriterSelected();
-        appendWriterLog(`♻️ [模擬舊晶片共用核准] 讀到 ${sample.name}|${sample.idCard} -> 本場已繳費 (${sample.bibNumber})，免重發卡！`);
+        showChipInspectResult(sample, sample.chipUid || 'LEGACY-CARD', `${sample.name}|${sample.idCard}`);
+        appendWriterLog(`♻️ [模擬舊晶片共用核准] 讀到 ${sample.name}|${sample.idCard} -> 本場已繳費 (${sample.bibNumber})${autoChk ? '｜已同步報到' : ''}`);
       } else if (!sim) {
         const ndef = new NDEFReader();
         await ndef.scan();
-        ndef.onreading = (e) => {
+        ndef.onreading = async (e) => {
           const uid = String(e.serialNumber || '').toUpperCase();
           const dec = new TextDecoder(); let txt = '';
           for (const rec of e.message.records) if (rec.recordType === 'text') txt = dec.decode(rec.data);
           const idPart = txt.includes('|') ? txt.split('|')[1].trim().toUpperCase() : '';
           const m = (idPart && State.idxByIdCard.get(idPart)) || State.idxByUid.get(uid);
-          if (m) { Feedback.success(); State.selectedWriterPid = m.participantId; renderWriterSelected(); appendWriterLog(`♻️ 舊卡核准：${m.name} (${m.bibNumber})`); }
-          else { Feedback.error(); appendWriterLog(`🔴 非本場晶片攔截：${txt || uid}`); }
+          if (m) {
+            Feedback.success(); State.selectedWriterPid = m.participantId;
+            if (autoChk) await applyPostWrite(m, m.chipUid || uid);
+            showChipInspectResult(m, uid, txt);
+            appendWriterLog(`♻️ 舊卡核准：${m.name} (${m.bibNumber})${autoChk ? '｜已同步報到' : ''}`);
+          } else { Feedback.error(); showChipInspectResult(null, uid, txt); appendWriterLog(`🔴 非本場晶片攔截：${txt || uid}`); }
           ndef.onreading = null;
         };
       }
@@ -770,13 +1157,16 @@
     const logs = State.timingLogs.filter((l) => l.eventId === State.opEventId && l.stationCode === State.opLockedStation).reverse().slice(0, 40);
     $('#stationLogCount').textContent = `${logs.length} 筆`;
     $('#recentLogsList').innerHTML = logs.map((l) => `
-      <div class="py-2 flex justify-between">
-        <span><b class="mono">${l.bibNumber}</b> ${l.lapCount ? `第${l.lapCount}圈` : ''} ${l.isValid === false ? '(超時)' : ''}</span>
-        <span class="mono text-slate-500">${String(l.sensedTime).slice(11)}</span>
+      <div class="py-2 flex items-start justify-between gap-2">
+        <div class="min-w-0">
+          <div><b class="mono">${l.bibNumber}</b> ${l.lapCount ? `第${l.lapCount}圈` : ''} ${l.source === 'manual_fallback' ? '<span class="px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 text-[10px] font-bold">🛠️手動補登</span>' : ''} ${l.isValid === false ? '<span class="text-rose-600 font-bold">(超時)</span>' : ''}</div>
+          ${l.note && l.source === 'manual_fallback' ? `<div class="text-[10px] text-slate-500 truncate">${C.escapeHtml(l.note)}</div>` : ''}
+        </div>
+        <span class="mono text-slate-500 shrink-0">${String(l.sensedTime).slice(11)}</span>
       </div>`).join('') || '<p class="text-slate-400 text-center py-6">尚無本站感應紀錄</p>';
   }
 
-  async function handleOperatorSense(raw, source = 'manual') {
+  async function handleOperatorSense(raw, source = 'manual', opts = {}) {
     const t0 = performance.now();
     const token = String(raw || '').trim().toUpperCase();
     const stCode = State.opLockedStation;
@@ -787,10 +1177,24 @@
     if (!p) p = State.idxByBib.get(token) || State.idxByUid.get(token) || State.idxByIdCard.get(token);
 
     const banner = $('#senseResultBanner');
+    // 階段 5 防呆：已結案活動禁止任何感應寫入
+    if (ev.status === 'finished') {
+      Feedback.error();
+      banner.className = 'p-5 rounded-xl bg-rose-100 border-2 border-rose-500 text-center';
+      banner.innerHTML = `<div class="text-xs font-bold text-rose-700">🔒 階段 5 結案鎖定攔截</div><div class="text-xl font-black text-rose-900 mt-1">本活動已結案鎖定，禁止寫入站點感應！</div>`;
+      return;
+    }
+    // 階段 3/4 防呆：尚未鳴槍開跑前，僅開放 CHECKIN 報到，攔截賽道計時站點避免產生異常負秒數
+    if (stCode !== 'CHECKIN' && !ev.raceStart) {
+      Feedback.error();
+      banner.className = 'p-5 rounded-xl bg-amber-100 border-2 border-amber-500 text-center';
+      banner.innerHTML = `<div class="text-xs font-bold text-amber-800">🔒 階段 3 開跑前防呆攔截 (${stCode})</div><div class="text-xl font-black text-amber-950 mt-1">賽事尚未鳴槍開跑！請先由承辦人於專區 1 鳴槍後再啟動計時感應</div>`;
+      return;
+    }
     if (!p || String(p.payStatus).toUpperCase() !== 'PAID' || !p.bibNumber) {
       Feedback.error();
       banner.className = 'p-5 rounded-xl bg-rose-100 border-2 border-rose-500 text-center';
-      banner.innerHTML = `<div class="text-xs font-bold text-rose-700">🔴 攔截：非本場選手或尚未配號</div><div class="text-2xl font-black text-rose-900 mono mt-1">${C.escapeHtml(token)}</div>`;
+      banner.innerHTML = `<div class="text-xs font-bold text-rose-700">🔴 階段 2 攔截：非本場選手、未繳費或尚未配號</div><div class="text-2xl font-black text-rose-900 mono mt-1">${C.escapeHtml(token)}</div>`;
       $('#lastSenseLatency').textContent = `${(performance.now() - t0).toFixed(1)} ms`;
       return;
     }
@@ -804,6 +1208,12 @@
       banner.innerHTML = `<div class="text-xs font-bold text-amber-800">🟡 重複報到：此選手已完成檢錄</div><div class="text-2xl font-black mono mt-1">${p.bibNumber} ${C.escapeHtml(p.name)}</div>`;
       return;
     }
+    if (stCode === 'FINISH' && p.raceStatus === 'finished') {
+      Feedback.warn();
+      banner.className = 'p-5 rounded-xl bg-amber-100 border-2 border-amber-500 text-center';
+      banner.innerHTML = `<div class="text-xs font-bold text-amber-800">🟡 階段 4 防重覆衝線：此選手已完賽，保留首次衝線成績</div><div class="text-2xl font-black mono mt-1">${p.bibNumber} ${C.escapeHtml(p.name)}</div>`;
+      return;
+    }
     if (nowMs - (State.lastScanMap.get(key) || 0) < cooldownMs) {
       Feedback.warn();
       banner.className = 'p-5 rounded-xl bg-amber-100 border-2 border-amber-500 text-center';
@@ -812,23 +1222,40 @@
     }
     State.lastScanMap.set(key, nowMs);
 
-    const nowStr = C.formatDateTime(new Date(nowMs));
+    let senseMs = nowMs;
+    if (opts.customTime) {
+      const ct = String(opts.customTime).trim();
+      if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(ct)) {
+        return toast('補登時間格式須為 YYYY-MM-DD HH:mm:ss（留空則自動帶入現在時間）', 'error');
+      }
+      const parsedCt = C.parseDateTime(ct);
+      if (!parsedCt) return toast('無效的補登時間', 'error');
+      if (stCode !== 'CHECKIN' && ev.raceStart) {
+        const sDt = C.parseDateTime(ev.raceStart);
+        if (sDt && parsedCt.getTime() < sDt.getTime()) {
+          return toast(`🔒 防呆攔截：補登時間 (${ct}) 不可早於鳴槍起跑時間 (${ev.raceStart})！`, 'error');
+        }
+      }
+      senseMs = parsedCt.getTime();
+    }
+    const nowStr = C.formatDateTime(new Date(senseMs));
     let lapCount = 0, isValid = true, note = '';
+    const reasonPrefix = opts.reason ? `[手動補登：${opts.reason}] ` : '';
 
     if (stCode === 'CHECKIN') {
       p.checkinStatus = 'checked_in';
       await C.TurDB.put('participants', p);
       await enqueueSync('updateParticipant', { participantId: p.participantId, checkinStatus: 'checked_in' });
-      note = '報到檢錄完成（不計入成績與圈數）';
+      note = reasonPrefix + '報到檢錄完成（不計入成績與圈數）';
     } else if (stCode === 'LAP') {
       const cat = State.categories.find((c) => c.catId === p.catId);
       lapCount = State.timingLogs.filter((l) => l.eventId === ev.eventId && l.bibNumber === p.bibNumber && l.stationCode === 'LAP' && l.isValid !== false).length + 1;
       const startDt = C.parseDateTime(ev.raceStart);
-      if (startDt && cat && Number(cat.timeLimitHours) > 0 && ((nowMs - startDt.getTime()) / 1000) > Number(cat.timeLimitHours) * 3600) {
+      if (startDt && cat && Number(cat.timeLimitHours) > 0 && ((senseMs - startDt.getTime()) / 1000) > Number(cat.timeLimitHours) * 3600) {
         isValid = false;
-        note = `⚠️ 超時圈（留存紀錄但不計有效里程）`;
+        note = reasonPrefix + `⚠️ 超時圈（留存紀錄但不計有效里程）`;
       } else {
-        note = `第 ${lapCount} 圈有效｜累計 ${(lapCount * Number(ev.lapDistanceKm || cat?.distanceKm || 1)).toFixed(1)} km`;
+        note = reasonPrefix + `第 ${lapCount} 圈有效｜累計 ${(lapCount * Number(ev.lapDistanceKm || cat?.distanceKm || 1)).toFixed(1)} km`;
       }
       if (p.raceStatus === 'dns') { p.raceStatus = 'on_track'; await C.TurDB.put('participants', p); }
     } else if (stCode === 'FINISH') {
@@ -836,11 +1263,11 @@
       await C.TurDB.put('participants', p);
       await enqueueSync('updateParticipant', { participantId: p.participantId, raceStatus: 'finished' });
       const startDt = C.parseDateTime(ev.raceStart);
-      const sec = startDt ? Math.round((nowMs - startDt.getTime()) / 1000) + Number(p.penaltySeconds || 0) : null;
-      note = `🏁 衝線完賽！整數秒成績 ${C.formatDuration(sec)}`;
+      const sec = startDt ? Math.round((senseMs - startDt.getTime()) / 1000) + Number(p.penaltySeconds || 0) : null;
+      note = reasonPrefix + `🏁 衝線完賽！整數秒成績 ${C.formatDuration(sec)}`;
     } else {
       if (p.raceStatus === 'dns') { p.raceStatus = 'on_track'; await C.TurDB.put('participants', p); }
-      note = `通過 ${stCode} 檢查站`;
+      note = reasonPrefix + `通過 ${stCode} 檢查站`;
     }
 
     const log = {
@@ -856,13 +1283,13 @@
     if (isValid) {
       Feedback.success();
       banner.className = 'p-5 rounded-xl bg-emerald-100 border-2 border-emerald-500 text-center';
-      banner.innerHTML = `<div class="text-xs font-bold text-emerald-800">🟢 感應成功 (${stCode}) · ${nowStr.slice(11)}</div><div class="text-3xl font-black text-emerald-950 mono mt-1">${p.bibNumber} ${C.escapeHtml(p.name)}</div><div class="text-sm font-bold text-emerald-800 mt-1">${C.escapeHtml(note)}</div>`;
+      banner.innerHTML = `<div class="text-xs font-bold text-emerald-800">🟢 ${source === 'manual_fallback' ? '手動補登成功' : '感應成功'} (${stCode}) · ${nowStr.slice(11)}</div><div class="text-3xl font-black text-emerald-950 mono mt-1">${p.bibNumber} ${C.escapeHtml(p.name)}</div><div class="text-sm font-bold text-emerald-800 mt-1">${C.escapeHtml(note)}</div>`;
     } else {
       Feedback.warn();
       banner.className = 'p-5 rounded-xl bg-amber-100 border-2 border-amber-500 text-center';
       banner.innerHTML = `<div class="text-xs font-bold text-amber-800">🟡 超時無效圈已留存</div><div class="text-2xl font-black mono mt-1">${p.bibNumber} ${C.escapeHtml(p.name)}</div><div class="text-sm font-bold text-rose-700 mt-1">${C.escapeHtml(note)}</div>`;
     }
-    renderOpLogs();
+    renderOperatorStation();
   }
 
   /* --------------------------------------------------------------------------
@@ -929,6 +1356,23 @@
    * Event Listeners Binding
    * -------------------------------------------------------------------------- */
   function bindEvents() {
+    // 全站字體大小調整器
+    const syncFontBtns = (mode) => {
+      $$('[data-font-scale]').forEach((b) => {
+        const act = b.dataset.fontScale === mode;
+        b.className = `px-2 py-1 rounded text-[11px] font-bold transition ${act ? 'bg-amber-400 text-slate-950 font-black' : 'text-slate-300 hover:bg-slate-700'}`;
+      });
+    };
+    syncFontBtns(C.applyFontScale(C.getSavedFontScale()));
+    $$('[data-font-scale]').forEach((b) => {
+      b.onclick = () => {
+        const next = C.applyFontScale(b.dataset.fontScale);
+        syncFontBtns(next);
+        const label = (C.FONT_SCALE_MODES.find((m) => m.id === next) || {}).label || next;
+        toast(`🔤 已切換畫面字體為「${label}」`, 'info');
+      };
+    });
+
     $('#btnOpenLogin').onclick = openLoginModal;
     $('#btnCloseLogin').onclick = () => $('#loginModal').classList.add('hidden');
     $('#btnLogout').onclick = logoutZeroTrace;
@@ -967,6 +1411,8 @@
     // Public Navigation & Form
     $('#btnGoLookupFromHome').onclick = () => switchView('public-lookup');
     $('#btnBackToHome').onclick = () => switchView('public-home');
+    $('#btnModeSolo').onclick = () => setRegMode('solo');
+    $('#btnModeGroup').onclick = () => setRegMode('group');
     $$('input[name="payMethod"]').forEach((r) => { r.onchange = () => { updatePayMethodUI(); validateRegForm(); }; });
     $('#regNationality').onchange = () => { $('#regNationalityCustom').classList.toggle('hidden', $('#regNationality').value !== 'OTHER'); validateRegForm(); };
     $('#regIdCard').addEventListener('input', () => {
@@ -987,6 +1433,9 @@
       const n = li + 10, w = [1, 9, 8, 7, 6, 5, 4, 3, 2, 1];
       const d = [Math.floor(n / 10), n % 10, gc, ...body];
       const chk = (10 - (d.reduce((a, x, i) => a + x * w[i], 0) % 10)) % 10;
+      if (State.regMode === 'group' && !$('#regGroupName').value.trim()) {
+        $('#regGroupName').value = 'TUR 範例跑團';
+      }
       $('#regNationality').value = 'TWN'; $('#regNationalityCustom').classList.add('hidden');
       $('#regName').value = gc === 1 ? '歐陽浩宇' : '上官靜怡';
       $('#regIdCard').value = `${L[li]}${gc}${body.join('')}${chk}`;
@@ -1016,6 +1465,10 @@
     };
     $('#regForm').onsubmit = async (e) => {
       e.preventDefault();
+      if (State.regMode === 'group') {
+        $('#btnAddToGroup').click();
+        return;
+      }
       const res = validateRegForm();
       if (!res.isValid) return toast('尚有欄位未通過 14 項防呆檢核', 'error');
       await commitRunners([res.runner]);
@@ -1028,43 +1481,172 @@
       State.groupCart = []; renderGroupCart();
     };
 
-    // 雙因子反向查改 (/lookup)
+    // 雙因子反向查改 (/lookup) — 已繳費嚴格鎖定費用相關項目（組別/加購/金額/末五碼），結案/完賽全面唯讀
     $('#btnLookupVerify').onclick = () => {
       const idCard = $('#lookupIdCard').value.trim().toUpperCase();
       const cred = $('#lookupCred').value.trim().toUpperCase();
       const p = State.participants.find((x) => String(x.idCard).toUpperCase() === idCard && (String(x.participantId).toUpperCase() === cred || String(x.email).toUpperCase() === cred));
       if (!p) return toast('查無報名資料，請確認身分證與序號/Email', 'error');
       State.lookupSession = { pid: p.participantId, exp: Date.now() + 45 * 60 * 1000 };
-      const isPaid = String(p.payStatus).toUpperCase() === 'PAID';
+      const ev = State.events.find((e) => e.eventId === p.eventId);
       const cats = State.categories.filter((c) => c.eventId === p.eventId);
+      const schema = C.parseJsonSafe(ev?.formSchemaJson, C.defaultFormSchema());
+      const addonDefs = Array.isArray(schema.addons) ? schema.addons : [];
+      const cfDefs = Array.isArray(schema.customFields) ? schema.customFields : [];
+      const curAddons = C.parseJsonSafe(p.addonsDetail, []);
+      const curCf = C.parseJsonSafe(p.customFieldsJson, {});
+      const paySt = String(p.payStatus || 'UNPAID').toUpperCase();
+      const isPaid = paySt === 'PAID';
+      const isCancelled = paySt === 'CANCELLED';
+      const isClosedLock = isCancelled || ev?.status === 'finished' || p.raceStatus === 'finished';
+      const feeLocked = isPaid || isClosedLock;
+      const evPayMode = C.getEventPaymentMode(ev);
+      const isPayuniEv = evPayMode === 'ONLINE_PAYUNi';
+
       $('#lookupTimerBadge').classList.remove('hidden');
       $('#lookupEditBox').classList.remove('hidden');
       $('#lookupEditBox').innerHTML = `
-        <div class="p-3 rounded-xl text-xs font-bold ${isPaid ? 'bg-amber-50 border border-amber-300 text-amber-900' : 'bg-sky-50 border border-sky-200 text-sky-900'}">
-          ${isPaid ? '🔒 本筆已繳費 (PAID)：組別與加購金額已鎖定，僅開放修改電話、Email、飲食與備註。' : '✏️ 待繳費 (UNPAID)：可修改組別重算金額與補填匯款末五碼。'}
+        <div class="p-3.5 rounded-xl text-xs font-bold ${isClosedLock ? 'bg-slate-200 border border-slate-400 text-slate-800' : (isPaid ? 'bg-amber-50 border-2 border-amber-400 text-amber-950' : 'bg-sky-50 border-2 border-sky-300 text-sky-950')}">
+          ${isClosedLock
+            ? `🔒 此筆報名已${isCancelled ? '取消' : (ev?.status === 'finished' ? '隨活動結案鎖定' : '完賽寫入正式成績')}，僅供查閱不可再修改。`
+            : (isPaid
+              ? '🔒 已繳費入帳 (PAID) 費用防呆鎖定：組別、加購服務、應繳金額與匯款末五碼已全面鎖定不可變更；您仍可自由修改聯絡電話、Email、居住縣市、緊急聯絡人、飲食、備註與活動自訂欄位！'
+              : '✏️ 尚未繳費 (UNPAID)：可自由反向修改「組別、加購服務（即時重算應繳金額）、匯款末五碼」以及所有基本聯絡與活動自訂欄位。')}
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-          <div><label class="font-bold">序號 / 號碼布</label><input disabled value="${p.participantId} (${p.bibNumber || '待配號'})" class="w-full px-2.5 py-2 border rounded bg-slate-100 mono" /></div>
-          <div><label class="font-bold">組別 ${isPaid ? '🔒' : ''}</label>
-            <select id="lkCat" ${isPaid ? 'disabled' : ''} class="w-full px-2.5 py-2 border rounded">${cats.map((c) => `<option value="${c.catId}" ${c.catId === p.catId ? 'selected' : ''}>${C.escapeHtml(c.name)} ($${c.fee})</option>`).join('')}</select>
+
+        <!-- 區塊 1：費用相關項目（已繳費嚴格鎖定） -->
+        <div class="p-3.5 rounded-xl border ${feeLocked ? 'bg-slate-100/90 border-slate-300' : 'bg-amber-50/40 border-amber-200'} space-y-2.5 text-xs">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <span class="font-black text-slate-900">💰 費用相關項目 ${feeLocked ? '<span class="ml-1 px-2 py-0.5 rounded-full bg-amber-200 text-amber-950 text-[10px]">🔒 已繳費/鎖定不可修改</span>' : '<span class="ml-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px]">✏️ 未繳費可調整重算</span>'}</span>
+            <span class="mono font-black text-base text-amber-700" id="lkTotalDisplay">應繳總額：NT$ ${Number(p.totalAmount || 0).toLocaleString()}</span>
           </div>
-          <div><label class="font-bold">末五碼 ${isPaid ? '🔒' : ''}</label><input id="lkLast5" ${isPaid ? 'disabled' : ''} value="${C.escapeHtml(p.remittanceLast5 || '')}" maxlength="5" class="w-full px-2.5 py-2 border rounded mono" /></div>
-          <div><label class="font-bold">手機</label><input id="lkPhone" value="${C.escapeHtml(p.phone)}" class="w-full px-2.5 py-2 border rounded mono" /></div>
-          <div><label class="font-bold">飲食</label><select id="lkDiet" class="w-full px-2.5 py-2 border rounded"><option value="葷" ${p.diet === '葷' ? 'selected' : ''}>葷食</option><option value="素" ${p.diet === '素' ? 'selected' : ''}>素食</option></select></div>
-          <div><label class="font-bold">備註</label><input id="lkRemark" value="${C.escapeHtml(p.remark || '')}" class="w-full px-2.5 py-2 border rounded" /></div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div><label class="font-bold">序號 / 號碼布 / 狀態</label><input disabled value="${p.participantId}｜${p.bibNumber || '待配號'}｜${paySt}" class="w-full px-2.5 py-2 border rounded-lg bg-slate-200/70 mono mt-0.5" /></div>
+            <div><label class="font-bold">報名組別 ${feeLocked ? '🔒' : ''}</label>
+              <select id="lkCat" ${feeLocked ? 'disabled' : ''} class="w-full px-2.5 py-2 border rounded-lg mt-0.5 ${feeLocked ? 'bg-slate-200/70 cursor-not-allowed' : 'bg-white'}">
+                ${cats.map((c) => `<option value="${c.catId}" data-fee="${c.fee}" ${c.catId === p.catId ? 'selected' : ''}>${C.escapeHtml(c.name)} (NT$${c.fee})</option>`).join('')}
+              </select>
+            </div>
+            <div><label class="font-bold">${isPayuniEv ? '金流單號 / 付款別 🔒' : `匯款末五碼 ${feeLocked ? '🔒' : ''}`}</label>
+              ${isPayuniEv
+                ? `<input id="lkLast5" disabled value="${C.escapeHtml(p.merTradeNo || p.paymentType || 'PAYUNi 線上金流')}" class="w-full px-2.5 py-2 border rounded-lg mono mt-0.5 bg-slate-200/70 cursor-not-allowed" />`
+                : `<input id="lkLast5" ${feeLocked ? 'disabled' : ''} value="${C.escapeHtml(p.remittanceLast5 || '')}" maxlength="5" placeholder="5 碼純數字" class="w-full px-2.5 py-2 border rounded-lg mono mt-0.5 ${feeLocked ? 'bg-slate-200/70 cursor-not-allowed' : 'bg-white'}" />`}
+            </div>
+          </div>
+          ${addonDefs.length ? `
+            <div>
+              <label class="font-bold block mb-1">加購服務 ${feeLocked ? '🔒（已繳費鎖定）' : '（勾選即重算應繳金額）'}</label>
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                ${addonDefs.map((a) => {
+                  const chk = Array.isArray(curAddons) && curAddons.includes(a.name);
+                  return `
+                    <label class="flex items-center gap-2 p-2 rounded-lg border ${feeLocked ? 'bg-slate-200/60 opacity-75 cursor-not-allowed' : 'bg-white cursor-pointer hover:border-amber-400'}">
+                      <input type="checkbox" class="lk-addon" data-name="${C.escapeHtml(a.name)}" data-price="${a.price}" ${chk ? 'checked' : ''} ${feeLocked ? 'disabled' : ''} />
+                      <span>${C.escapeHtml(a.name)} <b>+$${a.price}</b></span>
+                    </label>`;
+                }).join('')}
+              </div>
+            </div>` : ''}
         </div>
-        <button id="btnSaveLookup" class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold">💾 儲存修改</button>`;
-      $('#btnSaveLookup').onclick = async () => {
-        if (!State.lookupSession || Date.now() > State.lookupSession.exp) return toast('查改已逾 45 分鐘效期', 'error');
-        p.phone = $('#lkPhone').value.trim(); p.diet = $('#lkDiet').value; p.remark = $('#lkRemark').value.trim();
-        if (!isPaid) {
-          p.catId = $('#lkCat').value; p.remittanceLast5 = $('#lkLast5').value.trim();
-          const nc = State.categories.find((c) => c.catId === p.catId); if (nc) p.totalAmount = Number(nc.fee);
-        }
-        await C.TurDB.put('participants', p);
-        await enqueueSync('updateSelfRegistration', { participantId: p.participantId, idCard: p.idCard, patch: p });
-        toast('✅ 報名資料已更新！', 'success');
+
+        <!-- 區塊 2：基本聯絡與非費用欄位（賽前皆可自由修改） -->
+        <div class="p-3.5 rounded-xl border bg-white space-y-2.5 text-xs">
+          <div class="font-black text-slate-900">✏️ 個人聯絡、緊急聯絡人與非費用設定</div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div><label class="font-bold">手機號碼 (09 開頭 10 碼)</label><input id="lkPhone" ${isClosedLock ? 'disabled' : ''} value="${C.escapeHtml(p.phone || '')}" maxlength="10" class="w-full px-2.5 py-2 border rounded-lg mono mt-0.5" /></div>
+            <div><label class="font-bold">電子信箱 Email</label><input id="lkEmail" ${isClosedLock ? 'disabled' : ''} type="email" value="${C.escapeHtml(p.email || '')}" class="w-full px-2.5 py-2 border rounded-lg mt-0.5" /></div>
+            <div><label class="font-bold">居住縣市</label><input id="lkCity" ${isClosedLock ? 'disabled' : ''} value="${C.escapeHtml(p.city || '')}" class="w-full px-2.5 py-2 border rounded-lg mt-0.5" /></div>
+            <div><label class="font-bold">緊急聯絡人姓名</label><input id="lkEmergName" ${isClosedLock ? 'disabled' : ''} value="${C.escapeHtml(p.emergencyName || '')}" class="w-full px-2.5 py-2 border rounded-lg mt-0.5" /></div>
+            <div><label class="font-bold">緊急聯絡人電話</label><input id="lkEmergPhone" ${isClosedLock ? 'disabled' : ''} value="${C.escapeHtml(p.emergencyPhone || '')}" maxlength="10" class="w-full px-2.5 py-2 border rounded-lg mono mt-0.5" /></div>
+            <div><label class="font-bold">飲食習慣</label>
+              <select id="lkDiet" ${isClosedLock ? 'disabled' : ''} class="w-full px-2.5 py-2 border rounded-lg mt-0.5">
+                <option value="葷" ${p.diet === '葷' ? 'selected' : ''}>葷食</option>
+                <option value="素" ${p.diet === '素' ? 'selected' : ''}>素食</option>
+              </select>
+            </div>
+            <div class="sm:col-span-3"><label class="font-bold">備註 / 特殊需求</label><input id="lkRemark" ${isClosedLock ? 'disabled' : ''} value="${C.escapeHtml(p.remark || '')}" class="w-full px-2.5 py-2 border rounded-lg mt-0.5" /></div>
+          </div>
+          ${cfDefs.length ? `
+            <div class="pt-2 border-t space-y-2">
+              <div class="font-bold text-indigo-900">📝 活動自訂擴充欄位（非費用欄位，可自由修改）</div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                ${cfDefs.map((f) => {
+                  const v = curCf[f.key];
+                  const strV = Array.isArray(v) ? v.join(', ') : String(v ?? '');
+                  if (f.type === 'select') {
+                    return `<div><label class="font-bold">${C.escapeHtml(f.label)}</label><select data-lk-cf="${C.escapeHtml(f.key)}" data-lk-cftype="select" ${isClosedLock ? 'disabled' : ''} class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5"><option value="">請選擇</option>${(f.options || []).map((o) => `<option value="${C.escapeHtml(o)}" ${strV === o ? 'selected' : ''}>${C.escapeHtml(o)}</option>`).join('')}</select></div>`;
+                  }
+                  return `<div><label class="font-bold">${C.escapeHtml(f.label)}</label><input data-lk-cf="${C.escapeHtml(f.key)}" data-lk-cftype="${f.type}" ${isClosedLock ? 'disabled' : ''} value="${C.escapeHtml(strV)}" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5" /></div>`;
+                }).join('')}
+              </div>
+            </div>` : ''}
+        </div>
+
+        ${isClosedLock ? '' : '<button id="btnSaveLookup" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow">💾 儲存修改並寄送異動通知信</button>'}`;
+
+      const recalcLookupTotal = () => {
+        if (feeLocked) return Number(p.totalAmount || 0);
+        const nc = cats.find((c) => c.catId === $('#lkCat').value);
+        const addonSum = $$('.lk-addon:checked').reduce((s, cb) => s + Number(cb.dataset.price || 0), 0);
+        const total = (nc ? Number(nc.fee) : 0) + addonSum;
+        $('#lkTotalDisplay').textContent = `應繳總額：NT$ ${total.toLocaleString()}`;
+        return total;
       };
+      if (!feeLocked) {
+        $('#lkCat').onchange = recalcLookupTotal;
+        $$('.lk-addon').forEach((cb) => { cb.onchange = recalcLookupTotal; });
+      }
+
+      if ($('#btnSaveLookup')) {
+        $('#btnSaveLookup').onclick = async () => {
+          if (!State.lookupSession || Date.now() > State.lookupSession.exp) return toast('查改已逾 45 分鐘效期，請重新驗證', 'error');
+          const phone = $('#lkPhone').value.trim();
+          const email = $('#lkEmail').value.trim();
+          const emergName = $('#lkEmergName').value.trim();
+          const emergPhone = $('#lkEmergPhone').value.trim();
+          if (!/^09\d{8}$/.test(phone)) return toast('手機號碼須為 09 開頭 10 碼', 'error');
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return toast('Email 格式錯誤', 'error');
+          if (emergName && emergName === p.name) return toast('緊急聯絡人不可與本人同名', 'error');
+          if (emergPhone && emergPhone === phone) return toast('緊急聯絡電話不可與本人手機相同', 'error');
+
+          const patch = {
+            phone,
+            email,
+            city: $('#lkCity').value.trim(),
+            emergencyName: emergName,
+            emergencyPhone: emergPhone,
+            diet: $('#lkDiet').value,
+            remark: $('#lkRemark').value.trim()
+          };
+          if (cfDefs.length) {
+            const nextCf = { ...curCf };
+            $$('[data-lk-cf]').forEach((inp) => {
+              const k = inp.dataset.lkCf;
+              const t = inp.dataset.lkCftype;
+              nextCf[k] = t === 'checkbox'
+                ? inp.value.split(/[,，、]/).map((s) => s.trim()).filter(Boolean)
+                : inp.value.trim();
+            });
+            patch.customFieldsJson = JSON.stringify(nextCf);
+          }
+
+          // 嚴格把關：僅未繳費 (UNPAID) 才允許寫入費用相關欄位
+          if (!feeLocked) {
+            const l5 = $('#lkLast5').value.trim();
+            if (l5 && !/^\d{5}$/.test(l5)) return toast('匯款末五碼限 5 位純數字', 'error');
+            const addons = $$('.lk-addon:checked').map((cb) => cb.dataset.name);
+            patch.catId = $('#lkCat').value;
+            patch.addonsDetail = JSON.stringify(addons);
+            patch.totalAmount = recalcLookupTotal();
+            patch.remittanceLast5 = l5;
+          }
+
+          Object.assign(p, patch);
+          await C.TurDB.put('participants', p);
+          await enqueueSync('updateSelfRegistration', { participantId: p.participantId, idCard: p.idCard, patch });
+          toast(isPaid ? '✅ 非費用聯絡資料已更新（費用選項維持鎖定）｜✉️ 已觸發異動確認信！' : '✅ 報名資料與應繳金額已更新｜✉️ 已觸發異動確認信！', 'success');
+        };
+      }
     };
 
     // Zone 1 Controls
@@ -1077,46 +1659,137 @@
         $(`#z1-${b.dataset.z1tab}`).classList.remove('hidden');
       };
     });
-    $('#btnZ1NewEvent').onclick = async () => {
-      const nameZh = prompt('請輸入新活動中文名稱：', '2026 TUR 冬季超級馬拉松');
-      if (!nameZh) return;
-      const raceType = confirm('確定 = 一般距離賽 (distance)｜取消 = 繞圈計時賽 (lap_timed)') ? 'distance' : 'lap_timed';
+    // 建立新活動 Modal（明確區分距離賽 vs 計時繞圈賽 ＋ 轉帳核對末五碼 vs 結合金流廠商）
+    const setNewEventRaceType = (rt) => {
+      const isLap = rt === 'lap_timed';
+      $('#newEvRaceType').value = isLap ? 'lap_timed' : 'distance';
+      $('#btnNewEvDistance').className = `p-3 rounded-xl border-2 text-left transition ${!isLap ? 'border-sky-600 bg-sky-50' : 'border-slate-200 bg-white hover:border-sky-400'}`;
+      $('#btnNewEvLap').className = `p-3 rounded-xl border-2 text-left transition ${isLap ? 'border-indigo-600 bg-indigo-50' : 'border-slate-200 bg-white hover:border-indigo-400'}`;
+      $('#newEvDistanceFields').classList.toggle('hidden', isLap);
+      $('#newEvLapFields').classList.toggle('hidden', !isLap);
+    };
+    const setNewEventPayMode = (pm) => {
+      const isPayuni = pm === 'ONLINE_PAYUNi';
+      $('#newEvPayMode').value = isPayuni ? 'ONLINE_PAYUNi' : 'MANUAL_ATM';
+      $('#btnNewEvPayManual').className = `p-3 rounded-xl border-2 text-left transition ${!isPayuni ? 'border-amber-500 bg-amber-50' : 'border-slate-200 bg-white hover:border-amber-400'}`;
+      $('#btnNewEvPayPayuni').className = `p-3 rounded-xl border-2 text-left transition ${isPayuni ? 'border-emerald-600 bg-emerald-50' : 'border-slate-200 bg-white hover:border-emerald-400'}`;
+    };
+    $('#btnNewEvDistance').onclick = () => setNewEventRaceType('distance');
+    $('#btnNewEvLap').onclick = () => setNewEventRaceType('lap_timed');
+    $('#btnNewEvPayManual').onclick = () => setNewEventPayMode('MANUAL_ATM');
+    $('#btnNewEvPayPayuni').onclick = () => setNewEventPayMode('ONLINE_PAYUNi');
+    $('#btnCloseNewEvent').onclick = () => $('#newEventModal').classList.add('hidden');
+    $('#btnCancelNewEvent').onclick = () => $('#newEventModal').classList.add('hidden');
+    $('#btnZ1NewEvent').onclick = () => {
+      $('#newEvNameZh').value = '';
+      setNewEventRaceType('distance');
+      setNewEventPayMode('MANUAL_ATM');
+      $('#newEventModal').classList.remove('hidden');
+      $('#newEvNameZh').focus();
+    };
+    $('#newEventForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const nameZh = $('#newEvNameZh').value.trim();
+      if (!nameZh) return toast('請輸入中文活動名稱', 'warn');
+      const raceType = $('#newEvRaceType').value === 'lap_timed' ? 'lap_timed' : 'distance';
+      const payMode = $('#newEvPayMode').value === 'ONLINE_PAYUNi' ? 'ONLINE_PAYUNi' : 'MANUAL_ATM';
+      const rawStart = ($('#newEvRaceStart')?.value || '').trim();
+      if (!rawStart) return toast('請設定活動起跑日期與時間', 'warn');
+      const raceStartNorm = rawStart.replace('T', ' ') + (rawStart.length === 16 ? ':00' : '');
+      const isLap = raceType === 'lap_timed';
       const evId = `TUR-${Date.now().toString().slice(-6)}`;
+      const lapDist = isLap ? Math.max(0.1, Number($('#newEvLapKm').value || 1.0)) : 0;
       const ev = {
         eventId: evId, ownerUsername: State.currentUser.username, nameZh, nameEn: C.zhToEnEventName(nameZh),
-        organizerZh: 'TUR 台灣超馬協會', organizerEn: 'TUR', location: '台灣', raceType,
-        lapDistanceKm: raceType === 'lap_timed' ? 1.0 : 0, debounceSeconds: 15, status: 'open',
-        regStart: C.formatDateTime(), regEnd: '2026-12-31 23:59:59', raceStart: '', maxQuota: 500,
-        bannerUrl: 'banner-1', formSchemaJson: JSON.stringify(C.defaultFormSchema()), certConfigJson: JSON.stringify(C.defaultCertConfig())
+        organizerZh: $('#newEvOrganizer').value.trim() || 'TUR 台灣超馬協會', organizerEn: 'TUR',
+        location: $('#newEvLocation').value.trim() || '台灣', raceType,
+        lapDistanceKm: lapDist, debounceSeconds: 15, status: 'open',
+        regStart: C.formatDateTime(), regEnd: '2026-12-31 23:59:59', raceStart: raceStartNorm, maxQuota: 500,
+        bannerUrl: isLap ? 'dyn-track' : 'dyn-road',
+        brochureText: isLap
+          ? `【計時繞圈賽制】單圈 ${lapDist} km，於限時內通過主拱門累計有效圈數與總里程；逾限時圈次留存紀錄不計入有效里程。\n${C.DEFAULT_BROCHURE_TEMPLATE}`
+          : C.DEFAULT_BROCHURE_TEMPLATE,
+        formSchemaJson: JSON.stringify(C.defaultFormSchema(payMode)), certConfigJson: JSON.stringify(C.defaultCertConfig())
       };
-      const cat = { catId: `CAT-${evId}`, eventId: evId, name: raceType === 'lap_timed' ? '12H 繞圈組' : '50K 超馬組', distanceKm: raceType === 'lap_timed' ? 1.0 : 50, timeLimitHours: raceType === 'lap_timed' ? 12 : 8, fee: 1800, bibPrefix: 'A', bibStartNum: '001', quota: 300, customRaceStart: '' };
-      const sts = raceType === 'lap_timed'
-        ? [{ stationId: `ST-${evId}-0`, eventId: evId, stationCode: 'CHECKIN', name: '報到檢錄', distanceKm: 0, stationType: 'checkin', orderIndex: 0 }, { stationId: `ST-${evId}-1`, eventId: evId, stationCode: 'LAP', name: '繞圈門', distanceKm: 1.0, stationType: 'lap', orderIndex: 1 }]
-        : [{ stationId: `ST-${evId}-0`, eventId: evId, stationCode: 'CHECKIN', name: '報到檢錄', distanceKm: 0, stationType: 'checkin', orderIndex: 0 }, { stationId: `ST-${evId}-1`, eventId: evId, stationCode: 'CP1', name: 'CP1', distanceKm: 25, stationType: 'checkpoint', orderIndex: 1 }, { stationId: `ST-${evId}-2`, eventId: evId, stationCode: 'FINISH', name: '終點', distanceKm: 50, stationType: 'finish', orderIndex: 2 }];
+      const cat = isLap
+        ? { catId: `CAT-${evId}`, eventId: evId, name: $('#newEvLapCatName').value.trim() || '12H 繞圈組', distanceKm: lapDist, timeLimitHours: Number($('#newEvLapHrs').value || 12), fee: 2200, bibPrefix: 'L', bibStartNum: '001', quota: 300, customRaceStart: '' }
+        : { catId: `CAT-${evId}`, eventId: evId, name: $('#newEvDistCatName').value.trim() || '50K 超馬組', distanceKm: Number($('#newEvDistKm').value || 50), timeLimitHours: Number($('#newEvDistHrs').value || 8), fee: 1800, bibPrefix: 'A', bibStartNum: '001', quota: 300, customRaceStart: '' };
+      const distKm = Number(cat.distanceKm || 50);
+      const sts = isLap
+        ? [
+          { stationId: `ST-${evId}-0`, eventId: evId, stationCode: 'CHECKIN', name: '起點報到檢錄', distanceKm: 0, stationType: 'checkin', orderIndex: 0 },
+          { stationId: `ST-${evId}-1`, eventId: evId, stationCode: 'LAP', name: '主會場繞圈拱門', distanceKm: lapDist, stationType: 'lap', orderIndex: 1 }
+        ]
+        : [
+          { stationId: `ST-${evId}-0`, eventId: evId, stationCode: 'CHECKIN', name: '起點報到檢錄', distanceKm: 0, stationType: 'checkin', orderIndex: 0 },
+          { stationId: `ST-${evId}-1`, eventId: evId, stationCode: 'CP1', name: 'CP1 折返檢查站', distanceKm: Number((distKm / 2).toFixed(1)), stationType: 'checkpoint', orderIndex: 1 },
+          { stationId: `ST-${evId}-2`, eventId: evId, stationCode: 'FINISH', name: '終點衝線拱門', distanceKm: distKm, stationType: 'finish', orderIndex: 2 }
+        ];
       State.events.push(ev); State.categories.push(cat); State.stations.push(...sts);
       await C.TurDB.put('events', ev); await C.TurDB.put('categories', cat); await C.TurDB.bulkPut('stations', sts);
       await enqueueSync('saveEvent', { event: ev }); await enqueueSync('saveCategory', { category: cat });
       State.z1EventId = evId;
+      $('#newEventModal').classList.add('hidden');
       renderAll();
-      toast(`已建立活動「${nameZh}」（歸屬：${ev.ownerUsername}）`, 'success');
+      toast(`✅ 已建立【${isLap ? '計時繞圈賽' : '一般距離賽'}】「${nameZh}」並配置標準站點與分組！`, 'success');
     };
 
     // Operator Workspace Controls
     $('#btnOutdoorToggle').onclick = () => document.body.classList.toggle('outdoor-mode');
+    if ($('#writerEventSelect')) {
+      $('#writerEventSelect').onchange = (e) => {
+        State.opEventId = e.target.value;
+        State.selectedWriterPid = null;
+        if ($('#writerInspectCard')) $('#writerInspectCard').classList.add('hidden');
+        rebuildIndices(State.opEventId);
+        renderOperatorStation();
+      };
+    }
     $('#writerSearch').oninput = renderWriterList;
-    $('#writerSearchList').onclick = (e) => { if (e.target.dataset.pickWriter) { State.selectedWriterPid = e.target.dataset.pickWriter; renderWriterSelected(); } };
+    if ($('#writerFilter')) $('#writerFilter').onchange = renderWriterList;
+    $('#writerSearchList').onclick = (e) => {
+      if (e.target.dataset.pickWriter) {
+        State.selectedWriterPid = e.target.dataset.pickWriter;
+        renderWriterSelected();
+        renderWriterList();
+      } else if (e.target.dataset.writerToggleChk) {
+        const target = State.idxById.get(e.target.dataset.writerToggleChk);
+        if (target) setWriterRunnerCheckin(target, target.checkinStatus !== 'checked_in');
+      }
+    };
+    $('#btnWriterCheckin').onclick = () => setWriterRunnerCheckin(State.idxById.get(State.selectedWriterPid), true);
+    $('#btnWriterUncheckin').onclick = () => setWriterRunnerCheckin(State.idxById.get(State.selectedWriterPid), false);
     $('#btnNfcWriteNtag').onclick = () => runChipWrite('write', false);
     $('#btnNfcBindUid').onclick = () => runChipWrite('uid', false);
     $('#btnNfcReadLegacy').onclick = () => runChipWrite('legacy', false);
+    $('#btnNfcReadInspect').onclick = () => runChipWrite('inspect', false);
     $('#btnSimWriteNtag').onclick = () => runChipWrite('write', true);
     $('#btnSimBindUid').onclick = () => runChipWrite('uid', true);
     $('#btnSimReadLegacy').onclick = () => runChipWrite('legacy', true);
-    $('#btnSimInvalidCard').onclick = () => { Feedback.error(); appendWriterLog('🔴 [模擬異常卡] 非本場晶片已攔截！'); };
+    $('#btnSimReadInspect').onclick = () => runChipWrite('inspect', true);
+    $('#btnSimInvalidCard').onclick = () => { Feedback.error(); showChipInspectResult(null, 'INVALID-CARD', 'UNKNOWN'); appendWriterLog('🔴 [模擬異常卡] 非本場晶片已攔截！'); };
 
     $('#manualScanForm').onsubmit = async (e) => {
       e.preventDefault();
       const inp = $('#manualScanInput');
       if (inp.value.trim()) { await handleOperatorSense(inp.value.trim(), 'manual'); inp.value = ''; inp.focus(); }
+    };
+    $('#opManualPickerSearch').oninput = () => {
+      const ev = State.events.find((e) => e.eventId === State.opEventId);
+      if (!ev) return;
+      const stCode = State.opLockedStation;
+      const paid = State.participants.filter((p) => p.eventId === ev.eventId && String(p.payStatus).toUpperCase() === 'PAID' && p.bibNumber);
+      const stLogs = State.timingLogs.filter((l) => l.eventId === ev.eventId && l.stationCode === stCode && l.isValid !== false);
+      const passedBibSet = new Set(stLogs.map((l) => String(l.bibNumber).toUpperCase()));
+      renderOpFallbackPicker(ev, stCode, paid, passedBibSet, stLogs);
+    };
+    $('#btnOpManualFallback').onclick = async () => {
+      const bib = $('#opManualRunnerSelect').value;
+      if (!bib) return toast('請先選擇本活動之已配號選手', 'warn');
+      const reason = $('#opManualReason').value;
+      const customTime = $('#opManualTime').value.trim();
+      await handleOperatorSense(bib, 'manual_fallback', { reason, customTime });
+      $('#opManualTime').value = '';
     };
     $('#quickRunnerButtons').onclick = (e) => { if (e.target.dataset.opScan) handleOperatorSense(e.target.dataset.opScan, 'sim'); };
     $('#btnSimUnknownScan').onclick = () => handleOperatorSense('INVALID-999', 'sim');
@@ -1170,11 +1843,13 @@
     const loaded = await Promise.all(stores.map((s) => C.TurDB.getAll(s)));
     stores.forEach((s, i) => { State[s] = loaded[i]; });
 
-    if (!State.events.length) {
+    const oldSeedIds = new Set(['TUR-20260001', 'TUR-20260002', 'TUR-20260003', 'TUR-20260004', 'TUR-20260005', 'TUR-FIN-001', 'TUR-FIN-002', 'TUR-FIN-003', 'TUR-F24-001']);
+    const isUntouchedOldSeed = State.events.length > 0 && State.participants.length <= 9 && State.participants.every((p) => oldSeedIds.has(p.participantId));
+    if (!State.events.length || isUntouchedOldSeed) {
       const seed = C.buildFull5EventsSeed();
       for (const k of Object.keys(seed)) {
         State[k] = seed[k];
-        await C.TurDB.bulkPut(k, seed[k]);
+        await C.TurDB.clearAndFill(k, seed[k]);
       }
     }
 
