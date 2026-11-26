@@ -1841,6 +1841,16 @@
       { configKey: 'autoSendEmail', configValue: '1', description: '自動寄發報名與入帳通知信 (1=開/0=關)', updatedAt: now }
     ];
 
+    const formJsonW800 = JSON.stringify({
+      paymentMode: 'MANUAL_ATM',
+      addons: defaultFormSchema('MANUAL_ATM').addons,
+      customFields: [
+        { key: 'shirt_size', label: '百K 專屬紀念衣尺寸', type: 'select', required: true, options: ['XS', 'S', 'M', 'L', 'XL', '2XL'], placeholder: '請選擇尺寸' },
+        { key: 'headlamp_check', label: '是否自備夜間強制頭燈', type: 'radio', required: true, options: ['已自備雙頭燈', '現場租借'], placeholder: '' },
+        { key: 'dropbag_note', label: '轉換袋寄放需求', type: 'text', required: false, options: [], placeholder: '例如：CP2 需寄放替換跑鞋' }
+      ]
+    });
+
     const events = [
       {
         eventId: 'TUR-2026-50K', ownerUsername: 'org_north',
@@ -1856,7 +1866,7 @@
         organizerZh: 'TUR 台灣超馬協會', organizerEn: 'TUR Taiwan Ultra Runners', location: '台北田徑暖身場',
         raceType: 'lap_timed', lapDistanceKm: 1.0, debounceSeconds: 15, status: 'open',
         regStart: '2026-11-01 00:00:00', regEnd: '2026-12-31 23:59:59', raceStart: '2026-11-26 06:00:00',
-        maxQuota: 400, bannerUrl: 'dyn-track', brochureText: '【賽制說明】12H / 6H 標準繞圈限時賽，單圈 1.0 km。\n【計時規則】於限時內通過主拱門之有效圈數累計總里程；超時圈留存紀錄但不計入有效里程。\n【補給配置】主會場旁全時段供應熱湯、水果、電解質與冰塊。', formSchemaJson: formJsonPayuni, certConfigJson: certJson
+        maxQuota: 400, bannerUrl: 'dyn-track', brochureText: '【賽制說明】12H / 6H 標準繞圈限時賽，單圈 1.0 km，採 PAYUNi 統一金流線上繳費。\n【計時規則】於限時內通過主拱門之有效圈數累計總里程；超時圈留存紀錄但不計入有效里程。\n【補給配置】主會場旁全時段供應熱湯、水果、電解質與冰塊。', formSchemaJson: formJsonPayuni, certConfigJson: certJson
       },
       {
         eventId: 'TUR-2026-W800', ownerUsername: 'org_south',
@@ -1864,7 +1874,15 @@
         organizerZh: '南區超馬聯盟', organizerEn: 'South Taiwan Ultra Alliance', location: '高雄市旗山區',
         raceType: 'distance', lapDistanceKm: 0, debounceSeconds: 15, status: 'open',
         regStart: '2026-12-01 00:00:00', regEnd: '2027-01-31 23:59:59', raceStart: '',
-        maxQuota: 300, bannerUrl: 'dyn-warrior', brochureText: '【八百壯士認證賽事】凡 15 小時內完成 100K 者，自動登錄 TUR 八百壯士 100K+ 英雄榜並加發專屬榮譽標註完賽證書！\n【強制裝備】夜間頭燈、反光背心、環保水杯。', formSchemaJson: formJson, certConfigJson: certJson
+        maxQuota: 300, bannerUrl: 'dyn-warrior', brochureText: '【八百壯士認證賽事】凡 15 小時內完成 100K 者，自動登錄 TUR 八百壯士 100K+ 英雄榜並加發專屬榮譽標註完賽證書！\n【報名與查改】採轉帳核對末五碼；繳費前可透過 /lookup 修改組別與加購，入帳後自動鎖定費用選項。', formSchemaJson: formJsonW800, certConfigJson: certJson
+      },
+      {
+        eventId: 'TUR-2026-EARLY6H', ownerUsername: 'org_south',
+        nameZh: '2026 花蓮海濱 6H 體驗繞圈賽（賽前晶片整備）', nameEn: '2026 Hualien Coastal 6H Lap Ultra',
+        organizerZh: '南區超馬聯盟', organizerEn: 'South Taiwan Ultra Alliance', location: '花蓮太平洋公園海濱環道',
+        raceType: 'lap_timed', lapDistanceKm: 0.8, debounceSeconds: 15, status: 'closed',
+        regStart: '2026-09-01 00:00:00', regEnd: '2026-11-20 23:59:59', raceStart: '2026-12-19 07:00:00',
+        maxQuota: 200, bannerUrl: 'dyn-coast', brochureText: '【賽前晶片與報到示範場】報名已截止並預先設定起跑時間（2026-12-19 07:00:00），供作業員測試晶片寫入、讀取查看與現場報到管制。', formSchemaJson: formJsonPayuni, certConfigJson: certJson
       },
       {
         eventId: 'TUR-2026-FIN100', ownerUsername: 'org_north',
@@ -1880,7 +1898,7 @@
         organizerZh: '南區超馬聯盟', organizerEn: 'South Taiwan Ultra Alliance', location: '台南市立田徑場',
         raceType: 'lap_timed', lapDistanceKm: 1.0, debounceSeconds: 15, status: 'finished',
         regStart: '2026-02-01 00:00:00', regEnd: '2026-05-01 23:59:59', raceStart: '2026-05-23 18:00:00',
-        maxQuota: 300, bannerUrl: 'dyn-night', brochureText: DEFAULT_BROCHURE_TEMPLATE, formSchemaJson: formJson, certConfigJson: certJson
+        maxQuota: 300, bannerUrl: 'dyn-night', brochureText: DEFAULT_BROCHURE_TEMPLATE, formSchemaJson: formJsonPayuni, certConfigJson: certJson
       }
     ];
 
@@ -1889,10 +1907,14 @@
       { catId: 'CAT-100K', eventId: 'TUR-2026-50K', name: '100K 八百壯士組', distanceKm: 100, timeLimitHours: 16, fee: 2600, bibPrefix: 'U', bibStartNum: '001', quota: 200, customRaceStart: '' },
       { catId: 'CAT-12H', eventId: 'TUR-2026-12H', name: '12H 繞圈組', distanceKm: 1.0, timeLimitHours: 12, fee: 2200, bibPrefix: 'L', bibStartNum: '001', quota: 200, customRaceStart: '' },
       { catId: 'CAT-6H', eventId: 'TUR-2026-12H', name: '6H 繞圈組', distanceKm: 1.0, timeLimitHours: 6, fee: 1500, bibPrefix: 'S', bibStartNum: '001', quota: 200, customRaceStart: '' },
-      { catId: 'CAT-W800', eventId: 'TUR-2026-W800', name: '100K 八百壯士菁英組', distanceKm: 100, timeLimitHours: 15, fee: 2500, bibPrefix: 'W', bibStartNum: '001', quota: 300, customRaceStart: '' },
+      { catId: 'CAT-W800', eventId: 'TUR-2026-W800', name: '100K 八百壯士菁英組', distanceKm: 100, timeLimitHours: 15, fee: 2500, bibPrefix: 'W', bibStartNum: '001', quota: 200, customRaceStart: '' },
+      { catId: 'CAT-W50', eventId: 'TUR-2026-W800', name: '50K 南區挑戰組', distanceKm: 50, timeLimitHours: 8, fee: 1700, bibPrefix: 'G', bibStartNum: '001', quota: 100, customRaceStart: '' },
+      { catId: 'CAT-E6H', eventId: 'TUR-2026-EARLY6H', name: '6H 海濱繞圈組', distanceKm: 0.8, timeLimitHours: 6, fee: 1400, bibPrefix: 'H', bibStartNum: '001', quota: 120, customRaceStart: '' },
+      { catId: 'CAT-E3H', eventId: 'TUR-2026-EARLY6H', name: '3H 體驗繞圈組', distanceKm: 0.8, timeLimitHours: 3, fee: 950, bibPrefix: 'C', bibStartNum: '001', quota: 80, customRaceStart: '' },
       { catId: 'CAT-FIN100', eventId: 'TUR-2026-FIN100', name: '100K 八百壯士組', distanceKm: 100, timeLimitHours: 16, fee: 2600, bibPrefix: 'K', bibStartNum: '001', quota: 200, customRaceStart: '' },
       { catId: 'CAT-FIN50', eventId: 'TUR-2026-FIN100', name: '50K 挑戰組', distanceKm: 50, timeLimitHours: 8, fee: 1800, bibPrefix: 'F', bibStartNum: '001', quota: 300, customRaceStart: '' },
-      { catId: 'CAT-FIN24H', eventId: 'TUR-2026-FIN24H', name: '24H 繞圈組', distanceKm: 1.0, timeLimitHours: 24, fee: 2800, bibPrefix: 'T', bibStartNum: '001', quota: 300, customRaceStart: '' }
+      { catId: 'CAT-FIN24H', eventId: 'TUR-2026-FIN24H', name: '24H 繞圈組', distanceKm: 1.0, timeLimitHours: 24, fee: 2800, bibPrefix: 'T', bibStartNum: '001', quota: 200, customRaceStart: '' },
+      { catId: 'CAT-FIN12H', eventId: 'TUR-2026-FIN24H', name: '12H 夜間組', distanceKm: 1.0, timeLimitHours: 12, fee: 2100, bibPrefix: 'N', bibStartNum: '001', quota: 100, customRaceStart: '' }
     ];
 
     const stations = [
@@ -1906,6 +1928,8 @@
       { stationId: 'ST-W800-1', eventId: 'TUR-2026-W800', stationCode: 'CP1', name: 'CP1 旗山溪橋', distanceKm: 35, stationType: 'checkpoint', orderIndex: 1 },
       { stationId: 'ST-W800-2', eventId: 'TUR-2026-W800', stationCode: 'CP2', name: 'CP2 美濃折返', distanceKm: 70, stationType: 'checkpoint', orderIndex: 2 },
       { stationId: 'ST-W800-3', eventId: 'TUR-2026-W800', stationCode: 'FINISH', name: '終點衝線', distanceKm: 100, stationType: 'finish', orderIndex: 3 },
+      { stationId: 'ST-E6H-0', eventId: 'TUR-2026-EARLY6H', stationCode: 'CHECKIN', name: '海濱報到帳篷', distanceKm: 0, stationType: 'checkin', orderIndex: 0 },
+      { stationId: 'ST-E6H-1', eventId: 'TUR-2026-EARLY6H', stationCode: 'LAP', name: '海濱繞圈感應門', distanceKm: 0.8, stationType: 'lap', orderIndex: 1 },
       { stationId: 'ST-F100-0', eventId: 'TUR-2026-FIN100', stationCode: 'CHECKIN', name: '報到檢錄', distanceKm: 0, stationType: 'checkin', orderIndex: 0 },
       { stationId: 'ST-F100-1', eventId: 'TUR-2026-FIN100', stationCode: 'CP1', name: 'CP1 小油坑', distanceKm: 30, stationType: 'checkpoint', orderIndex: 1 },
       { stationId: 'ST-F100-2', eventId: 'TUR-2026-FIN100', stationCode: 'CP2', name: 'CP2 擎天崗', distanceKm: 65, stationType: 'checkpoint', orderIndex: 2 },
@@ -1958,36 +1982,65 @@
       mkP({ pid: 'TUR-20260016', ev: 'TUR-2026-50K', cat: 'CAT-100K', bib: 'U007', name: '周柏諺', id: 'F123456789', g: 'M', dob: '1983-07-14', nat: 'TWN', ph: '0939112244', em: 'chou@tur.tw', city: '新北市', rem: 'CP1 後右小腿拉傷申請棄賽', amt: 2600, l5: '90812', ps: 'PAID', uid: '04:55:66:77:11', chk: 'checked_in', rs: 'dnf', cf: { shirt_size: 'L', shuttle_wave: '不需接駁' } }),
       // 已取消報名 CANCELLED (1 位)
       mkP({ pid: 'TUR-20260017', ev: 'TUR-2026-50K', cat: 'CAT-50K', bib: '', name: '謝佳蓉', id: 'A221122334', g: 'F', dob: '1992-09-09', nat: 'TWN', ph: '0921556677', em: 'hsieh@tur.tw', city: '台北市', rem: '因行程衝突已申請退費取消', amt: 1800, ps: 'CANCELLED', chk: 'pending', rs: 'dns' }),
+      // 外部名單匯入範例 (2 位：非系統報名、賽中匯入加入計時)
+      mkP({ pid: 'EXT-20260018', ev: 'TUR-2026-50K', cat: 'CAT-50K', bib: 'A007', name: '林大為', id: 'A128877669', g: 'M', dob: '1986-04-22', nat: 'TWN', ph: '0916223344', em: 'dawei@ext.tw', city: '新竹市', rem: '外部報名平台匯入（中途加入執行）', amt: 0, pm: 'EXTERNAL_IMPORT', pt: 'EXTERNAL', ps: 'PAID', uid: '04:66:77:88:12', chk: 'checked_in', rs: 'on_track', cf: { shirt_size: 'L', shuttle_wave: '不需接駁' } }),
+      mkP({ pid: 'EXT-20260019', ev: 'TUR-2026-50K', cat: 'CAT-100K', bib: 'U008', name: '端木晴', id: 'F229900112', g: 'F', dob: '1990-07-07', nat: 'TWN', ph: '0923445566', em: 'duanmu@ext.tw', city: '宜蘭縣', rem: '外部協會邀請選手匯入', amt: 0, pm: 'EXTERNAL_IMPORT', pt: 'EXTERNAL', ps: 'PAID', uid: '04:66:77:88:13', chk: 'checked_in', rs: 'finished', cf: { shirt_size: 'M', shuttle_wave: '不需接駁' } }),
 
-      // ========= 活動 2: TUR-2026-12H（12H 繞圈進行中，8 位全階段） =========
-      mkP({ pid: 'TUR-20260005', ev: 'TUR-2026-12H', cat: 'CAT-12H', bib: 'L001', name: '王超馬', id: 'E121234565', g: 'M', dob: '1982-07-08', nat: 'TWN', ph: '0919888777', em: 'wang@tur.tw', city: '高雄市', amt: 2200, l5: '99887', ps: 'PAID', uid: '04:C3:4D:77:30', chk: 'checked_in', rs: 'on_track' }),
-      mkP({ pid: 'TUR-12H-002', ev: 'TUR-2026-12H', cat: 'CAT-12H', bib: 'L002', name: '陳怡君', id: 'F221234561', g: 'F', dob: '1989-04-21', nat: 'TWN', ph: '0922113355', em: 'yichun@tur.tw', city: '新北市', amt: 2200, pm: 'ONLINE_PAYUNi', mtn: 'PU2026110102', ps: 'PAID', uid: '04:AA:11:22:33', chk: 'checked_in', rs: 'on_track' }),
-      mkP({ pid: 'TUR-12H-003', ev: 'TUR-2026-12H', cat: 'CAT-6H', bib: 'S001', name: '劉哲維', id: 'A129876541', g: 'M', dob: '1991-01-12', nat: 'TWN', ph: '0936778899', em: 'liu@tur.tw', city: '台北市', amt: 1500, pm: 'ONLINE_PAYUNi', mtn: 'PU2026110103', ps: 'PAID', uid: '04:BB:22:33:44', chk: 'checked_in', rs: 'finished' }),
-      mkP({ pid: 'TUR-12H-004', ev: 'TUR-2026-12H', cat: 'CAT-6H', bib: 'S002', name: 'Sato Yuki', id: 'JP55443322', g: 'F', dob: '1993-08-08', nat: 'JPN', ph: '0915223344', em: 'yuki@jp.run', city: '離島 / 海外', amt: 1500, pm: 'ONLINE_PAYUNi', mtn: 'PU2026110104', ps: 'PAID', uid: '04:CC:33:44:55', chk: 'checked_in', rs: 'finished' }),
-      mkP({ pid: 'TUR-12H-005', ev: 'TUR-2026-12H', cat: 'CAT-12H', bib: 'L003', name: '郭俊宏', id: 'H121122338', g: 'M', dob: '1980-12-19', nat: 'TWN', ph: '0933887766', em: 'kuo@tur.tw', city: '桃園市', amt: 2200, l5: '44512', ps: 'PAID', uid: '04:DD:44:55:66', chk: 'checked_in', rs: 'dns' }),
-      mkP({ pid: 'TUR-12H-006', ev: 'TUR-2026-12H', cat: 'CAT-6H', bib: 'S003', name: '楊雅雯', id: 'B223344551', g: 'F', dob: '1995-05-03', nat: 'TWN', ph: '0955112233', em: 'yang@tur.tw', city: '台中市', amt: 1500, l5: '11298', ps: 'PAID', chk: 'pending', rs: 'dns' }),
-      mkP({ pid: 'TUR-12H-007', ev: 'TUR-2026-12H', cat: 'CAT-12H', bib: '', gc: 'GRP26-1209', gn: '大安晨跑團', name: '何宗霖', id: 'A125566773', g: 'M', dob: '1987-02-25', nat: 'TWN', ph: '0920445566', em: 'ho@tur.tw', city: '台北市', amt: 2200, l5: '88710', ps: 'UNPAID', chk: 'pending', rs: 'dns' }),
-      mkP({ pid: 'TUR-12H-008', ev: 'TUR-2026-12H', cat: 'CAT-12H', bib: 'L004', name: '徐國華', id: 'J123456786', g: 'M', dob: '1978-09-14', nat: 'TWN', ph: '0910998877', em: 'hsu2@tur.tw', city: '新竹縣', amt: 2200, l5: '31209', ps: 'PAID', uid: '04:EE:55:66:77', chk: 'checked_in', rs: 'dnf' }),
+      // ========= 活動 2: TUR-2026-12H（12H 繞圈進行中・PAYUNi 專屬管制，12 位全階段） =========
+      mkP({ pid: 'TUR-20260005', ev: 'TUR-2026-12H', cat: 'CAT-12H', bib: 'L001', name: '王超馬', id: 'E121234565', g: 'M', dob: '1982-07-08', nat: 'TWN', ph: '0919888777', em: 'wang@tur.tw', city: '高雄市', amt: 2200, pm: 'ONLINE_PAYUNi', mtn: 'PU2026110101', tn: '26110100101', ps: 'PAID', uid: '04:C3:4D:77:30', chk: 'checked_in', rs: 'on_track' }),
+      mkP({ pid: 'TUR-12H-002', ev: 'TUR-2026-12H', cat: 'CAT-12H', bib: 'L002', name: '陳怡君', id: 'F221234561', g: 'F', dob: '1989-04-21', nat: 'TWN', ph: '0922113355', em: 'yichun@tur.tw', city: '新北市', amt: 2200, pm: 'ONLINE_PAYUNi', mtn: 'PU2026110102', tn: '26110100102', ps: 'PAID', uid: '04:AA:11:22:33', chk: 'checked_in', rs: 'on_track' }),
+      mkP({ pid: 'TUR-12H-003', ev: 'TUR-2026-12H', cat: 'CAT-6H', bib: 'S001', name: '劉哲維', id: 'A129876541', g: 'M', dob: '1991-01-12', nat: 'TWN', ph: '0936778899', em: 'liu@tur.tw', city: '台北市', amt: 1500, pm: 'ONLINE_PAYUNi', mtn: 'PU2026110103', tn: '26110100103', ps: 'PAID', uid: '04:BB:22:33:44', chk: 'checked_in', rs: 'finished' }),
+      mkP({ pid: 'TUR-12H-004', ev: 'TUR-2026-12H', cat: 'CAT-6H', bib: 'S002', name: 'Sato Yuki', id: 'JP55443322', g: 'F', dob: '1993-08-08', nat: 'JPN', ph: '0915223344', em: 'yuki@jp.run', city: '離島 / 海外', amt: 1500, pm: 'ONLINE_PAYUNi', mtn: 'PU2026110104', tn: '26110100104', ps: 'PAID', uid: '04:CC:33:44:55', chk: 'checked_in', rs: 'finished' }),
+      mkP({ pid: 'TUR-12H-005', ev: 'TUR-2026-12H', cat: 'CAT-12H', bib: 'L003', name: '郭俊宏', id: 'H121122338', g: 'M', dob: '1980-12-19', nat: 'TWN', ph: '0933887766', em: 'kuo@tur.tw', city: '桃園市', amt: 2200, pm: 'ONLINE_PAYUNi', mtn: 'PU2026110105', ps: 'PAID', uid: '04:DD:44:55:66', chk: 'checked_in', rs: 'dns' }),
+      mkP({ pid: 'TUR-12H-006', ev: 'TUR-2026-12H', cat: 'CAT-6H', bib: 'S003', name: '楊雅雯', id: 'B223344551', g: 'F', dob: '1995-05-03', nat: 'TWN', ph: '0955112233', em: 'yang@tur.tw', city: '台中市', amt: 1500, pm: 'ONLINE_PAYUNi', mtn: 'PU2026110106', ps: 'PAID', chk: 'pending', rs: 'dns' }),
+      mkP({ pid: 'TUR-12H-007', ev: 'TUR-2026-12H', cat: 'CAT-12H', bib: '', gc: 'GRP26-1209', gn: '大安晨跑團', name: '何宗霖', id: 'A125566773', g: 'M', dob: '1987-02-25', nat: 'TWN', ph: '0920445566', em: 'ho@tur.tw', city: '台北市', amt: 2200, pm: 'ONLINE_PAYUNi', mtn: 'PU2026110107', ps: 'UNPAID', chk: 'pending', rs: 'dns' }),
+      mkP({ pid: 'TUR-12H-008', ev: 'TUR-2026-12H', cat: 'CAT-12H', bib: 'L004', name: '徐國華', id: 'J123456786', g: 'M', dob: '1978-09-14', nat: 'TWN', ph: '0910998877', em: 'hsu2@tur.tw', city: '新竹縣', amt: 2200, pm: 'ONLINE_PAYUNi', mtn: 'PU2026110108', ps: 'PAID', uid: '04:EE:55:66:77', chk: 'checked_in', rs: 'dnf' }),
+      mkP({ pid: 'TUR-12H-009', ev: 'TUR-2026-12H', cat: 'CAT-12H', bib: 'L005', name: '馬克思', id: 'DE77112233', g: 'M', dob: '1984-11-11', nat: 'DEU', ph: '0971112233', em: 'markus@de.run', city: '離島 / 海外', amt: 2200, pm: 'ONLINE_PAYUNi', mtn: 'PU2026110109', ps: 'PAID', uid: '04:FF:66:77:88', chk: 'checked_in', rs: 'on_track' }),
+      mkP({ pid: 'TUR-12H-010', ev: 'TUR-2026-12H', cat: 'CAT-6H', bib: 'S004', name: '呂佩蓉', id: 'F224455667', g: 'F', dob: '1992-03-08', nat: 'TWN', ph: '0925667788', em: 'lupr@tur.tw', city: '新北市', amt: 1500, pm: 'ONLINE_PAYUNi', mtn: 'PU2026110110', ps: 'PAID', uid: '04:10:20:30:40', chk: 'checked_in', rs: 'finished' }),
+      mkP({ pid: 'TUR-12H-011', ev: 'TUR-2026-12H', cat: 'CAT-12H', bib: '', gc: 'GRP26-1209', gn: '大安晨跑團', name: '范姜宇', id: 'H124455661', g: 'M', dob: '1988-08-19', nat: 'TWN', ph: '0931223344', em: 'fanjiang@tur.tw', city: '桃園市', amt: 2200, pm: 'ONLINE_PAYUNi', mtn: 'PU2026110111', ps: 'PENDING_PAY', chk: 'pending', rs: 'dns' }),
+      mkP({ pid: 'TUR-12H-012', ev: 'TUR-2026-12H', cat: 'CAT-6H', bib: '', name: '賴怡婷', id: 'B226677882', g: 'F', dob: '1996-06-30', nat: 'TWN', ph: '0952334455', em: 'lai@tur.tw', city: '台中市', rem: '線上申請取消退費', amt: 1500, pm: 'ONLINE_PAYUNi', ps: 'CANCELLED', chk: 'pending', rs: 'dns' }),
 
-      // ========= 活動 3: TUR-2026-W800（高雄八百壯士 100K 報名階段，4 位） =========
-      mkP({ pid: 'TUR-W800-001', ev: 'TUR-2026-W800', cat: 'CAT-W800', bib: 'W001', name: '葉志豪', id: 'E123344552', g: 'M', dob: '1985-06-18', nat: 'TWN', ph: '0918776655', em: 'yeh@tur.tw', city: '高雄市', amt: 2500, pm: 'ONLINE_PAYUNi', mtn: 'PU2026120101', ps: 'PAID', chk: 'pending', rs: 'dns' }),
-      mkP({ pid: 'TUR-W800-002', ev: 'TUR-2026-W800', cat: 'CAT-W800', bib: 'W002', name: '洪佳玲', id: 'S223456784', g: 'F', dob: '1990-10-10', nat: 'TWN', ph: '0927889900', em: 'hung@tur.tw', city: '屏東縣', amt: 2500, l5: '65432', ps: 'PAID', chk: 'pending', rs: 'dns' }),
-      mkP({ pid: 'TUR-W800-003', ev: 'TUR-2026-W800', cat: 'CAT-W800', bib: '', gc: 'GRP26-9901', gn: '高雄港都超馬隊', name: '潘威廷', id: 'E126677884', g: 'M', dob: '1988-03-03', nat: 'TWN', ph: '0938112299', em: 'pan@tur.tw', city: '高雄市', amt: 2500, l5: '77123', ps: 'UNPAID', chk: 'pending', rs: 'dns' }),
-      mkP({ pid: 'TUR-W800-004', ev: 'TUR-2026-W800', cat: 'CAT-W800', bib: '', gc: 'GRP26-9901', gn: '高雄港都超馬隊', name: '蘇婉瑜', id: 'E227788995', g: 'F', dob: '1992-07-29', nat: 'TWN', ph: '0963223344', em: 'su@tur.tw', city: '高雄市', amt: 2500, l5: '77123', ps: 'UNPAID', chk: 'pending', rs: 'dns' }),
+      // ========= 活動 3: TUR-2026-W800（高雄八百壯士 100K 報名階段・雙因子查改與對帳示範，8 位） =========
+      mkP({ pid: 'TUR-W800-001', ev: 'TUR-2026-W800', cat: 'CAT-W800', bib: 'W001', name: '葉志豪', id: 'E123344552', g: 'M', dob: '1985-06-18', nat: 'TWN', ph: '0918776655', em: 'yeh@tur.tw', city: '高雄市', amt: 2500, l5: '10293', ps: 'PAID', chk: 'pending', rs: 'dns', cf: { shirt_size: 'L', headlamp_check: '已自備雙頭燈', dropbag_note: 'CP2 放能量膠' } }),
+      mkP({ pid: 'TUR-W800-002', ev: 'TUR-2026-W800', cat: 'CAT-W800', bib: 'W002', name: '洪佳玲', id: 'S223456784', g: 'F', dob: '1990-10-10', nat: 'TWN', ph: '0927889900', em: 'hung@tur.tw', city: '屏東縣', amt: 2500, l5: '65432', ps: 'PAID', chk: 'pending', rs: 'dns', cf: { shirt_size: 'S', headlamp_check: '已自備雙頭燈' } }),
+      mkP({ pid: 'TUR-W800-003', ev: 'TUR-2026-W800', cat: 'CAT-W800', bib: '', gc: 'GRP26-9901', gn: '高雄港都超馬隊', name: '潘威廷', id: 'E126677884', g: 'M', dob: '1988-03-03', nat: 'TWN', ph: '0938112299', em: 'pan@tur.tw', city: '高雄市', amt: 2500, l5: '77123', ps: 'UNPAID', chk: 'pending', rs: 'dns', cf: { shirt_size: 'XL', headlamp_check: '現場租借' } }),
+      mkP({ pid: 'TUR-W800-004', ev: 'TUR-2026-W800', cat: 'CAT-W800', bib: '', gc: 'GRP26-9901', gn: '高雄港都超馬隊', name: '蘇婉瑜', id: 'E227788995', g: 'F', dob: '1992-07-29', nat: 'TWN', ph: '0963223344', em: 'su@tur.tw', city: '高雄市', amt: 2500, l5: '77123', ps: 'UNPAID', chk: 'pending', rs: 'dns', cf: { shirt_size: 'M', headlamp_check: '已自備雙頭燈' } }),
+      mkP({ pid: 'TUR-W800-005', ev: 'TUR-2026-W800', cat: 'CAT-W50', bib: 'G001', name: '鍾明憲', id: 'D125544339', g: 'M', dob: '1983-01-15', nat: 'TWN', ph: '0911445566', em: 'chung@tur.tw', city: '台南市', amt: 1700, l5: '54329', ps: 'PAID', chk: 'pending', rs: 'dns', cf: { shirt_size: 'L', headlamp_check: '已自備雙頭燈' } }),
+      mkP({ pid: 'TUR-W800-006', ev: 'TUR-2026-W800', cat: 'CAT-W50', bib: '', name: '江品潔', id: 'T221133557', g: 'F', dob: '1994-11-22', nat: 'TWN', ph: '0929334455', em: 'chiang@tur.tw', city: '屏東縣', amt: 1950, addons: '["會場接駁專車"]', l5: '88001', ps: 'UNPAID', chk: 'pending', rs: 'dns', cf: { shirt_size: 'S', headlamp_check: '現場租借' } }),
+      mkP({ pid: 'TUR-W800-007', ev: 'TUR-2026-W800', cat: 'CAT-W800', bib: 'W003', name: '歐陽鋒', id: 'E129988771', g: 'M', dob: '1979-09-09', nat: 'TWN', ph: '0932889911', em: 'oyf@tur.tw', city: '高雄市', amt: 2650, addons: '["獎牌雷射刻字"]', l5: '33219', ps: 'PAID', chk: 'pending', rs: 'dns', cf: { shirt_size: '2XL', headlamp_check: '已自備雙頭燈' } }),
+      mkP({ pid: 'TUR-W800-008', ev: 'TUR-2026-W800', cat: 'CAT-W50', bib: '', name: '蕭博仁', id: 'E124433221', g: 'M', dob: '1991-05-05', nat: 'TWN', ph: '0958112233', em: 'hsiao@tur.tw', city: '嘉義市', rem: '待轉帳填報末五碼', amt: 1700, l5: '', ps: 'UNPAID', chk: 'pending', rs: 'dns' }),
 
-      // ========= 活動 4: TUR-2026-FIN100（已結案陽明山 100K 八百壯士賽，6 位） =========
-      mkP({ pid: 'TUR-FIN-001', ev: 'TUR-2026-FIN100', cat: 'CAT-FIN100', bib: 'K001', name: '陳志明', id: 'A123456789', g: 'M', dob: '1988-05-12', nat: 'TWN', ph: '0912345678', em: 'chen@tur.tw', city: '台北市', amt: 2600, pm: 'ONLINE_PAYUNi', mtn: 'PU20260201', ps: 'PAID', uid: '04:A1:2B:99:10', chk: 'checked_in', rs: 'finished', paidAt: '2026-02-01 12:00:00' }),
+      // ========= 活動 4: TUR-2026-EARLY6H（花蓮 6H 報名截止・晶片發卡與報到整備示範，8 位） =========
+      mkP({ pid: 'TUR-E6H-001', ev: 'TUR-2026-EARLY6H', cat: 'CAT-E6H', bib: 'H001', name: '游智翔', id: 'U123456781', g: 'M', dob: '1987-02-14', nat: 'TWN', ph: '0912111222', em: 'yu@tur.tw', city: '花蓮縣', amt: 1400, pm: 'ONLINE_PAYUNi', mtn: 'PU2026091001', ps: 'PAID', uid: '04:A0:01:02:03', chk: 'checked_in', rs: 'dns' }),
+      mkP({ pid: 'TUR-E6H-002', ev: 'TUR-2026-EARLY6H', cat: 'CAT-E6H', bib: 'H002', name: '彭郁婷', id: 'U223456782', g: 'F', dob: '1992-08-25', nat: 'TWN', ph: '0922333444', em: 'peng@tur.tw', city: '花蓮縣', amt: 1400, pm: 'ONLINE_PAYUNi', mtn: 'PU2026091002', ps: 'PAID', uid: '04:A0:01:02:04', chk: 'checked_in', rs: 'dns' }),
+      mkP({ pid: 'TUR-E6H-003', ev: 'TUR-2026-EARLY6H', cat: 'CAT-E6H', bib: 'H003', name: '林聖傑', id: 'V123456783', g: 'M', dob: '1985-11-30', nat: 'TWN', ph: '0933555666', em: 'linsj@tur.tw', city: '台東縣', amt: 1400, pm: 'ONLINE_PAYUNi', mtn: 'PU2026091003', ps: 'PAID', uid: '04:A0:01:02:05', chk: 'pending', rs: 'dns' }),
+      mkP({ pid: 'TUR-E6H-004', ev: 'TUR-2026-EARLY6H', cat: 'CAT-E6H', bib: 'H004', name: '曾雅琪', id: 'G223456784', g: 'F', dob: '1993-04-12', nat: 'TWN', ph: '0955777888', em: 'tsengyq@tur.tw', city: '宜蘭縣', amt: 1400, pm: 'ONLINE_PAYUNi', mtn: 'PU2026091004', ps: 'PAID', uid: '', chk: 'pending', rs: 'dns' }),
+      mkP({ pid: 'TUR-E6H-005', ev: 'TUR-2026-EARLY6H', cat: 'CAT-E3H', bib: 'C001', name: '柯宇倫', id: 'A127766554', g: 'M', dob: '1996-07-04', nat: 'TWN', ph: '0966888999', em: 'ko@tur.tw', city: '台北市', amt: 950, pm: 'ONLINE_PAYUNi', mtn: 'PU2026091005', ps: 'PAID', uid: '04:A0:01:02:06', chk: 'checked_in', rs: 'dns' }),
+      mkP({ pid: 'TUR-E6H-006', ev: 'TUR-2026-EARLY6H', cat: 'CAT-E3H', bib: 'C002', name: '莊惠雯', id: 'F226655443', g: 'F', dob: '1990-12-20', nat: 'TWN', ph: '0977999000', em: 'chuang@tur.tw', city: '新北市', amt: 950, pm: 'ONLINE_PAYUNi', mtn: 'PU2026091006', ps: 'PAID', uid: '', chk: 'pending', rs: 'dns' }),
+      mkP({ pid: 'TUR-E6H-007', ev: 'TUR-2026-EARLY6H', cat: 'CAT-E3H', bib: 'C003', name: 'David Chen', id: 'CA33445566', g: 'M', dob: '1988-09-18', nat: 'CAN', ph: '0988000111', em: 'david@ca.run', city: '離島 / 海外', amt: 950, pm: 'ONLINE_PAYUNi', mtn: 'PU2026091007', ps: 'PAID', uid: '', chk: 'pending', rs: 'dns' }),
+      mkP({ pid: 'TUR-E6H-008', ev: 'TUR-2026-EARLY6H', cat: 'CAT-E6H', bib: '', name: '傅家豪', id: 'U128899776', g: 'M', dob: '1984-03-27', nat: 'TWN', ph: '0919001122', em: 'fu@tur.tw', city: '花蓮縣', rem: '逾期未付款', amt: 1400, pm: 'ONLINE_PAYUNi', ps: 'UNPAID', chk: 'pending', rs: 'dns' }),
+
+      // ========= 活動 5: TUR-2026-FIN100（已結案陽明山 100K 八百壯士賽，10 位：7 完賽開放印證書 / 2 DNF / 1 DNS） =========
+      mkP({ pid: 'TUR-FIN-001', ev: 'TUR-2026-FIN100', cat: 'CAT-FIN100', bib: 'K001', name: '陳志明', id: 'A123456789', g: 'M', dob: '1988-05-12', nat: 'TWN', ph: '0912345678', em: 'chen@tur.tw', city: '台北市', amt: 2600, l5: '88123', ps: 'PAID', uid: '04:A1:2B:99:10', chk: 'checked_in', rs: 'finished', paidAt: '2026-02-01 12:00:00' }),
       mkP({ pid: 'TUR-FIN-002', ev: 'TUR-2026-FIN100', cat: 'CAT-FIN100', bib: 'K002', name: '司馬青雲', id: 'E121234565', g: 'M', dob: '1982-07-08', nat: 'TWN', ph: '0919888777', em: 'sima@tur.tw', city: '高雄市', amt: 2600, l5: '45678', ps: 'PAID', uid: '04:C3:4D:77:30', chk: 'checked_in', rs: 'finished', pen: 120, paidAt: '2026-02-05 15:00:00' }),
-      mkP({ pid: 'TUR-FIN-004', ev: 'TUR-2026-FIN100', cat: 'CAT-FIN100', bib: 'K003', name: '諸葛明', id: 'A124455668', g: 'M', dob: '1986-08-18', nat: 'TWN', ph: '0912998811', em: 'zhuge@tur.tw', city: '新北市', amt: 2600, pm: 'ONLINE_PAYUNi', mtn: 'PU20260208', ps: 'PAID', uid: '04:99:88:77:66', chk: 'checked_in', rs: 'finished', paidAt: '2026-02-08 10:00:00' }),
+      mkP({ pid: 'TUR-FIN-004', ev: 'TUR-2026-FIN100', cat: 'CAT-FIN100', bib: 'K003', name: '諸葛明', id: 'A124455668', g: 'M', dob: '1986-08-18', nat: 'TWN', ph: '0912998811', em: 'zhuge@tur.tw', city: '新北市', amt: 2600, l5: '66778', ps: 'PAID', uid: '04:99:88:77:66', chk: 'checked_in', rs: 'finished', paidAt: '2026-02-08 10:00:00' }),
+      mkP({ pid: 'TUR-FIN-007', ev: 'TUR-2026-FIN100', cat: 'CAT-FIN100', bib: 'K005', name: '上官婉兒', id: 'A228877665', g: 'F', dob: '1990-06-06', nat: 'TWN', ph: '0928112233', em: 'shangguan@tur.tw', city: '台北市', amt: 2600, l5: '77889', ps: 'PAID', uid: '04:88:77:66:55', chk: 'checked_in', rs: 'finished', paidAt: '2026-02-09 09:00:00' }),
       mkP({ pid: 'TUR-FIN-003', ev: 'TUR-2026-FIN100', cat: 'CAT-FIN50', bib: 'F001', name: '歐陽晴', id: 'F223456786', g: 'F', dob: '1991-09-20', nat: 'TWN', ph: '0922334455', em: 'ouyang@tur.tw', city: '新北市', diet: '素', amt: 1800, l5: '54321', ps: 'PAID', uid: '04:B2:3C:88:20', chk: 'checked_in', rs: 'finished', paidAt: '2026-02-06 09:30:00' }),
+      mkP({ pid: 'TUR-FIN-008', ev: 'TUR-2026-FIN100', cat: 'CAT-FIN50', bib: 'F003', name: '林雅婷', id: 'A223456781', g: 'F', dob: '1993-04-15', nat: 'TWN', ph: '0932112233', em: 'linyt@tur.tw', city: '桃園市', amt: 1800, l5: '33441', ps: 'PAID', uid: '04:B2:3C:88:21', chk: 'checked_in', rs: 'finished', paidAt: '2026-02-07 10:15:00' }),
+      mkP({ pid: 'TUR-FIN-009', ev: 'TUR-2026-FIN100', cat: 'CAT-FIN50', bib: 'F004', name: 'Tanaka Kenji', id: 'JP99887766', g: 'M', dob: '1985-03-14', nat: 'JPN', ph: '0911223344', em: 'kenji@jp-run.jp', city: '離島 / 海外', amt: 1800, l5: '99112', ps: 'PAID', uid: '04:B2:3C:88:22', chk: 'checked_in', rs: 'finished', paidAt: '2026-02-08 11:20:00' }),
       mkP({ pid: 'TUR-FIN-005', ev: 'TUR-2026-FIN100', cat: 'CAT-FIN100', bib: 'K004', name: '高志強', id: 'B127788990', g: 'M', dob: '1981-04-04', nat: 'TWN', ph: '0931667788', em: 'kao@tur.tw', city: '台中市', amt: 2600, l5: '22334', ps: 'PAID', uid: '04:77:66:55:44', chk: 'checked_in', rs: 'dnf', paidAt: '2026-02-09 11:00:00' }),
+      mkP({ pid: 'TUR-FIN-010', ev: 'TUR-2026-FIN100', cat: 'CAT-FIN50', bib: 'F005', name: '吳俊傑', id: 'C126655442', g: 'M', dob: '1987-07-17', nat: 'TWN', ph: '0915667788', em: 'wujj@tur.tw', city: '基隆市', rem: 'CP1 扭傷退賽', amt: 1800, l5: '44332', ps: 'PAID', uid: '04:77:66:55:45', chk: 'checked_in', rs: 'dnf', paidAt: '2026-02-09 16:00:00' }),
       mkP({ pid: 'TUR-FIN-006', ev: 'TUR-2026-FIN100', cat: 'CAT-FIN50', bib: 'F002', name: '曾詩涵', id: 'F228899002', g: 'F', dob: '1994-12-01', nat: 'TWN', ph: '0926554433', em: 'tseng@tur.tw', city: '台北市', amt: 1800, l5: '88990', ps: 'PAID', chk: 'pending', rs: 'dns', paidAt: '2026-02-10 14:00:00' }),
 
-      // ========= 活動 5: TUR-2026-FIN24H（已結案台南 24H 跨夜繞圈，4 位） =========
+      // ========= 活動 6: TUR-2026-FIN24H（已結案台南 24H 跨夜繞圈，8 位：6 完賽 / 1 DNF / 1 DNS） =========
       mkP({ pid: 'TUR-F24-001', ev: 'TUR-2026-FIN24H', cat: 'CAT-FIN24H', bib: 'T001', name: 'Sarah Miller', id: 'US44556677', g: 'F', dob: '1990-02-18', nat: 'USA', ph: '0988776655', em: 'sarah@ultra.us', city: '台北市', diet: '素', amt: 2800, pm: 'ONLINE_PAYUNi', mtn: 'PU20260401', ps: 'PAID', uid: '04:D4:5E:66:40', chk: 'checked_in', rs: 'finished', paidAt: '2026-04-01 08:00:00' }),
-      mkP({ pid: 'TUR-F24-002', ev: 'TUR-2026-FIN24H', cat: 'CAT-FIN24H', bib: 'T002', name: '林宏達', id: 'D123456783', g: 'M', dob: '1983-05-20', nat: 'TWN', ph: '0917223344', em: 'linhd@tur.tw', city: '台南市', amt: 2800, l5: '11223', ps: 'PAID', uid: '04:D4:5E:66:42', chk: 'checked_in', rs: 'finished', paidAt: '2026-04-02 09:00:00' }),
-      mkP({ pid: 'TUR-F24-003', ev: 'TUR-2026-FIN24H', cat: 'CAT-FIN24H', bib: 'T003', name: '王淑芬', id: 'D224567891', g: 'F', dob: '1987-11-11', nat: 'TWN', ph: '0928334455', em: 'wangsf@tur.tw', city: '台南市', amt: 2800, l5: '33445', ps: 'PAID', uid: '04:D4:5E:66:43', chk: 'checked_in', rs: 'finished', paidAt: '2026-04-03 10:00:00' }),
-      mkP({ pid: 'TUR-F24-004', ev: 'TUR-2026-FIN24H', cat: 'CAT-FIN24H', bib: 'T004', name: '張哲銘', id: 'E128899001', g: 'M', dob: '1979-03-27', nat: 'TWN', ph: '0937445566', em: 'changzm@tur.tw', city: '高雄市', amt: 2800, l5: '55667', ps: 'PAID', uid: '04:D4:5E:66:44', chk: 'checked_in', rs: 'dnf', paidAt: '2026-04-04 11:00:00' })
+      mkP({ pid: 'TUR-F24-002', ev: 'TUR-2026-FIN24H', cat: 'CAT-FIN24H', bib: 'T002', name: '林宏達', id: 'D123456783', g: 'M', dob: '1983-05-20', nat: 'TWN', ph: '0917223344', em: 'linhd@tur.tw', city: '台南市', amt: 2800, pm: 'ONLINE_PAYUNi', mtn: 'PU20260402', ps: 'PAID', uid: '04:D4:5E:66:42', chk: 'checked_in', rs: 'finished', paidAt: '2026-04-02 09:00:00' }),
+      mkP({ pid: 'TUR-F24-003', ev: 'TUR-2026-FIN24H', cat: 'CAT-FIN24H', bib: 'T003', name: '王淑芬', id: 'D224567891', g: 'F', dob: '1987-11-11', nat: 'TWN', ph: '0928334455', em: 'wangsf@tur.tw', city: '台南市', amt: 2800, pm: 'ONLINE_PAYUNi', mtn: 'PU20260403', ps: 'PAID', uid: '04:D4:5E:66:43', chk: 'checked_in', rs: 'finished', paidAt: '2026-04-03 10:00:00' }),
+      mkP({ pid: 'TUR-F24-005', ev: 'TUR-2026-FIN24H', cat: 'CAT-FIN12H', bib: 'N001', name: '謝明哲', id: 'D129988112', g: 'M', dob: '1986-02-28', nat: 'TWN', ph: '0913445566', em: 'hsiehmz@tur.tw', city: '台南市', amt: 2100, pm: 'ONLINE_PAYUNi', mtn: 'PU20260405', ps: 'PAID', uid: '04:D4:5E:66:45', chk: 'checked_in', rs: 'finished', paidAt: '2026-04-05 10:00:00' }),
+      mkP({ pid: 'TUR-F24-006', ev: 'TUR-2026-FIN24H', cat: 'CAT-FIN12H', bib: 'N002', name: '許芳瑜', id: 'E221122339', g: 'F', dob: '1991-07-19', nat: 'TWN', ph: '0924556677', em: 'hsufy@tur.tw', city: '高雄市', amt: 2100, pm: 'ONLINE_PAYUNi', mtn: 'PU20260406', ps: 'PAID', uid: '04:D4:5E:66:46', chk: 'checked_in', rs: 'finished', paidAt: '2026-04-06 11:00:00' }),
+      mkP({ pid: 'TUR-F24-007', ev: 'TUR-2026-FIN24H', cat: 'CAT-FIN12H', bib: 'N003', name: 'Kim Min-Jae', id: 'KR88221100', g: 'M', dob: '1992-01-30', nat: 'KOR', ph: '0972334411', em: 'minjae@kr-run.kr', city: '離島 / 海外', amt: 2100, pm: 'ONLINE_PAYUNi', mtn: 'PU20260407', ps: 'PAID', uid: '04:D4:5E:66:47', chk: 'checked_in', rs: 'finished', paidAt: '2026-04-07 12:00:00' }),
+      mkP({ pid: 'TUR-F24-004', ev: 'TUR-2026-FIN24H', cat: 'CAT-FIN24H', bib: 'T004', name: '張哲銘', id: 'E128899001', g: 'M', dob: '1979-03-27', nat: 'TWN', ph: '0937445566', em: 'changzm@tur.tw', city: '高雄市', amt: 2800, pm: 'ONLINE_PAYUNi', mtn: 'PU20260404', ps: 'PAID', uid: '04:D4:5E:66:44', chk: 'checked_in', rs: 'dnf', paidAt: '2026-04-04 11:00:00' }),
+      mkP({ pid: 'TUR-F24-008', ev: 'TUR-2026-FIN24H', cat: 'CAT-FIN12H', bib: 'N004', name: '蔡宜蓁', id: 'D229900118', g: 'F', dob: '1995-09-02', nat: 'TWN', ph: '0961223344', em: 'tsaiyz@tur.tw', city: '台南市', amt: 2100, pm: 'ONLINE_PAYUNi', mtn: 'PU20260408', ps: 'PAID', chk: 'pending', rs: 'dns', paidAt: '2026-04-08 15:00:00' })
     ];
 
     const timingLogs = [
@@ -2018,24 +2071,35 @@
       { logId: 'LOG-50K-16', eventId: 'TUR-2026-50K', stationCode: 'CP1', bibNumber: 'A004', idCardHash: '', sensedTime: '2026-11-26 08:19:02', lapCount: 0, operator: 'cp1', source: 'nfc', isValid: true, note: '' },
       // U007 周柏諺 (100K DNF — 過 CP1 後抽筋棄賽)
       { logId: 'LOG-50K-17', eventId: 'TUR-2026-50K', stationCode: 'CP1', bibNumber: 'U007', idCardHash: '', sensedTime: '2026-11-26 08:28:40', lapCount: 0, operator: 'cp1', source: 'nfc', isValid: true, note: '於 CP1 後回報退賽' },
+      // A007 林大為 (外部名單匯入中途加入，手動補登 CP1)
+      { logId: 'LOG-50K-18', eventId: 'TUR-2026-50K', stationCode: 'CP1', bibNumber: 'A007', idCardHash: '', sensedTime: '2026-11-26 08:11:25', lapCount: 0, operator: 'cp1', source: 'manual', isValid: true, note: '外部匯入選手・晶片異常由站長手動補登' },
+      // U008 端木晴 (外部名單匯入已完賽)
+      { logId: 'LOG-50K-19', eventId: 'TUR-2026-50K', stationCode: 'CP1', bibNumber: 'U008', idCardHash: '', sensedTime: '2026-11-26 07:38:00', lapCount: 0, operator: 'cp1', source: 'nfc', isValid: true, note: '' },
+      { logId: 'LOG-50K-20', eventId: 'TUR-2026-50K', stationCode: 'CP2', bibNumber: 'U008', idCardHash: '', sensedTime: '2026-11-26 10:42:15', lapCount: 0, operator: 'cp1', source: 'nfc', isValid: true, note: '' },
+      { logId: 'LOG-50K-21', eventId: 'TUR-2026-50K', stationCode: 'FINISH', bibNumber: 'U008', idCardHash: '', sensedTime: '2026-11-26 16:12:30', lapCount: 0, operator: 'finish01', source: 'nfc', isValid: true, note: '外部匯入完賽' },
 
-      // === 活動 2: TUR-2026-12H（2026-11-26 06:00:00 起跑，繞圈進行中與完賽範例） ===
+      // === 活動 2: TUR-2026-12H（2026-11-26 06:00:00 起跑，繞圈進行中、手動補登與超時圈範例） ===
       { logId: 'LOG-12H-01', eventId: 'TUR-2026-12H', stationCode: 'LAP', bibNumber: 'L001', idCardHash: '', sensedTime: '2026-11-26 06:06:12', lapCount: 1, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
       { logId: 'LOG-12H-02', eventId: 'TUR-2026-12H', stationCode: 'LAP', bibNumber: 'L001', idCardHash: '', sensedTime: '2026-11-26 06:12:30', lapCount: 2, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
       { logId: 'LOG-12H-03', eventId: 'TUR-2026-12H', stationCode: 'LAP', bibNumber: 'L001', idCardHash: '', sensedTime: '2026-11-26 06:18:55', lapCount: 3, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
-      { logId: 'LOG-12H-04', eventId: 'TUR-2026-12H', stationCode: 'LAP', bibNumber: 'L001', idCardHash: '', sensedTime: '2026-11-26 06:25:18', lapCount: 4, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
+      { logId: 'LOG-12H-04', eventId: 'TUR-2026-12H', stationCode: 'LAP', bibNumber: 'L001', idCardHash: '', sensedTime: '2026-11-26 06:25:18', lapCount: 4, operator: 'lap01', source: 'manual', isValid: true, note: '雨天晶片未感應手動補圈' },
       { logId: 'LOG-12H-05', eventId: 'TUR-2026-12H', stationCode: 'LAP', bibNumber: 'L001', idCardHash: '', sensedTime: '2026-11-26 06:31:40', lapCount: 5, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
       { logId: 'LOG-12H-06', eventId: 'TUR-2026-12H', stationCode: 'LAP', bibNumber: 'L002', idCardHash: '', sensedTime: '2026-11-26 06:07:05', lapCount: 1, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
       { logId: 'LOG-12H-07', eventId: 'TUR-2026-12H', stationCode: 'LAP', bibNumber: 'L002', idCardHash: '', sensedTime: '2026-11-26 06:14:15', lapCount: 2, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
       { logId: 'LOG-12H-08', eventId: 'TUR-2026-12H', stationCode: 'LAP', bibNumber: 'L002', idCardHash: '', sensedTime: '2026-11-26 06:21:30', lapCount: 3, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
+      { logId: 'LOG-12H-15', eventId: 'TUR-2026-12H', stationCode: 'LAP', bibNumber: 'L005', idCardHash: '', sensedTime: '2026-11-26 06:06:50', lapCount: 1, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
+      { logId: 'LOG-12H-16', eventId: 'TUR-2026-12H', stationCode: 'LAP', bibNumber: 'L005', idCardHash: '', sensedTime: '2026-11-26 06:13:40', lapCount: 2, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
       { logId: 'LOG-12H-09', eventId: 'TUR-2026-12H', stationCode: 'LAP', bibNumber: 'S001', idCardHash: '', sensedTime: '2026-11-26 06:05:40', lapCount: 1, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
       { logId: 'LOG-12H-10', eventId: 'TUR-2026-12H', stationCode: 'LAP', bibNumber: 'S001', idCardHash: '', sensedTime: '2026-11-26 09:12:15', lapCount: 2, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
       { logId: 'LOG-12H-11', eventId: 'TUR-2026-12H', stationCode: 'LAP', bibNumber: 'S001', idCardHash: '', sensedTime: '2026-11-26 11:54:20', lapCount: 3, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
+      { logId: 'LOG-12H-17', eventId: 'TUR-2026-12H', stationCode: 'LAP', bibNumber: 'S001', idCardHash: '', sensedTime: '2026-11-26 12:04:10', lapCount: 4, operator: 'lap01', source: 'nfc', isValid: false, note: '6H 限時已過・超時圈不計入有效里程' },
       { logId: 'LOG-12H-12', eventId: 'TUR-2026-12H', stationCode: 'LAP', bibNumber: 'S002', idCardHash: '', sensedTime: '2026-11-26 06:06:30', lapCount: 1, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
       { logId: 'LOG-12H-13', eventId: 'TUR-2026-12H', stationCode: 'LAP', bibNumber: 'S002', idCardHash: '', sensedTime: '2026-11-26 11:48:10', lapCount: 2, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
+      { logId: 'LOG-12H-18', eventId: 'TUR-2026-12H', stationCode: 'LAP', bibNumber: 'S004', idCardHash: '', sensedTime: '2026-11-26 06:08:10', lapCount: 1, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
+      { logId: 'LOG-12H-19', eventId: 'TUR-2026-12H', stationCode: 'LAP', bibNumber: 'S004', idCardHash: '', sensedTime: '2026-11-26 11:50:45', lapCount: 2, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
       { logId: 'LOG-12H-14', eventId: 'TUR-2026-12H', stationCode: 'LAP', bibNumber: 'L004', idCardHash: '', sensedTime: '2026-11-26 06:08:50', lapCount: 1, operator: 'lap01', source: 'nfc', isValid: true, note: '膝蓋不適申請退賽' },
 
-      // === 活動 4: 已結案陽明山 100K 完整各站紀錄 ===
+      // === 活動 5: 已結案陽明山 100K 完整各站紀錄（7 完賽開放印證書 + 2 DNF） ===
       { logId: 'LOG-F100-1', eventId: 'TUR-2026-FIN100', stationCode: 'CP1', bibNumber: 'K001', idCardHash: '', sensedTime: '2026-04-18 07:45:12', lapCount: 0, operator: 'cp1', source: 'nfc', isValid: true, note: '' },
       { logId: 'LOG-F100-2', eventId: 'TUR-2026-FIN100', stationCode: 'CP2', bibNumber: 'K001', idCardHash: '', sensedTime: '2026-04-18 11:18:40', lapCount: 0, operator: 'cp2', source: 'nfc', isValid: true, note: '' },
       { logId: 'LOG-F100-3', eventId: 'TUR-2026-FIN100', stationCode: 'FINISH', bibNumber: 'K001', idCardHash: '', sensedTime: '2026-04-18 14:52:05', lapCount: 0, operator: 'finish01', source: 'nfc', isValid: true, note: '' },
@@ -2045,33 +2109,53 @@
       { logId: 'LOG-F100-9', eventId: 'TUR-2026-FIN100', stationCode: 'CP1', bibNumber: 'K003', idCardHash: '', sensedTime: '2026-04-18 08:15:30', lapCount: 0, operator: 'cp1', source: 'nfc', isValid: true, note: '' },
       { logId: 'LOG-F100-10', eventId: 'TUR-2026-FIN100', stationCode: 'CP2', bibNumber: 'K003', idCardHash: '', sensedTime: '2026-04-18 12:18:45', lapCount: 0, operator: 'cp2', source: 'nfc', isValid: true, note: '' },
       { logId: 'LOG-F100-11', eventId: 'TUR-2026-FIN100', stationCode: 'FINISH', bibNumber: 'K003', idCardHash: '', sensedTime: '2026-04-18 16:45:12', lapCount: 0, operator: 'finish01', source: 'nfc', isValid: true, note: '' },
+      { logId: 'LOG-F100-13', eventId: 'TUR-2026-FIN100', stationCode: 'CP1', bibNumber: 'K005', idCardHash: '', sensedTime: '2026-04-18 08:22:00', lapCount: 0, operator: 'cp1', source: 'nfc', isValid: true, note: '' },
+      { logId: 'LOG-F100-14', eventId: 'TUR-2026-FIN100', stationCode: 'CP2', bibNumber: 'K005', idCardHash: '', sensedTime: '2026-04-18 12:40:18', lapCount: 0, operator: 'cp2', source: 'nfc', isValid: true, note: '' },
+      { logId: 'LOG-F100-15', eventId: 'TUR-2026-FIN100', stationCode: 'FINISH', bibNumber: 'K005', idCardHash: '', sensedTime: '2026-04-18 17:20:44', lapCount: 0, operator: 'finish01', source: 'nfc', isValid: true, note: '女子百K 冠軍' },
       { logId: 'LOG-F100-7', eventId: 'TUR-2026-FIN100', stationCode: 'CP1', bibNumber: 'F001', idCardHash: '', sensedTime: '2026-04-18 08:12:00', lapCount: 0, operator: 'cp1', source: 'nfc', isValid: true, note: '' },
       { logId: 'LOG-F100-8', eventId: 'TUR-2026-FIN100', stationCode: 'FINISH', bibNumber: 'F001', idCardHash: '', sensedTime: '2026-04-18 10:14:22', lapCount: 0, operator: 'finish01', source: 'nfc', isValid: true, note: '' },
+      { logId: 'LOG-F100-16', eventId: 'TUR-2026-FIN100', stationCode: 'CP1', bibNumber: 'F003', idCardHash: '', sensedTime: '2026-04-18 08:24:15', lapCount: 0, operator: 'cp1', source: 'nfc', isValid: true, note: '' },
+      { logId: 'LOG-F100-17', eventId: 'TUR-2026-FIN100', stationCode: 'FINISH', bibNumber: 'F003', idCardHash: '', sensedTime: '2026-04-18 10:42:09', lapCount: 0, operator: 'finish01', source: 'nfc', isValid: true, note: '' },
+      { logId: 'LOG-F100-18', eventId: 'TUR-2026-FIN100', stationCode: 'CP1', bibNumber: 'F004', idCardHash: '', sensedTime: '2026-04-18 08:05:30', lapCount: 0, operator: 'cp1', source: 'nfc', isValid: true, note: '' },
+      { logId: 'LOG-F100-19', eventId: 'TUR-2026-FIN100', stationCode: 'FINISH', bibNumber: 'F004', idCardHash: '', sensedTime: '2026-04-18 09:58:40', lapCount: 0, operator: 'finish01', source: 'nfc', isValid: true, note: '' },
       { logId: 'LOG-F100-12', eventId: 'TUR-2026-FIN100', stationCode: 'CP1', bibNumber: 'K004', idCardHash: '', sensedTime: '2026-04-18 08:45:00', lapCount: 0, operator: 'cp1', source: 'nfc', isValid: true, note: 'DNF 棄賽' },
+      { logId: 'LOG-F100-20', eventId: 'TUR-2026-FIN100', stationCode: 'CP1', bibNumber: 'F005', idCardHash: '', sensedTime: '2026-04-18 08:52:10', lapCount: 0, operator: 'cp1', source: 'nfc', isValid: true, note: '扭傷棄賽' },
 
-      // === 活動 5: 已結案台南 24H 跨夜（18:00 起跑 -> 隔日刷圈） ===
+      // === 活動 6: 已結案台南 24H 跨夜（18:00 起跑 -> 隔日刷圈，6 完賽 + 1 DNF） ===
       { logId: 'LOG-F24-1', eventId: 'TUR-2026-FIN24H', stationCode: 'LAP', bibNumber: 'T001', idCardHash: '', sensedTime: '2026-05-23 18:06:10', lapCount: 1, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
       { logId: 'LOG-F24-2', eventId: 'TUR-2026-FIN24H', stationCode: 'LAP', bibNumber: 'T001', idCardHash: '', sensedTime: '2026-05-24 02:15:30', lapCount: 2, operator: 'lap01', source: 'nfc', isValid: true, note: '跨夜測試圈' },
       { logId: 'LOG-F24-3', eventId: 'TUR-2026-FIN24H', stationCode: 'LAP', bibNumber: 'T001', idCardHash: '', sensedTime: '2026-05-24 17:42:10', lapCount: 3, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
       { logId: 'LOG-F24-4', eventId: 'TUR-2026-FIN24H', stationCode: 'LAP', bibNumber: 'T002', idCardHash: '', sensedTime: '2026-05-23 18:05:50', lapCount: 1, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
       { logId: 'LOG-F24-5', eventId: 'TUR-2026-FIN24H', stationCode: 'LAP', bibNumber: 'T002', idCardHash: '', sensedTime: '2026-05-24 16:50:00', lapCount: 2, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
       { logId: 'LOG-F24-6', eventId: 'TUR-2026-FIN24H', stationCode: 'LAP', bibNumber: 'T003', idCardHash: '', sensedTime: '2026-05-23 18:07:30', lapCount: 1, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
+      { logId: 'LOG-F24-8', eventId: 'TUR-2026-FIN24H', stationCode: 'LAP', bibNumber: 'N001', idCardHash: '', sensedTime: '2026-05-23 18:06:40', lapCount: 1, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
+      { logId: 'LOG-F24-9', eventId: 'TUR-2026-FIN24H', stationCode: 'LAP', bibNumber: 'N001', idCardHash: '', sensedTime: '2026-05-24 05:32:10', lapCount: 2, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
+      { logId: 'LOG-F24-10', eventId: 'TUR-2026-FIN24H', stationCode: 'LAP', bibNumber: 'N002', idCardHash: '', sensedTime: '2026-05-23 18:07:15', lapCount: 1, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
+      { logId: 'LOG-F24-11', eventId: 'TUR-2026-FIN24H', stationCode: 'LAP', bibNumber: 'N002', idCardHash: '', sensedTime: '2026-05-24 05:45:20', lapCount: 2, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
+      { logId: 'LOG-F24-12', eventId: 'TUR-2026-FIN24H', stationCode: 'LAP', bibNumber: 'N003', idCardHash: '', sensedTime: '2026-05-23 18:05:30', lapCount: 1, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
+      { logId: 'LOG-F24-13', eventId: 'TUR-2026-FIN24H', stationCode: 'LAP', bibNumber: 'N003', idCardHash: '', sensedTime: '2026-05-24 05:18:55', lapCount: 2, operator: 'lap01', source: 'nfc', isValid: true, note: '' },
       { logId: 'LOG-F24-7', eventId: 'TUR-2026-FIN24H', stationCode: 'LAP', bibNumber: 'T004', idCardHash: '', sensedTime: '2026-05-23 21:10:00', lapCount: 1, operator: 'lap01', source: 'nfc', isValid: true, note: '夜間退賽' }
     ];
 
     const historyResults = [
-      { historyId: 'HIS-2023-001', eventDate: '2023-11-18', eventName: '2023 TUR 東吳八百壯士 100K 超馬賽', categoryName: '100K 組', bibNumber: 'W012', name: '陳志明', nationality: 'TWN', idCardHash: 'demo-hash-chen', finishTime: '10:48:20', distanceKm: 100, lapCount: 0, overallRank: 5, catRank: 3, status: 'FINISHED', isWarrior800: true, remark: '初百K 達標' },
+      { historyId: 'HIS-2022-001', eventDate: '2022-11-19', eventName: '2022 TUR 東吳八百壯士 100K 超馬賽', categoryName: '100K 組', bibNumber: 'W005', name: '陳志明', nationality: 'TWN', idCardHash: 'demo-hash-chen', finishTime: '11:15:30', distanceKm: 100, lapCount: 0, overallRank: 9, catRank: 5, status: 'FINISHED', isWarrior800: true, remark: '首登百K 殿堂' },
+      { historyId: 'HIS-2022-002', eventDate: '2022-11-19', eventName: '2022 TUR 東吳八百壯士 100K 超馬賽', categoryName: '100K 組', bibNumber: 'W008', name: '司馬青雲', nationality: 'TWN', idCardHash: 'demo-hash-sima', finishTime: '10:22:10', distanceKm: 100, lapCount: 0, overallRank: 3, catRank: 3, status: 'FINISHED', isWarrior800: true, remark: '男總三' },
+      { historyId: 'HIS-2022-003', eventDate: '2022-06-12', eventName: '2022 TUR 花蓮 6H 海濱繞圈賽', categoryName: '6H 組', bibNumber: 'H015', name: '林宏達', nationality: 'TWN', idCardHash: 'demo-hash-linhd', finishTime: '05:54:20', distanceKm: 64.0, lapCount: 64, overallRank: 4, catRank: 2, status: 'FINISHED', isWarrior800: false, remark: '分組第二' },
+      { historyId: 'HIS-2023-001', eventDate: '2023-11-18', eventName: '2023 TUR 東吳八百壯士 100K 超馬賽', categoryName: '100K 組', bibNumber: 'W012', name: '陳志明', nationality: 'TWN', idCardHash: 'demo-hash-chen', finishTime: '10:48:20', distanceKm: 100, lapCount: 0, overallRank: 5, catRank: 3, status: 'FINISHED', isWarrior800: true, remark: '二星達標' },
       { historyId: 'HIS-2023-002', eventDate: '2023-11-18', eventName: '2023 TUR 東吳八百壯士 100K 超馬賽', categoryName: '100K 組', bibNumber: 'W018', name: '司馬青雲', nationality: 'TWN', idCardHash: 'demo-hash-sima', finishTime: '09:58:15', distanceKm: 100, lapCount: 0, overallRank: 2, catRank: 2, status: 'FINISHED', isWarrior800: true, remark: '男總二' },
       { historyId: 'HIS-2023-003', eventDate: '2023-05-14', eventName: '2023 TUR 日月潭 50K 環湖超馬', categoryName: '50K 組', bibNumber: 'B022', name: '歐陽晴', nationality: 'TWN', idCardHash: 'demo-hash-ouyang', finishTime: '05:24:10', distanceKm: 50, lapCount: 0, overallRank: 8, catRank: 2, status: 'FINISHED', isWarrior800: false, remark: '女總二' },
+      { historyId: 'HIS-2023-004', eventDate: '2023-11-18', eventName: '2023 TUR 東吳八百壯士 100K 超馬賽', categoryName: '100K 組', bibNumber: 'W031', name: '上官婉兒', nationality: 'TWN', idCardHash: 'demo-hash-shangguan', finishTime: '12:08:40', distanceKm: 100, lapCount: 0, overallRank: 11, catRank: 2, status: 'FINISHED', isWarrior800: true, remark: '女子百K 亞軍' },
       { historyId: 'HIS-2024-001', eventDate: '2024-11-16', eventName: '2024 TUR 東吳八百壯士 100K 超馬賽', categoryName: '100K 組', bibNumber: 'A101', name: '陳志明', nationality: 'TWN', idCardHash: 'demo-hash-chen', finishTime: '10:12:45', distanceKm: 100, lapCount: 0, overallRank: 3, catRank: 2, status: 'FINISHED', isWarrior800: true, remark: '個人 PB' },
       { historyId: 'HIS-2024-002', eventDate: '2024-11-16', eventName: '2024 TUR 東吳八百壯士 100K 超馬賽', categoryName: '100K 組', bibNumber: 'A109', name: 'Sarah Miller', nationality: 'USA', idCardHash: 'demo-hash-sarah', finishTime: '11:05:30', distanceKm: 100, lapCount: 0, overallRank: 7, catRank: 1, status: 'FINISHED', isWarrior800: true, remark: '女總一' },
       { historyId: 'HIS-2024-003', eventDate: '2024-03-24', eventName: '2024 TUR 台中 12H 繞圈超馬賽', categoryName: '12H 組', bibNumber: 'L044', name: '王超馬', nationality: 'TWN', idCardHash: 'demo-hash-wang', finishTime: '11:56:40', distanceKm: 112.0, lapCount: 112, overallRank: 2, catRank: 2, status: 'FINISHED', isWarrior800: true, remark: '繞圈破百K' },
       { historyId: 'HIS-2024-004', eventDate: '2024-09-08', eventName: '2024 TUR 墾丁 50K 海岸挑戰賽', categoryName: '50K 組', bibNumber: 'S088', name: '林雅婷', nationality: 'TWN', idCardHash: 'demo-hash-linyt', finishTime: '05:42:18', distanceKm: 50, lapCount: 0, overallRank: 12, catRank: 3, status: 'FINISHED', isWarrior800: false, remark: '分組前三' },
+      { historyId: 'HIS-2024-005', eventDate: '2024-11-16', eventName: '2024 TUR 東吳八百壯士 100K 超馬賽', categoryName: '100K 組', bibNumber: 'A118', name: 'Tanaka Kenji', nationality: 'JPN', idCardHash: 'demo-hash-kenji', finishTime: '10:35:12', distanceKm: 100, lapCount: 0, overallRank: 4, catRank: 3, status: 'FINISHED', isWarrior800: true, remark: '日本國際跑者' },
       { historyId: 'HIS-2025-002', eventDate: '2025-04-20', eventName: '2025 台北 24H 超級馬拉松', categoryName: '24H 組', bibNumber: 'B208', name: '司馬青雲', nationality: 'TWN', idCardHash: 'demo-hash-sima', finishTime: '23:54:10', distanceKm: 148.5, lapCount: 148, overallRank: 1, catRank: 1, status: 'FINISHED', isWarrior800: true, remark: '破場地紀錄' },
       { historyId: 'HIS-2025-003', eventDate: '2025-10-12', eventName: '2025 TUR 宜蘭 50K 海岸超馬', categoryName: '50K 組', bibNumber: 'C055', name: '歐陽晴', nationality: 'TWN', idCardHash: 'demo-hash-ouyang', finishTime: '05:08:30', distanceKm: 50, lapCount: 0, overallRank: 5, catRank: 1, status: 'FINISHED', isWarrior800: false, remark: '女總一' },
       { historyId: 'HIS-2025-004', eventDate: '2025-12-07', eventName: '2025 TUR 花蓮太魯閣 100K 越野超馬', categoryName: '100K 組', bibNumber: 'W019', name: '諸葛明', nationality: 'TWN', idCardHash: 'demo-hash-zhuge', finishTime: '11:45:22', distanceKm: 100, lapCount: 0, overallRank: 6, catRank: 4, status: 'FINISHED', isWarrior800: true, remark: '八百壯士達標' },
       { historyId: 'HIS-2025-005', eventDate: '2025-12-07', eventName: '2025 TUR 花蓮太魯閣 100K 越野超馬', categoryName: '100K 組', bibNumber: 'W027', name: '歐陽晴', nationality: 'TWN', idCardHash: 'demo-hash-ouyang', finishTime: '11:20:05', distanceKm: 100, lapCount: 0, overallRank: 4, catRank: 1, status: 'FINISHED', isWarrior800: true, remark: '初百K 女總一' },
-      { historyId: 'HIS-2025-006', eventDate: '2025-04-20', eventName: '2025 台北 24H 超級馬拉松', categoryName: '24H 組', bibNumber: 'B215', name: '林宏達', nationality: 'TWN', idCardHash: 'demo-hash-linhd', finishTime: '23:40:12', distanceKm: 126.0, lapCount: 126, overallRank: 4, catRank: 3, status: 'FINISHED', isWarrior800: true, remark: '跨夜百K' }
+      { historyId: 'HIS-2025-006', eventDate: '2025-04-20', eventName: '2025 台北 24H 超級馬拉松', categoryName: '24H 組', bibNumber: 'B215', name: '林宏達', nationality: 'TWN', idCardHash: 'demo-hash-linhd', finishTime: '23:40:12', distanceKm: 126.0, lapCount: 126, overallRank: 4, catRank: 3, status: 'FINISHED', isWarrior800: true, remark: '跨夜百K' },
+      { historyId: 'HIS-2025-007', eventDate: '2025-04-20', eventName: '2025 台北 24H 超級馬拉松', categoryName: '24H 組', bibNumber: 'B220', name: 'Sarah Miller', nationality: 'USA', idCardHash: 'demo-hash-sarah', finishTime: '23:51:00', distanceKm: 135.0, lapCount: 135, overallRank: 2, catRank: 1, status: 'FINISHED', isWarrior800: true, remark: '24H 女子冠軍' }
     ];
 
     return { users, globalConfig, events, categories, stations, participants, timingLogs, historyResults };

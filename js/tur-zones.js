@@ -2472,7 +2472,7 @@
             <label class="px-3.5 py-2 rounded-lg bg-amber-100 text-amber-900 font-bold cursor-pointer">
               ♻️ 覆蓋還原（整機回溯）<input id="z5RestoreOverwrite" type="file" accept=".json" class="hidden" />
             </label>
-            <button id="btnZ5Seed5" class="px-3.5 py-2 rounded-lg bg-indigo-600 text-white font-bold">⚡ 載入全情境測試資料（5 場活動 / 38 位全階段選手）</button>
+            <button id="btnZ5Seed5" class="px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold">⚡ 清空舊活動並重建 6 場全情境示範資料（同步雲端）</button>
             <button id="btnZ5ClearAll" class="px-3.5 py-2 rounded-lg bg-rose-600 text-white font-bold">🗑️ 清空全平台資料</button>
           </div>
         </div>
@@ -2574,15 +2574,49 @@
       $('#z5RestoreOverwrite').onchange = (e) => handleRestore(e.target.files?.[0], 'overwrite');
 
       $('#btnZ5Seed5').onclick = async () => {
-        if (!confirm('載入全情境 5 場測試活動資料（將覆蓋本機快取）？')) return;
+        const hasCloud = Boolean(App.State.gasUrl && navigator.onLine);
+        const tip = hasCloud
+          ? '確定清空「本機與雲端 Google 試算表」原來建的所有活動資料，並重建 6 場全情境示範資料（64 位選手／70+ 筆計時紀錄／18 筆 2022–2025 歷年成績）？\n\n註：您的帳號密碼 (Users) 與系統參數 (GlobalConfig) 會保留不變！'
+          : '確定清空原來建的所有活動資料，並重建 6 場全情境示範資料（64 位選手／70+ 筆計時紀錄／18 筆 2022–2025 歷年成績）？';
+        if (!confirm(tip)) return;
+
         const seed = C.buildFull5EventsSeed();
-        for (const k of Object.keys(seed)) {
+        const eventStores = ['events', 'categories', 'stations', 'participants', 'timingLogs', 'historyResults'];
+        for (const k of eventStores) {
           App.State[k] = seed[k];
           await C.TurDB.clearAndFill(k, seed[k]);
         }
+        App.State.syncQueue = [];
+        await C.TurDB.clear('syncQueue');
+        if (!App.State.users.length) { App.State.users = seed.users; await C.TurDB.clearAndFill('users', seed.users); }
+        if (!App.State.globalConfig.length) { App.State.globalConfig = seed.globalConfig; await C.TurDB.clearAndFill('globalConfig', seed.globalConfig); }
+
+        let cloudMsg = '';
+        if (hasCloud) {
+          App.toast('☁️ 正在清空雲端試算表舊活動並寫入 6 場全情境示範資料...', 'info');
+          const sheetPairs = [
+            ['Events', seed.events],
+            ['Categories', seed.categories],
+            ['Stations', seed.stations],
+            ['Participants', seed.participants],
+            ['TimingLogs', seed.timingLogs],
+            ['HistoryResults', seed.historyResults]
+          ];
+          let okCnt = 0;
+          for (const [sn, rows] of sheetPairs) {
+            try {
+              const r = await C.gasPost(App.State.gasUrl, { action: 'adminBatchUpdateSheet', sheetName: sn, rows, mode: 'replace' });
+              if (r && r.ok) okCnt++;
+            } catch (_) {}
+          }
+          cloudMsg = okCnt === sheetPairs.length ? '（☁️ 雲端 Google 試算表 6 張表已同步清空重建！）' : `（雲端同步完成 ${okCnt}/${sheetPairs.length} 表）`;
+        }
+
+        App.State.z1EventId = seed.events[0]?.eventId || '';
+        App.State.z2EventId = seed.events.find((e) => e.status === 'finished')?.eventId || '';
         App.rebuildIndices();
         App.renderAll();
-        App.toast('⚡ 已載入 5 場全情境測試資料（含距離賽、12H、100K 八百壯士、2 場已結案）', 'success');
+        App.toast(`⚡ 已清空舊活動並重建 6 場全情境示範資料（${seed.participants.length} 位選手 / ${seed.timingLogs.length} 筆感應 / ${seed.historyResults.length} 筆歷年）${cloudMsg}`, 'success');
       };
 
       $('#btnZ5ClearAll').onclick = async () => {

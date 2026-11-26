@@ -186,6 +186,22 @@ function initTurDatabase() {
   return setupSheets();
 }
 
+/**
+ * 僅清空 6 張活動與成績工作表（保留 Users 帳號與 GlobalConfig 系統參數），
+ * 方便從前台專區 5 點擊「⚡ 清空舊活動並重建 6 場全情境示範資料」重新寫入。
+ */
+function clearEventsDataOnly() {
+  const targets = ['Events', 'Categories', 'Stations', 'Participants', 'TimingLogs', 'HistoryResults'];
+  targets.forEach(function (name) {
+    const sheet = ensureSheet(name);
+    const lastRow = sheet.getLastRow();
+    if (lastRow > 1) {
+      sheet.getRange(2, 1, lastRow - 1, Math.max(SHEET_SCHEMAS[name].length, sheet.getLastColumn())).clearContent();
+    }
+  });
+  return '已清空 6 張活動與成績工作表（已保留 Users 與 GlobalConfig）。';
+}
+
 /* ============================================================================
  * HTTP Entrypoints (doGet / doPost) - 支援 JSON 與 JSONP
  * ============================================================================ */
