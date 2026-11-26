@@ -139,11 +139,11 @@
   }
 
   async function syncPushNow(silent = false) {
-    if (!State.syncQueue.length) { if (!silent) toast('本機無待上傳紀錄，雲端已同步', 'info'); return true; }
-    if (!State.gasUrl) { if (!silent) toast(`本機已保存 ${State.syncQueue.length} 筆待同步資料（請於專區 5 設定 GAS URL）`, 'warn'); return false; }
-    if (!navigator.onLine) { if (!silent) toast('目前離線中，連網後將自動批次上傳', 'warn'); return false; }
+    if (!State.syncQueue.length) { if (!silent) toast('本機無待上傳紀錄，雲端已同步', 'info'); return { ok: true, uploaded: 0 }; }
+    if (!State.gasUrl) { if (!silent) toast(`本機已保存 ${State.syncQueue.length} 筆待同步資料（請於專區 5 設定 GAS URL）`, 'warn'); return { ok: false, error: '尚未設定 GAS URL' }; }
+    if (!navigator.onLine) { if (!silent) toast('目前離線中，連網後將自動批次上傳', 'warn'); return { ok: false, error: '目前為離線狀態' }; }
 
-    if (syncInFlight) { syncAgainAfter = true; return true; }
+    if (syncInFlight) { syncAgainAfter = true; return { ok: true, queued: true }; }
     syncInFlight = true;
 
     const snap = [...State.syncQueue];
@@ -155,34 +155,37 @@
     }
 
     let uploaded = 0;
-    let okAll = true;
+    let lastError = '';
     try {
-      if (logItems.length) {
-        const res = await C.gasPost(State.gasUrl, { action: 'batchUploadLogs', timingLogs: logItems });
-        if (!res.ok) throw new Error(res.error);
-        for (const id of logQids) { await C.TurDB.remove('syncQueue', id); State.syncQueue = State.syncQueue.filter((x) => x.qid !== id); }
-        uploaded += logItems.length;
-      }
-      if (partUpd.length) {
-        const res = await C.gasPost(State.gasUrl, { action: 'batchUpdateParticipants', updates: partUpd, sendMail: true });
-        if (!res.ok) throw new Error(res.error);
-        for (const id of partQids) { await C.TurDB.remove('syncQueue', id); State.syncQueue = State.syncQueue.filter((x) => x.qid !== id); }
-        uploaded += partUpd.length;
-      }
+      // 1. 先執行建檔與結構寫入（registerRunner / saveEvent / saveCategory 等），確保列已存在於試算表
       for (const it of others) {
         const res = await C.gasPost(State.gasUrl, { action: it.action, ...it.payload });
-        if (!res.ok) throw new Error(res.error);
+        if (!res || !res.ok) throw new Error((res && res.error) || `同步 ${it.action} 失敗`);
         await C.TurDB.remove('syncQueue', it.qid);
         State.syncQueue = State.syncQueue.filter((x) => x.qid !== it.qid);
         uploaded++;
       }
+      // 2. 再批次更新選手狀態 / 配號 / 晶片
+      if (partUpd.length) {
+        const res = await C.gasPost(State.gasUrl, { action: 'batchUpdateParticipants', updates: partUpd, sendMail: true });
+        if (!res || !res.ok) throw new Error((res && res.error) || '批次更新選手失敗');
+        for (const id of partQids) { await C.TurDB.remove('syncQueue', id); State.syncQueue = State.syncQueue.filter((x) => x.qid !== id); }
+        uploaded += partUpd.length;
+      }
+      // 3. 最後批次寫入高頻感應紀錄
+      if (logItems.length) {
+        const res = await C.gasPost(State.gasUrl, { action: 'batchUploadLogs', timingLogs: logItems });
+        if (!res || !res.ok) throw new Error((res && res.error) || '批次上傳感應紀錄失敗');
+        for (const id of logQids) { await C.TurDB.remove('syncQueue', id); State.syncQueue = State.syncQueue.filter((x) => x.qid !== id); }
+        uploaded += logItems.length;
+      }
       updateQueueBadge();
       if (!silent) toast(`☁️ 雲端同步完成！共寫入 ${uploaded} 筆至 Google 試算表`, 'success');
     } catch (err) {
-      okAll = false;
+      lastError = err.message || String(err);
       updateQueueBadge();
-      if (!silent) toast(`上傳失敗：${err.message}`, 'error');
-      else console.warn('[TUR AutoSync queued for retry]', err.message);
+      if (!silent) toast(`上傳失敗：${lastError}`, 'error');
+      else console.warn('[TUR AutoSync error]', lastError);
     } finally {
       syncInFlight = false;
       if (syncAgainAfter && State.syncQueue.length > 0) {
@@ -190,7 +193,7 @@
         setTimeout(() => syncPushNow(true), 600);
       }
     }
-    return okAll;
+    return lastError ? { ok: false, error: lastError, uploaded } : { ok: true, uploaded };
   }
 
   async function syncPullFromGas(silent = false) {
@@ -573,26 +576,59 @@
     const isGroup = runners.length > 1 || Boolean(runners[0].groupName);
     const grpCode = isGroup ? `GRP26-${Math.floor(1000 + Math.random() * 8999)}` : '';
     const sharedLast5 = runners[0].remittanceLast5;
-    const payuniPids = [];
+    const evId = runners[0].eventId;
+    const usedBibs = new Set(State.participants.filter((p) => p.eventId === evId && p.bibNumber).map((p) => String(p.bibNumber).toUpperCase()));
+    const assignedBibs = [];
 
     for (const r of runners) {
       if (grpCode) r.groupCode = grpCode;
       if (r.payMethod === 'MANUAL_ATM' && !r.remittanceLast5 && sharedLast5) r.remittanceLast5 = sharedLast5;
+
+      // 若為 PAYUNi 秒級自動銷帳，於寫入雲端前直接配好號碼布，單次寫入到位
+      if (r.payMethod === 'ONLINE_PAYUNi' && !r.bibNumber) {
+        const cat = State.categories.find((c) => c.catId === r.catId);
+        const prefix = String(cat?.bibPrefix || 'R').toUpperCase();
+        const startStr = String(cat?.bibStartNum || '001');
+        const width = Math.max(3, startStr.length);
+        let num = parseInt(startStr, 10) || 1;
+        let bib = `${prefix}${String(num).padStart(width, '0')}`;
+        while (usedBibs.has(bib)) { num++; bib = `${prefix}${String(num).padStart(width, '0')}`; }
+        usedBibs.add(bib);
+        r.bibNumber = bib;
+        assignedBibs.push(bib);
+      }
+
       State.participants.push(r);
       await C.TurDB.put('participants', r);
-      if (r.payMethod === 'ONLINE_PAYUNi') payuniPids.push(r.participantId);
     }
-    await enqueueSync('registerRunner', { runners });
-
-    if (payuniPids.length) {
-      await autoAssignBibsForEvent(runners[0].eventId, payuniPids);
-      const assignedBibs = payuniPids.map((id) => State.idxById.get(id)?.bibNumber).filter(Boolean).join(', ');
-      toast(`⚡ PAYUNi 統一金流秒級銷帳成功！已自動改 PAID 並配號：${assignedBibs}`, 'success');
-    } else {
-      rebuildIndices(runners[0].eventId);
-      toast(`📝 報名成功！序號 ${runners[0].participantId}${grpCode ? `｜團報碼 ${grpCode}` : ''}（請依帳戶轉帳）`, 'success');
-    }
+    rebuildIndices(evId);
     renderPublicRegister();
+
+    // 放入佇列並立即等待寫入 Google 試算表，讓使用者立刻看到雲端同步成功或明確錯誤原因
+    const item = { qid: `Q-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, action: 'registerRunner', payload: { runners }, createdAt: Date.now() };
+    State.syncQueue.push(item);
+    await C.TurDB.put('syncQueue', item);
+    updateQueueBadge();
+
+    let cloudNote = '（本機已存，尚未設定 GAS 網址）';
+    let toastType = 'success';
+    if (State.gasUrl && navigator.onLine) {
+      const syncRes = await syncPushNow(true);
+      if (syncRes.ok) {
+        cloudNote = '｜☁️ 已即時寫入 Google 試算表！';
+      } else {
+        cloudNote = `｜⚠️ 雲端寫入失敗（已暫存佇列）：${syncRes.error}`;
+        toastType = 'warn';
+      }
+    } else if (State.gasUrl && !navigator.onLine) {
+      cloudNote = '｜📴 離線暫存，連網後自動寫入雲端';
+    }
+
+    if (assignedBibs.length) {
+      toast(`⚡ PAYUNi 銷帳配號成功 (${assignedBibs.join(', ')})${cloudNote}`, toastType);
+    } else {
+      toast(`📝 報名成功！序號 ${runners[0].participantId}${grpCode ? `｜團報 ${grpCode}` : ''}${cloudNote}`, toastType);
+    }
   }
 
   /* --------------------------------------------------------------------------

@@ -1405,6 +1405,12 @@
         </div>
       `}`;
 
+    $('#z5GasUrl').onchange = (e) => {
+      const url = e.target.value.trim();
+      App.State.gasUrl = url;
+      localStorage.setItem('TUR_GAS_URL', url);
+      App.updateNetworkBadge();
+    };
     $('#btnZ5TestGas').onclick = async () => {
       const url = $('#z5GasUrl').value.trim();
       try {
