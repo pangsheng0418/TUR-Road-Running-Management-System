@@ -60,7 +60,7 @@
   const State = {
     events: [], categories: [], stations: [], participants: [], timingLogs: [],
     historyResults: [], users: [], globalConfig: [], syncQueue: [],
-    gasUrl: localStorage.getItem('TUR_GAS_URL') || '',
+    gasUrl: localStorage.getItem('TUR_GAS_URL') || C.DEFAULT_GAS_URL || '',
     currentUser: { username: 'public', displayName: '民眾 / 跑者', role: 'public', allowedStation: '' },
     activeView: 'public-home',
     regEventId: '',
@@ -96,13 +96,31 @@
   }
 
   /* --------------------------------------------------------------------------
-   * Sync Engine
+   * Sync Engine (連網即時自動同步 + 刷卡 8 秒批次節流 + 斷網離線佇列)
    * -------------------------------------------------------------------------- */
-  async function enqueueSync(action, payload) {
+  let syncInFlight = false;
+  let syncAgainAfter = false;
+  let batchTimer = null;
+
+  async function enqueueSync(action, payload, immediate = true) {
     const item = { qid: `Q-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, action, payload, createdAt: Date.now() };
     State.syncQueue.push(item);
     await C.TurDB.put('syncQueue', item);
     updateQueueBadge();
+
+    if (!State.gasUrl || !navigator.onLine) return;
+
+    // 賽道高頻刷卡採 8 秒背景批次合併上傳（不阻塞 <10ms 感應）；報名/對帳/設定則立即寫入雲端
+    if (action === 'addTimingLog' && !immediate) {
+      if (!batchTimer) {
+        batchTimer = setTimeout(() => {
+          batchTimer = null;
+          syncPushNow(true);
+        }, 8000);
+      }
+    } else {
+      syncPushNow(true);
+    }
   }
 
   function updateQueueBadge() {
@@ -112,7 +130,7 @@
   function updateNetworkBadge() {
     const b = $('#netBadge');
     if (navigator.onLine) {
-      b.textContent = State.gasUrl ? '● 雲端連線' : '● 本機模式';
+      b.textContent = State.gasUrl ? '● 雲端即時同步' : '● 本機模式';
       b.className = 'whitespace-nowrap text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
     } else {
       b.textContent = '● 離線作業中';
@@ -121,9 +139,12 @@
   }
 
   async function syncPushNow(silent = false) {
-    if (!State.syncQueue.length) { if (!silent) toast('本機無待上傳紀錄', 'info'); return; }
-    if (!State.gasUrl) { if (!silent) toast(`本機已保存 ${State.syncQueue.length} 筆待同步資料（請於專區 5 設定 GAS URL）`, 'warn'); return; }
-    if (!navigator.onLine) { if (!silent) toast('目前離線中，連網後即可批次上傳', 'warn'); return; }
+    if (!State.syncQueue.length) { if (!silent) toast('本機無待上傳紀錄，雲端已同步', 'info'); return true; }
+    if (!State.gasUrl) { if (!silent) toast(`本機已保存 ${State.syncQueue.length} 筆待同步資料（請於專區 5 設定 GAS URL）`, 'warn'); return false; }
+    if (!navigator.onLine) { if (!silent) toast('目前離線中，連網後將自動批次上傳', 'warn'); return false; }
+
+    if (syncInFlight) { syncAgainAfter = true; return true; }
+    syncInFlight = true;
 
     const snap = [...State.syncQueue];
     const logItems = [], logQids = [], partUpd = [], partQids = [], others = [];
@@ -134,6 +155,7 @@
     }
 
     let uploaded = 0;
+    let okAll = true;
     try {
       if (logItems.length) {
         const res = await C.gasPost(State.gasUrl, { action: 'batchUploadLogs', timingLogs: logItems });
@@ -155,16 +177,28 @@
         uploaded++;
       }
       updateQueueBadge();
-      if (!silent) toast(`☁️ 批次上傳完成！共 ${uploaded} 筆寫入 Google 試算表`, 'success');
+      if (!silent) toast(`☁️ 雲端同步完成！共寫入 ${uploaded} 筆至 Google 試算表`, 'success');
     } catch (err) {
+      okAll = false;
       updateQueueBadge();
       if (!silent) toast(`上傳失敗：${err.message}`, 'error');
+      else console.warn('[TUR AutoSync queued for retry]', err.message);
+    } finally {
+      syncInFlight = false;
+      if (syncAgainAfter && State.syncQueue.length > 0) {
+        syncAgainAfter = false;
+        setTimeout(() => syncPushNow(true), 600);
+      }
     }
+    return okAll;
   }
 
-  async function syncPullFromGas() {
-    if (!State.gasUrl) return toast('尚未設定 GAS Web App URL，請先於專區 5 貼上網址', 'warn');
+  async function syncPullFromGas(silent = false) {
+    if (!State.gasUrl) { if (!silent) toast('尚未設定 GAS Web App URL，請先於專區 5 貼上網址', 'warn'); return; }
+    if (!navigator.onLine) return;
     try {
+      // 若本機尚有未上傳的離線異動，先自動推播再拉取，避免覆蓋剛寫入的資料
+      if (State.syncQueue.length > 0) await syncPushNow(true);
       const res = await C.gasGet(State.gasUrl, { action: 'getBootstrapData' });
       if (!res || !res.ok) throw new Error(res?.error || '拉取失敗');
       const d = res.data || {};
@@ -177,9 +211,10 @@
       }
       rebuildIndices();
       renderAll();
-      toast(`🔄 雙向拉取成功！同步 ${State.events.length} 場賽事、${State.participants.length} 位選手`, 'success');
+      if (!silent) toast(`🔄 雙向同步成功！已載入 ${State.events.length} 場賽事、${State.participants.length} 位選手`, 'success');
     } catch (err) {
-      toast(`拉取失敗：${err.message}`, 'error');
+      if (!silent) toast(`拉取失敗：${err.message}`, 'error');
+      else console.warn('[TUR AutoPull skipped]', err.message);
     }
   }
 
@@ -779,7 +814,7 @@
     };
     State.timingLogs.push(log);
     await C.TurDB.put('timingLogs', log);
-    await enqueueSync('addTimingLog', log);
+    await enqueueSync('addTimingLog', log, false);
 
     $('#lastSenseLatency').textContent = `${(performance.now() - t0).toFixed(1)} ms`;
     if (isValid) {
@@ -1065,7 +1100,7 @@
       } catch (err) { toast(`NFC 失敗：${err.message}`, 'error'); }
     };
 
-    window.addEventListener('online', updateNetworkBadge);
+    window.addEventListener('online', () => { updateNetworkBadge(); syncPushNow(true); });
     window.addEventListener('offline', updateNetworkBadge);
 
     // 碼錶與 45 分鐘查改倒數
@@ -1130,6 +1165,11 @@
     bindEvents();
     updatePayMethodUI();
     switchView(State.activeView);
+
+    // 連網且已綁定 GAS 時，背景自動同步雲端最新 Google 試算表資料（不影響開頁秒開速度）
+    if (State.gasUrl && navigator.onLine) {
+      syncPullFromGas(true);
+    }
   }
 
   init().catch((err) => { console.error(err); alert('系統初始化失敗：' + err.message); });

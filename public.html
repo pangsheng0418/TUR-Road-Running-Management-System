@@ -165,7 +165,7 @@
   };
 
   async function loadAll() {
-    const gasUrl = (localStorage.getItem('TUR_GAS_URL') || '').trim();
+    const gasUrl = (localStorage.getItem('TUR_GAS_URL') || C.DEFAULT_GAS_URL || '').trim();
     let ok = false;
     if (gasUrl && navigator.onLine) {
       try {

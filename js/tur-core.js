@@ -7,6 +7,9 @@
 (function (global) {
   'use strict';
 
+  // 若要部署至 GitHub Pages / Vercel 讓所有跑者與作業員免設定自動連線，請將 GAS /exec 網址貼於此處：
+  const DEFAULT_GAS_URL = '';
+
   /* --------------------------------------------------------------------------
    * 1. Date / Integer-Second Time Utilities (嚴格整數秒 HH:mm:ss，防跨夜誤差)
    * -------------------------------------------------------------------------- */
@@ -1131,6 +1134,7 @@
   }
 
   global.TurCore = {
+    DEFAULT_GAS_URL,
     pad2, formatDateTime, parseDateTime, formatDuration, formatPace, escapeHtml,
     COMPOUND_SURNAMES_28, splitFullName, mergeNameParts, zhToEnEventName,
     verifyTaiwanIdChecksum, inferGenderFromId, calcAge, sha256Hex,
