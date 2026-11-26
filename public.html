@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TUR 公開成績查詢・八百壯士英雄榜・客製化完賽證書 v3.0</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+    .mono { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    .ptab.active { background-color: #f59e0b; color: #0f172a; font-weight: 900; }
+    canvas { touch-action: none; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col">
+
+<header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-30">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+    <div class="flex items-center gap-2.5">
+      <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-amber-400 to-orange-600 text-slate-950 font-black flex items-center justify-center text-sm">TUR</div>
+      <div>
+        <h1 class="font-bold text-sm sm:text-base">TUR 公開成績查詢・歷年歸併・八百壯士 ＆ 動態完賽證書</h1>
+        <p class="text-[11px] text-slate-400">全面隱藏身分證與報到時間 · 遵循承辦人證書開關 · 3 款相框拖曳縮放 · 高解析 PNG / PDF</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 text-xs">
+      <select id="pubEventSelect" class="bg-slate-800 border border-slate-700 text-amber-300 rounded-lg px-2.5 py-1.5"></select>
+      <a href="index.html" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700">← 返回報名/管理系統</a>
+    </div>
+  </div>
+  <div class="max-w-7xl mx-auto px-4 pb-2 flex gap-1.5 overflow-x-auto text-xs">
+    <button data-ptab="live" class="ptab active px-3.5 py-1.5 rounded-lg bg-slate-800">🏃 即時與結案成績</button>
+    <button data-ptab="history" class="ptab px-3.5 py-1.5 rounded-lg bg-slate-800">📚 歷年成績查詢</button>
+    <button data-ptab="warriors" class="ptab px-3.5 py-1.5 rounded-lg bg-slate-800">🏅 八百壯士 100K+ 英雄榜</button>
+    <button data-ptab="cert" class="ptab px-3.5 py-1.5 rounded-lg bg-slate-800">🏆 客製化完賽證書</button>
+  </div>
+</header>
+
+<main class="max-w-7xl w-full mx-auto px-4 py-5 flex-1">
+
+  <!-- 分頁 1：即時與結案成績（不含身分證與報到時間） -->
+  <section id="ptab-live" class="ppanel space-y-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-900 p-3.5 rounded-2xl border border-slate-800 text-xs">
+      <input id="liveSearch" type="text" placeholder="搜尋號碼布 / 選手姓名 / 國籍" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white w-64" />
+      <div id="liveStats" class="text-slate-300 font-bold"></div>
+    </div>
+    <div class="bg-slate-900 rounded-2xl border border-slate-800 overflow-x-auto">
+      <table class="w-full text-xs text-left">
+        <thead class="bg-slate-800 text-slate-200">
+          <tr>
+            <th class="p-3">總名次(組)</th><th class="p-3">號碼布</th><th class="p-3">選手 / 國籍</th>
+            <th class="p-3">組別</th><th class="p-3">有效距離 / 圈數</th><th class="p-3">完賽成績 (整數秒)</th>
+            <th class="p-3">均速</th><th class="p-3">操作</th>
+          </tr>
+        </thead>
+        <tbody id="liveBody" class="divide-y divide-slate-800"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 分頁 2：歷年成績查詢 -->
+  <section id="ptab-history" class="ppanel hidden space-y-4">
+    <div class="bg-slate-900 p-3.5 rounded-2xl border border-slate-800 flex flex-wrap gap-2 items-center text-xs">
+      <input id="hisSearch" type="text" placeholder="輸入姓名或歷屆賽事名稱查詢" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white w-72" />
+      <span class="text-slate-400">已採 SHA-256 匿名歸併，完全不顯示身分證字號。</span>
+    </div>
+    <div class="bg-slate-900 rounded-2xl border border-slate-800 overflow-x-auto">
+      <table class="w-full text-xs text-left">
+        <thead class="bg-slate-800 text-slate-200">
+          <tr><th class="p-3">日期</th><th class="p-3">賽事名稱</th><th class="p-3">組別</th><th class="p-3">姓名</th><th class="p-3">距離</th><th class="p-3">成績</th><th class="p-3">標註</th></tr>
+        </thead>
+        <tbody id="hisBody" class="divide-y divide-slate-800"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 分頁 3：八百壯士 100K+ 英雄榜 -->
+  <section id="ptab-warriors" class="ppanel hidden space-y-4">
+    <div class="bg-gradient-to-r from-rose-950 via-red-900 to-amber-900 p-5 rounded-2xl border border-amber-500/40">
+      <div class="text-xs font-bold text-amber-300">TUR 100K+ ULTRA HALL OF FAME</div>
+      <h2 class="text-xl font-black text-white mt-1">🏅 八百壯士 100K+ 超馬英雄榜</h2>
+      <p class="text-xs text-amber-100/80 mt-1">凡單場有效完賽里程 ≥ 100 km 或八百壯士系列賽事完賽者，自動彙整登錄榮譽榜！</p>
+    </div>
+    <div id="warriorsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-xs"></div>
+  </section>
+
+  <!-- 分頁 4：動態完賽證書中心（聯動承辦人開關） -->
+  <section id="ptab-cert" class="ppanel hidden grid grid-cols-1 lg:grid-cols-12 gap-5">
+    <div class="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+      <h2 class="font-bold text-sm text-amber-400">🔍 選擇選手產製完賽證書</h2>
+      <input id="certSearch" type="text" placeholder="輸入號碼布或姓名" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white" />
+      <div id="certRunnerList" class="divide-y divide-slate-800 max-h-[520px] overflow-y-auto text-xs"></div>
+    </div>
+
+    <div class="lg:col-span-8 bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 class="font-bold text-base text-white">🏆 完賽證書即時合成（自動套用本場承辦人開關設定）</h2>
+          <p id="certConfigHint" class="text-[11px] text-slate-400"></p>
+        </div>
+        <div class="flex gap-2">
+          <button id="btnDlPng" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs">⬇️ 下載高解析 PNG</button>
+          <button id="btnDlPdf" class="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs">📄 匯出 PDF</button>
+        </div>
+      </div>
+
+      <div class="bg-slate-950 p-2 rounded-xl border border-slate-800 flex items-center justify-center">
+        <canvas id="pubCertCanvas" class="max-w-full max-h-[540px] w-auto h-auto rounded-lg shadow-2xl cursor-grab active:cursor-grabbing"></canvas>
+      </div>
+
+      <!-- 選手自助個人化區塊（依承辦人 allowPublicPhotoQuote 開關動態啟閉） -->
+      <div id="pubPhotoQuoteControls" class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs bg-slate-950/70 p-3.5 rounded-xl border border-slate-800">
+        <div class="space-y-2">
+          <div class="font-bold text-slate-300">📸 上傳個人衝線照片（畫布可拖曳＋3 款相框）</div>
+          <div class="flex items-center gap-2">
+            <input id="pubPhotoFile" type="file" accept="image/*" class="text-[11px] flex-1" />
+            <button id="btnPubClearPhoto" class="px-2 py-1 rounded bg-slate-800">移除</button>
+          </div>
+          <div class="flex gap-1.5">
+            <button data-frame="rounded" class="frame-btn px-2.5 py-1 rounded bg-amber-400 text-slate-950 font-bold">1. 圓角相框</button>
+            <button data-frame="circle" class="frame-btn px-2.5 py-1 rounded bg-slate-800 text-slate-300">2. 圓形勳章</button>
+            <button data-frame="polaroid" class="frame-btn px-2.5 py-1 rounded bg-slate-800 text-slate-300">3. 拍立得</button>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-slate-400">縮放</span>
+            <input id="pubZoom" type="range" min="0.5" max="2.8" step="0.05" value="1" class="flex-1 accent-amber-400" />
+            <span id="pubZoomTxt" class="mono text-amber-300 w-10 text-right">1.0x</span>
+          </div>
+        </div>
+        <div class="space-y-2">
+          <div class="flex justify-between font-bold text-slate-300">
+            <span>💬 完賽感言（最多 40 字）</span>
+            <span id="pubQuoteCnt" class="mono text-slate-400">0 / 40</span>
+          </div>
+          <input id="pubQuoteInput" type="text" maxlength="40" value="突破極限，感謝每一站熱情的志工！" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white" />
+          <div class="grid grid-cols-2 gap-2 pt-1">
+            <select id="pubLayoutPick" class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs"></select>
+            <select id="pubPalettePick" class="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs"></select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="js/tur-core.js"></script>
+<script>
+(() => {
+  'use strict';
+  const C = window.TurCore;
+  const $ = (s) => document.querySelector(s);
+  const $$ = (s) => Array.from(document.querySelectorAll(s));
+
+  const Pub = {
+    events: [], categories: [], stations: [], participants: [], timingLogs: [], historyResults: [],
+    activeEventId: '',
+    rows: [],
+    selectedRow: null,
+    photoImg: null, customBgImg: null,
+    photoFrame: 'rounded', photoZoom: 1, photoOffsetX: 0, photoOffsetY: 0,
+    quote: '突破極限，感謝每一站熱情的志工！',
+    overrideLayout: '', overridePalette: '',
+    dragging: false, dx0: 0, dy0: 0
+  };
+
+  async function loadAll() {
+    const gasUrl = (localStorage.getItem('TUR_GAS_URL') || '').trim();
+    let ok = false;
+    if (gasUrl && navigator.onLine) {
+      try {
+        const res = await C.gasGet(gasUrl, { action: 'publicLookup' });
+        if (res && res.ok && res.data && res.data.events?.length) {
+          Object.assign(Pub, res.data);
+          ok = true;
+        }
+      } catch (_) {}
+    }
+
+    if (!ok) {
+      await C.TurDB.open();
+      const [events, categories, stations, participants, timingLogs, historyResults] = await Promise.all([
+        C.TurDB.getAll('events'), C.TurDB.getAll('categories'), C.TurDB.getAll('stations'),
+        C.TurDB.getAll('participants'), C.TurDB.getAll('timingLogs'), C.TurDB.getAll('historyResults')
+      ]);
+      if (events.length) {
+        // 公開頁強制剝離身分證、電話、Email 與 CHECKIN 報到時間
+        Pub.events = events;
+        Pub.categories = categories;
+        Pub.stations = stations.filter((s) => String(s.stationCode).toUpperCase() !== 'CHECKIN');
+        Pub.participants = participants.map((p) => ({
+          participantId: p.participantId, eventId: p.eventId, catId: p.catId, bibNumber: p.bibNumber,
+          name: p.name, gender: p.gender, nationality: p.nationality || 'TWN',
+          payStatus: p.payStatus, raceStatus: p.raceStatus, penaltySeconds: p.penaltySeconds || 0
+        }));
+        Pub.timingLogs = timingLogs.filter((l) => String(l.stationCode).toUpperCase() !== 'CHECKIN');
+        Pub.historyResults = historyResults;
+        ok = true;
+      }
+    }
+
+    if (!ok) {
+      const seed = C.buildFull5EventsSeed();
+      Object.assign(Pub, seed);
+    }
+
+    // 優先選取已結案或有成績之賽事
+    const finEv = Pub.events.find((e) => e.status === 'finished') || Pub.events[0];
+    Pub.activeEventId = finEv ? finEv.eventId : '';
+    renderEventSelect();
+    recomputeEvent();
+    renderHistory();
+    renderWarriors();
+  }
+
+  function renderEventSelect() {
+    $('#pubEventSelect').innerHTML = Pub.events.map((e) => `<option value="${e.eventId}" ${e.eventId === Pub.activeEventId ? 'selected' : ''}>${C.escapeHtml(e.nameZh)} ${e.status === 'finished' ? '(已結案)' : ''}</option>`).join('');
+  }
+
+  function getActiveEvent() {
+    return Pub.events.find((e) => e.eventId === Pub.activeEventId) || Pub.events[0];
+  }
+
+  function recomputeEvent() {
+    const ev = getActiveEvent();
+    if (!ev) return;
+    Pub.rows = C.computeLeaderboard({
+      event: ev, categories: Pub.categories, stations: Pub.stations,
+      participants: Pub.participants, timingLogs: Pub.timingLogs
+    });
+    const cfg = C.parseJsonSafe(ev.certConfigJson, C.defaultCertConfig());
+    Pub.overrideLayout = cfg.layoutId;
+    Pub.overridePalette = cfg.paletteId;
+    $('#pubLayoutPick').innerHTML = C.CERT_LAYOUTS.map((l) => `<option value="${l.id}" ${l.id === cfg.layoutId ? 'selected' : ''}>${l.name}</option>`).join('');
+    $('#pubPalettePick').innerHTML = C.CERT_PALETTES.map((p) => `<option value="${p.id}" ${p.id === cfg.paletteId ? 'selected' : ''}>${p.name}</option>`).join('');
+
+    Pub.customBgImg = null;
+    if (cfg.customBgDataUrl) {
+      const im = new Image(); im.onload = () => { Pub.customBgImg = im; drawCert(); }; im.src = cfg.customBgDataUrl;
+    }
+
+    Pub.selectedRow = Pub.rows[0] || null;
+    renderLiveTable();
+    renderCertRunnerList();
+    drawCert();
+  }
+
+  function renderLiveTable() {
+    const q = ($('#liveSearch').value || '').trim().toUpperCase();
+    const list = Pub.rows.filter((r) => !q || `${r.participant.bibNumber} ${r.participant.name} ${r.participant.nationality}`.toUpperCase().includes(q));
+    $('#liveStats').textContent = `共 ${Pub.rows.length} 位參賽選手｜完賽 ${Pub.rows.filter((r) => r.status === 'finished').length} 人`;
+    $('#liveBody').innerHTML = list.map((r) => `
+      <tr class="hover:bg-slate-800/60">
+        <td class="p-3 font-black mono text-amber-400">#${r.overallRank} <span class="text-slate-400 text-[10px]">(${r.catRank})</span></td>
+        <td class="p-3 mono font-bold">${r.participant.bibNumber}</td>
+        <td class="p-3 font-bold text-white">${C.escapeHtml(r.participant.name)} <span class="px-1.5 py-0.5 rounded bg-sky-900 text-sky-300 text-[10px]">${r.participant.nationality}</span> ${r.isWarrior800 ? '<span class="px-1.5 py-0.5 rounded bg-rose-600 text-white text-[10px]">🏅100K+</span>' : ''}</td>
+        <td class="p-3">${C.escapeHtml(r.category.name)}</td>
+        <td class="p-3 mono">${r.totalDistanceKm} km ${r.lapCount ? `(${r.lapCount}圈)` : ''}</td>
+        <td class="p-3 mono font-black text-emerald-400">${C.formatDuration(r.elapsedSec)}</td>
+        <td class="p-3 mono">${r.avgPace}</td>
+        <td class="p-3"><button data-go-cert="${r.participant.participantId}" class="px-2.5 py-1 rounded-lg bg-amber-400 text-slate-950 font-black">🏅 印證書</button></td>
+      </tr>`).join('') || '<tr><td colspan="8" class="p-8 text-center text-slate-500">本場尚無公開成績</td></tr>';
+
+    $$('[data-go-cert]').forEach((b) => {
+      b.onclick = () => {
+        Pub.selectedRow = Pub.rows.find((r) => r.participant.participantId === b.dataset.goCert) || Pub.rows[0];
+        switchPubTab('cert');
+        renderCertRunnerList();
+        drawCert();
+      };
+    });
+  }
+
+  function renderHistory() {
+    const q = ($('#hisSearch').value || '').trim().toUpperCase();
+    const list = Pub.historyResults.filter((h) => !q || `${h.name} ${h.eventName} ${h.categoryName}`.toUpperCase().includes(q));
+    $('#hisBody').innerHTML = list.map((h) => `
+      <tr class="hover:bg-slate-800/60">
+        <td class="p-3 mono text-slate-400">${h.eventDate}</td>
+        <td class="p-3 font-semibold">${C.escapeHtml(h.eventName)}</td>
+        <td class="p-3">${C.escapeHtml(h.categoryName)}</td>
+        <td class="p-3 font-black text-white">${C.escapeHtml(h.name)}</td>
+        <td class="p-3 mono font-bold text-amber-300">${h.distanceKm} km</td>
+        <td class="p-3 mono text-emerald-400">${h.finishTime}</td>
+        <td class="p-3">${h.isWarrior800 ? '<span class="px-2 py-0.5 rounded-full bg-rose-600 text-white font-bold">🏅 八百壯士</span>' : '-'}</td>
+      </tr>`).join('') || '<tr><td colspan="7" class="p-8 text-center text-slate-500">查無歷年成績</td></tr>';
+  }
+
+  function renderWarriors() {
+    // 結合歷屆 HistoryResults 與今年度所有 100K+ 完賽者
+    const entries = Pub.historyResults.filter((h) => h.isWarrior800).map((h) => ({
+      name: h.name, eventName: h.eventName, date: h.eventDate, dist: h.distanceKm, time: h.finishTime, badge: '歷屆認證'
+    }));
+    Pub.events.forEach((ev) => {
+      const rs = C.computeLeaderboard({ event: ev, categories: Pub.categories, stations: Pub.stations, participants: Pub.participants, timingLogs: Pub.timingLogs });
+      rs.filter((r) => r.isWarrior800).forEach((r) => {
+        entries.push({ name: r.participant.name, eventName: ev.nameZh, date: (ev.raceStart || '').slice(0, 10), dist: r.totalDistanceKm, time: C.formatDuration(r.elapsedSec), badge: '本季新科' });
+      });
+    });
+
+    $('#warriorsGrid').innerHTML = entries.map((w, i) => `
+      <div class="bg-slate-900 border border-amber-500/30 rounded-2xl p-4 flex items-center justify-between gap-3">
+        <div>
+          <div class="text-[10px] text-amber-400 font-bold">WARRIOR #${i + 1} · ${w.badge}</div>
+          <div class="text-lg font-black text-white mt-0.5">${C.escapeHtml(w.name)}</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">${C.escapeHtml(w.eventName)} (${w.date || '-'})</div>
+        </div>
+        <div class="text-right mono">
+          <div class="text-xl font-black text-amber-400">${w.dist} km</div>
+          <div class="text-xs text-emerald-400">${w.time}</div>
+        </div>
+      </div>`).join('') || '<div class="text-slate-500 col-span-3 text-center py-8">尚無八百壯士紀錄</div>';
+  }
+
+  function renderCertRunnerList() {
+    const q = ($('#certSearch').value || '').trim().toUpperCase();
+    const list = Pub.rows.filter((r) => !q || `${r.participant.bibNumber} ${r.participant.name}`.toUpperCase().includes(q));
+    $('#certRunnerList').innerHTML = list.map((r) => {
+      const active = Pub.selectedRow?.participant.participantId === r.participant.participantId;
+      return `
+        <button data-pick-cert="${r.participant.participantId}" class="w-full text-left py-2.5 px-2.5 rounded-xl flex justify-between ${active ? 'bg-amber-500/20 border border-amber-400/50' : 'hover:bg-slate-800'}">
+          <div>
+            <div class="font-bold text-white">#${r.overallRank} ${r.participant.bibNumber} ${C.escapeHtml(r.participant.name)}</div>
+            <div class="text-[10px] text-slate-400">${C.escapeHtml(r.category.name)} · ${r.totalDistanceKm} km</div>
+          </div>
+          <div class="mono font-bold text-emerald-400">${C.formatDuration(r.elapsedSec)}</div>
+        </button>`;
+    }).join('') || '<p class="text-slate-500 text-center py-6">查無選手</p>';
+
+    $$('[data-pick-cert]').forEach((b) => {
+      b.onclick = () => {
+        Pub.selectedRow = Pub.rows.find((r) => r.participant.participantId === b.dataset.pickCert);
+        renderCertRunnerList();
+        drawCert();
+      };
+    });
+  }
+
+  function drawCert() {
+    const ev = getActiveEvent();
+    if (!ev) return;
+    const baseCfg = C.parseJsonSafe(ev.certConfigJson, C.defaultCertConfig());
+    const cfg = { ...baseCfg, layoutId: Pub.overrideLayout || baseCfg.layoutId, paletteId: Pub.overridePalette || baseCfg.paletteId };
+    $('#pubPhotoQuoteControls').classList.toggle('hidden', !cfg.allowPublicPhotoQuote);
+    $('#certConfigHint').textContent = `引擎：${cfg.engine === 'custom' ? '大會自訂底圖' : '官方 6×6'} · 方向：${cfg.orientation === 'portrait' ? '直式' : '橫式'} · ${cfg.allowPublicPhotoQuote ? '已開放上傳照片與40字感言' : '承辦人已鎖定公版無感言'}`;
+
+    C.renderCertificateCanvas($('#pubCertCanvas'), Pub.selectedRow, cfg, {
+      customBgImg: Pub.customBgImg,
+      photoImg: Pub.photoImg,
+      showPhotoPlaceholder: cfg.allowPublicPhotoQuote,
+      photoFrame: Pub.photoFrame,
+      photoZoom: Pub.photoZoom,
+      photoOffsetX: Pub.photoOffsetX,
+      photoOffsetY: Pub.photoOffsetY,
+      quote: Pub.quote
+    });
+  }
+
+  function switchPubTab(tab) {
+    $$('.ptab').forEach((b) => b.classList.toggle('active', b.dataset.ptab === tab));
+    $$('.ppanel').forEach((p) => p.classList.toggle('hidden', p.id !== `ptab-${tab}`));
+    if (tab === 'cert') drawCert();
+  }
+
+  $$('.ptab').forEach((b) => { b.onclick = () => switchPubTab(b.dataset.ptab); });
+  $('#pubEventSelect').onchange = (e) => { Pub.activeEventId = e.target.value; recomputeEvent(); };
+  $('#liveSearch').oninput = renderLiveTable;
+  $('#hisSearch').oninput = renderHistory;
+  $('#certSearch').oninput = renderCertRunnerList;
+  $('#pubLayoutPick').onchange = (e) => { Pub.overrideLayout = e.target.value; drawCert(); };
+  $('#pubPalettePick').onchange = (e) => { Pub.overridePalette = e.target.value; drawCert(); };
+  $('#pubQuoteCnt').textContent = `${Pub.quote.length} / 40`;
+  $('#pubQuoteInput').oninput = (e) => { Pub.quote = e.target.value.slice(0, 40); $('#pubQuoteCnt').textContent = `${Pub.quote.length} / 40`; drawCert(); };
+  $('#pubZoom').oninput = (e) => { Pub.photoZoom = Number(e.target.value); $('#pubZoomTxt').textContent = `${Pub.photoZoom.toFixed(1)}x`; drawCert(); };
+  $$('.frame-btn').forEach((b) => {
+    b.onclick = () => {
+      Pub.photoFrame = b.dataset.frame;
+      $$('.frame-btn').forEach((x) => { x.className = 'frame-btn px-2.5 py-1 rounded ' + (x === b ? 'bg-amber-400 text-slate-950 font-bold' : 'bg-slate-800 text-slate-300'); });
+      drawCert();
+    };
+  });
+  $('#pubPhotoFile').onchange = (e) => {
+    const f = e.target.files?.[0]; if (!f) return;
+    const im = new Image(); im.onload = () => { Pub.photoImg = im; Pub.photoOffsetX = 0; Pub.photoOffsetY = 0; drawCert(); }; im.src = URL.createObjectURL(f);
+  };
+  $('#btnPubClearPhoto').onclick = () => { Pub.photoImg = null; $('#pubPhotoFile').value = ''; drawCert(); };
+
+  const cv = $('#pubCertCanvas');
+  cv.onpointerdown = (e) => { if (!Pub.photoImg) return; Pub.dragging = true; Pub.dx0 = e.clientX; Pub.dy0 = e.clientY; cv.setPointerCapture(e.pointerId); };
+  cv.onpointermove = (e) => {
+    if (!Pub.dragging) return;
+    const r = cv.getBoundingClientRect();
+    const scale = cv.width / r.width;
+    Pub.photoOffsetX += (e.clientX - Pub.dx0) * scale; Pub.photoOffsetY += (e.clientY - Pub.dy0) * scale;
+    Pub.dx0 = e.clientX; Pub.dy0 = e.clientY; drawCert();
+  };
+  cv.onpointerup = () => { Pub.dragging = false; };
+
+  $('#btnDlPng').onclick = () => {
+    const a = document.createElement('a');
+    a.download = `TUR_Cert_${Pub.selectedRow?.participant.bibNumber || 'FINISHER'}.png`;
+    a.href = cv.toDataURL('image/png', 1.0); a.click();
+  };
+  $('#btnDlPdf').onclick = () => {
+    const orient = cv.height > cv.width ? 'portrait' : 'landscape';
+    if (window.jspdf?.jsPDF) {
+      const pdf = new window.jspdf.jsPDF({ orientation: orient, unit: 'mm', format: 'a4' });
+      pdf.addImage(cv.toDataURL('image/jpeg', 0.94), 'JPEG', 0, 0, orient === 'portrait' ? 210 : 297, orient === 'portrait' ? 297 : 210);
+      pdf.save(`TUR_Cert_${Pub.selectedRow?.participant.bibNumber || 'FINISHER'}.pdf`);
+    } else window.print();
+  };
+
+  loadAll();
+})();
+</script>
+</body>
+</html>
