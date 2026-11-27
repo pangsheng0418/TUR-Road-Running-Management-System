@@ -1,10 +1,10 @@
 /**
- * TUR計時王 PWA Service Worker (Network-First 輕量版)
+ * 跑管家 PWA Service Worker (Network-First 輕量版)
  * - 支援 Android Chrome「安裝應用程式」與 iOS 全螢幕主畫面啟動
  * - 連網一律優先取最新程式，絕不卡舊快取；離線時自動回退本機快取
  * - 完全略過 GAS / 外部網域與非 GET 請求，確保同步與金流/報名不受干擾
  */
-const CACHE_NAME = 'tur-timing-king-v5.21';
+const CACHE_NAME = 'tur-run-manager-v5.22';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -29,7 +29,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
       .then((keys) => Promise.all(
-        keys.filter((k) => k.startsWith('tur-timing-king-') && k !== CACHE_NAME)
+        keys.filter((k) => (k.startsWith('tur-run-manager-') || k.startsWith('tur-timing-king-')) && k !== CACHE_NAME)
           .map((k) => caches.delete(k))
       ))
       .then(() => self.clients.claim())

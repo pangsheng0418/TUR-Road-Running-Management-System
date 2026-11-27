@@ -1,6 +1,6 @@
 {
-  "name": "TUR計時王｜台灣超馬報名計時系統",
-  "short_name": "TUR計時王",
+  "name": "跑管家｜TUR 台灣超馬報名計時系統",
+  "short_name": "跑管家",
   "description": "台灣超級馬拉松運動協會（TUR）一體化賽事報名、現場感應計時、即時成績與完賽證書系統",
   "start_url": "./index.html",
   "scope": "./",
