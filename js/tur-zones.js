@@ -621,7 +621,7 @@
           <!-- 📜 活動簡章內容編輯區（預設空白，有填寫才顯示於前台報名頁） -->
           <div class="space-y-1.5 pt-2 border-t">
             <label class="font-bold block">📜 活動簡章與參賽須知（選填，預設空白）</label>
-            <textarea id="z1Brochure" rows="4" placeholder="選填，留空則前台不顯示簡章區塊..." class="w-full px-2.5 py-2 border rounded-lg text-xs leading-relaxed">${C.escapeHtml(ev.brochureText || '')}</textarea>
+            <textarea id="z1Brochure" rows="4" placeholder="選填，留空則前台不顯示簡章區塊..." class="w-full px-2.5 py-2 border rounded-lg text-xs leading-relaxed">${C.escapeHtml(C.sanitizeBrochureText(ev.brochureText))}</textarea>
           </div>
 
           <!-- 活動橫幅（顯示預覽，16 款樣式預設收合減少表單長度） -->

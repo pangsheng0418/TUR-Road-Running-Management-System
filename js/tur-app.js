@@ -213,8 +213,9 @@
       const keys = ['events', 'categories', 'stations', 'participants', 'timingLogs', 'historyResults', 'users', 'globalConfig'];
       for (const k of keys) {
         if (Array.isArray(d[k]) && (k !== 'users' || d[k].length)) {
-          State[k] = d[k];
-          await C.TurDB.clearAndFill(k, d[k]);
+          const rows = k === 'events' ? d[k].map((e) => C.normalizeEventData({ ...e })) : d[k];
+          State[k] = rows;
+          await C.TurDB.clearAndFill(k, rows);
         }
       }
       rebuildIndices();
@@ -523,7 +524,7 @@
     $('#regBannerHero').setAttribute('style', C.getBannerStyle(ev.bannerUrl));
     $('#regEventTitle').textContent = ev.nameZh;
     $('#regEventMeta').textContent = `${ev.nameEn || ''} · ${ev.location || ''} · 🏁 起跑：${ev.raceStart || '待公告'} · 主辦：${ev.organizerZh || 'TUR'}`;
-    const brochureTxt = (ev.brochureText || '').trim();
+    const brochureTxt = C.sanitizeBrochureText(ev.brochureText);
     if ($('#regBrochureBox')) $('#regBrochureBox').classList.toggle('hidden', !brochureTxt);
     $('#regBrochureContent').textContent = brochureTxt;
 
@@ -2781,6 +2782,7 @@
     const stores = ['events', 'categories', 'stations', 'participants', 'timingLogs', 'historyResults', 'users', 'globalConfig', 'syncQueue'];
     const loaded = await Promise.all(stores.map((s) => C.TurDB.getAll(s)));
     stores.forEach((s, i) => { State[s] = loaded[i]; });
+    State.events = (State.events || []).map((e) => C.normalizeEventData({ ...e }));
 
     const oldSeedIds = new Set(['TUR-20260001', 'TUR-20260002', 'TUR-20260003', 'TUR-20260004', 'TUR-20260005', 'TUR-FIN-001', 'TUR-FIN-002', 'TUR-FIN-003', 'TUR-F24-001']);
     const isUntouchedOldSeed = State.events.length > 0 && State.participants.length <= 9 && State.participants.every((p) => oldSeedIds.has(p.participantId));

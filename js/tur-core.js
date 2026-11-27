@@ -282,6 +282,30 @@
 
   const DEFAULT_BROCHURE_TEMPLATE = '';
 
+  function sanitizeBrochureText(raw) {
+    const s = String(raw || '').trim();
+    if (!s) return '';
+    // 防護舊試算表欄位錯位寫入之系統 JSON / Base64 亂碼
+    if (s.startsWith('{') && (/"certMode"|"layoutId"|"paletteId"|"paymentMode"|"addons"|"customFields"/.test(s))) return '';
+    if (/^data:image\//i.test(s)) return '';
+    return s;
+  }
+
+  function normalizeEventData(ev) {
+    if (!ev || typeof ev !== 'object') return ev;
+    const vals = [ev.brochureText, ev.formSchemaJson, ev.certConfigJson].map((v) => String(v || '').trim());
+    const isCert = (s) => s.startsWith('{') && /"certMode"|"layoutId"|"paletteId"/.test(s);
+    const isForm = (s) => s.startsWith('{') && /"paymentMode"|"addons"|"customFields"/.test(s);
+    if (isCert(vals[0]) || isForm(vals[0]) || (!isForm(vals[1]) && vals.some(isForm)) || (!isCert(vals[2]) && vals.some(isCert))) {
+      const foundForm = vals.find(isForm);
+      const foundCert = vals.find(isCert);
+      if (foundForm) ev.formSchemaJson = foundForm;
+      if (foundCert) ev.certConfigJson = foundCert;
+    }
+    ev.brochureText = sanitizeBrochureText(ev.brochureText);
+    return ev;
+  }
+
   function getBannerStyle(bannerUrl) {
     if (!bannerUrl) {
       const first = CURATED_BANNERS[0];
@@ -2326,7 +2350,7 @@
         organizerZh: 'TUR 台灣超馬協會', organizerEn: 'TUR Taiwan Ultra Runners', location: '新北市烏來區',
         raceType: 'distance', lapDistanceKm: 0, debounceSeconds: 15, status: 'open',
         regStart: '2026-10-01 00:00:00', regEnd: '2026-12-31 23:59:59', raceStart: '2026-11-26 05:00:00',
-        maxQuota: 800, bannerUrl: 'dyn-trail', brochureText: DEFAULT_BROCHURE_TEMPLATE, formSchemaJson: formJsonWithCustom, certConfigJson: certJson
+        maxQuota: 800, bannerUrl: 'dyn-trail', brochureText: '', formSchemaJson: formJsonWithCustom, certConfigJson: certJson
       },
       {
         eventId: 'TUR-2026-12H', ownerUsername: 'org_north',
@@ -2334,7 +2358,7 @@
         organizerZh: 'TUR 台灣超馬協會', organizerEn: 'TUR Taiwan Ultra Runners', location: '台北田徑暖身場',
         raceType: 'lap_timed', lapDistanceKm: 1.0, debounceSeconds: 15, status: 'open',
         regStart: '2026-11-01 00:00:00', regEnd: '2026-12-31 23:59:59', raceStart: '2026-11-26 06:00:00',
-        maxQuota: 400, bannerUrl: 'dyn-track', brochureText: '【賽制說明】12H / 6H 標準繞圈限時賽，單圈 1.0 km，採 PAYUNi 統一金流線上繳費。\n【計時規則】於限時內通過主拱門之有效圈數累計總里程；超時圈留存紀錄但不計入有效里程。\n【補給配置】主會場旁全時段供應熱湯、水果、電解質與冰塊。', formSchemaJson: formJsonPayuni, certConfigJson: mkCertJson('郭志明')
+        maxQuota: 400, bannerUrl: 'dyn-track', brochureText: '', formSchemaJson: formJsonPayuni, certConfigJson: mkCertJson('郭志明')
       },
       {
         eventId: 'TUR-2026-W800', ownerUsername: 'org_south',
@@ -2342,7 +2366,7 @@
         organizerZh: '南區超馬聯盟', organizerEn: 'South Taiwan Ultra Alliance', location: '高雄市旗山區',
         raceType: 'distance', lapDistanceKm: 0, debounceSeconds: 15, status: 'open',
         regStart: '2026-12-01 00:00:00', regEnd: '2027-01-31 23:59:59', raceStart: '',
-        maxQuota: 300, bannerUrl: 'dyn-warrior', brochureText: '【八百壯士認證賽事】凡 15 小時內完成 100K 者，自動登錄 TUR 八百壯士 100K+ 英雄榜並加發專屬榮譽標註完賽證書！\n【報名與查改】採轉帳核對末五碼；繳費前可透過 /lookup 修改組別與加購，入帳後自動鎖定費用選項。', formSchemaJson: formJsonW800, certConfigJson: mkCertJson('陳文龍')
+        maxQuota: 300, bannerUrl: 'dyn-warrior', brochureText: '', formSchemaJson: formJsonW800, certConfigJson: mkCertJson('陳文龍')
       },
       {
         eventId: 'TUR-2026-EARLY6H', ownerUsername: 'org_south',
@@ -2350,7 +2374,7 @@
         organizerZh: '南區超馬聯盟', organizerEn: 'South Taiwan Ultra Alliance', location: '花蓮太平洋公園海濱環道',
         raceType: 'lap_timed', lapDistanceKm: 0.8, debounceSeconds: 15, status: 'closed',
         regStart: '2026-09-01 00:00:00', regEnd: '2026-11-20 23:59:59', raceStart: '2026-12-19 07:00:00',
-        maxQuota: 200, bannerUrl: 'dyn-coast', brochureText: '【賽前晶片與報到示範場】報名已截止並預先設定起跑時間（2026-12-19 07:00:00），供作業員測試晶片寫入、讀取查看與現場報到管制。', formSchemaJson: formJsonPayuni, certConfigJson: mkCertJson('吳家豪')
+        maxQuota: 200, bannerUrl: 'dyn-coast', brochureText: '', formSchemaJson: formJsonPayuni, certConfigJson: mkCertJson('吳家豪')
       },
       {
         eventId: 'TUR-2026-FIN100', ownerUsername: 'org_north',
@@ -2358,7 +2382,7 @@
         organizerZh: 'TUR 台灣超馬協會', organizerEn: 'TUR Taiwan Ultra Runners', location: '台北陽明山國家公園',
         raceType: 'distance', lapDistanceKm: 0, debounceSeconds: 15, status: 'finished',
         regStart: '2026-01-01 00:00:00', regEnd: '2026-03-31 23:59:59', raceStart: '2026-04-18 05:00:00',
-        maxQuota: 500, bannerUrl: 'dyn-coast', brochureText: DEFAULT_BROCHURE_TEMPLATE, formSchemaJson: formJson, certConfigJson: mkCertJson('林政宏')
+        maxQuota: 500, bannerUrl: 'dyn-coast', brochureText: '', formSchemaJson: formJson, certConfigJson: mkCertJson('林政宏')
       },
       {
         eventId: 'TUR-2026-FIN24H', ownerUsername: 'org_south',
@@ -2366,7 +2390,7 @@
         organizerZh: '南區超馬聯盟', organizerEn: 'South Taiwan Ultra Alliance', location: '台南市立田徑場',
         raceType: 'lap_timed', lapDistanceKm: 1.0, debounceSeconds: 15, status: 'finished',
         regStart: '2026-02-01 00:00:00', regEnd: '2026-05-01 23:59:59', raceStart: '2026-05-23 18:00:00',
-        maxQuota: 300, bannerUrl: 'dyn-night', brochureText: DEFAULT_BROCHURE_TEMPLATE, formSchemaJson: formJsonPayuni, certConfigJson: mkCertJson('黃建民')
+        maxQuota: 300, bannerUrl: 'dyn-night', brochureText: '', formSchemaJson: formJsonPayuni, certConfigJson: mkCertJson('黃建民')
       }
     ];
 
@@ -3093,7 +3117,7 @@
     COMPOUND_SURNAMES_28, splitFullName, mergeNameParts, zhToEnEventName,
     verifyTaiwanIdChecksum, inferGenderFromId, calcAge, sha256Hex,
     CURATED_BANNERS, DEFAULT_BROCHURE_TEMPLATE, DEFAULT_TUR_ADDONS, DEFAULT_ADDONS_NOTE_FIELD, CUSTOM_FIELD_TYPES, CUSTOM_FIELD_PRESETS, HISTORY_IMPORT_SPEC, EXTERNAL_IMPORT_SPEC, PAYMENT_MODES,
-    getBannerStyle, defaultFormSchema, getEventPaymentMode, normalizeEarlyBirdEnd, getEventEarlyBirdConfig, isEarlyBirdActive, getEffectiveCategoryPrice, defaultCertConfig, parseJsonSafe,
+    getBannerStyle, sanitizeBrochureText, normalizeEventData, defaultFormSchema, getEventPaymentMode, normalizeEarlyBirdEnd, getEventEarlyBirdConfig, isEarlyBirdActive, getEffectiveCategoryPrice, defaultCertConfig, parseJsonSafe,
     TurDB, validateGasUrl, buildGasQueryUrl, gasGet, gasPost,
     isCategoryWarrior800, isWarrior800Eligible, computeLeaderboard, computeEventProgressAnalytics, evaluateEventStageGates,
     isCertEligible, buildUnifiedHistoryRecords, parseExternalRosterRows,
