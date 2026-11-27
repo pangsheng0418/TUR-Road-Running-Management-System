@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>跑管家｜TUR 賽事管理</title>
   <!-- PWA / 手機主畫面 App 圖示與全螢幕模式 -->
-  <link rel="manifest" href="manifest.webmanifest?v=5.26" />
+  <link rel="manifest" href="manifest.webmanifest?v=5.27" />
   <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png" />
   <link rel="icon" type="image/png" sizes="512x512" href="assets/icon-512.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png" />
@@ -572,8 +572,9 @@
             </div>
           </div>
 
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
             <button id="btnNfcWriteNtag" class="p-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold">✍️ 寫入 NTAG</button>
+            <button id="btnNfcVerifyWrite" class="p-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold">✅ 回讀驗證</button>
             <button id="btnNfcBindUid" class="p-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold">🔗 綁定 UID</button>
             <button id="btnNfcReadLegacy" class="p-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold">♻️ 共用舊卡</button>
             <button id="btnNfcReadInspect" class="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 font-bold">🔍 讀卡查看</button>
@@ -699,27 +700,24 @@
       <div class="flex flex-wrap gap-1.5 text-xs sm:text-sm">
         <button data-z1tab="setup" class="sub-pill active px-3 py-1.5 rounded-lg bg-slate-100">1. 設定</button>
         <button data-z1tab="recon" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">2. 對帳配號</button>
-        <button data-z1tab="chip" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">3. 晶片報到</button>
-        <button data-z1tab="gun" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">4. 起跑站點</button>
-        <button data-z1tab="score" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">5. 成績結案</button>
-        <button data-z1tab="ops" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">6. 權限</button>
+        <button data-z1tab="chip" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">3. 晶片管制</button>
+        <button data-z1tab="score" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">4. 成績結案</button>
+        <button data-z1tab="ops" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">5. 權限</button>
       </div>
     </div>
 
-    <!-- 五階段作業管制節點層層把關看板（報名 → 繳費 → 起跑整備 → 賽事進行 → 結案鎖定） -->
+    <!-- 五階段作業管制節點層層把關看板（報名 → 繳費 → 晶片整備 → 賽道管制 → 結案鎖定） -->
     <div id="z1StageGateBar"></div>
 
-    <!-- 分頁 1：活動基本資料、10款橫幅/上傳5MB、分組與動態加購 -->
+    <!-- 分頁 1：活動基本資料、橫幅、分組與動態加購 -->
     <div id="z1-setup" class="z1-panel space-y-4"></div>
     <!-- 分頁 2：雙軌對帳、整團一鍵入帳、配號、外部CSV/Excel雙向互通 -->
     <div id="z1-recon" class="z1-panel hidden space-y-4"></div>
-    <!-- 分頁 3：晶片寫入・讀取查看與現場報到管制（後台直接作業） -->
+    <!-- 分頁 3：晶片管制（寫卡讀取 → 報到管制 → 起跑與站點 → 賽道即時管制到終點） -->
     <div id="z1-chip" class="z1-panel hidden space-y-4"></div>
-    <!-- 分頁 4：起跑時間微調與站點設定 -->
-    <div id="z1-gun" class="z1-panel hidden space-y-4"></div>
-    <!-- 分頁 5：成績微調、逐圈補刪、完賽比例統計與結案鎖定移至專區 2 -->
+    <!-- 分頁 4：成績微調、完賽比例統計與結案鎖定移至專區 2 -->
     <div id="z1-score" class="z1-panel hidden space-y-4"></div>
-    <!-- 分頁 6：承辦人名下作業員帳號管理 -->
+    <!-- 分頁 5：站點配置與晶片作業員帳號權限管理 -->
     <div id="z1-ops" class="z1-panel hidden space-y-4"></div>
   </section>
 
@@ -984,9 +982,9 @@
   </div>
 </div>
 
-<script src="js/tur-logo.js?v=5.26"></script>
-<script src="js/tur-core.js?v=5.26"></script>
-<script src="js/tur-zones.js?v=5.26"></script>
-<script src="js/tur-app.js?v=5.26"></script>
+<script src="js/tur-logo.js?v=5.27"></script>
+<script src="js/tur-core.js?v=5.27"></script>
+<script src="js/tur-zones.js?v=5.27"></script>
+<script src="js/tur-app.js?v=5.27"></script>
 </body>
 </html>

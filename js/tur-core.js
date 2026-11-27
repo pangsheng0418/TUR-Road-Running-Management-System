@@ -822,34 +822,65 @@
       const startDt = parseDateTime(cat.customRaceStart || event.raceStart);
       const bib = String(p.bibNumber).toUpperCase();
       const pLogs = logsByBib.get(bib) || [];
+      const checkInLog = pLogs.find((l) => String(l.stationCode).toUpperCase() === 'CHECKIN') || null;
+      const checkedIn = Boolean(checkInLog || String(p.checkinStatus || '').toLowerCase() === 'checked_in');
+      const checkInTime = checkInLog ? String(checkInLog.sensedTime).slice(11) : '';
+      const trackLogs = pLogs.filter((l) => String(l.stationCode).toUpperCase() !== 'CHECKIN');
       const penaltySec = Math.round(Number(p.penaltySeconds || 0));
 
       if (event.raceType === 'lap_timed') {
         const limitSec = Number(cat.timeLimitHours || 12) * 3600;
         const lapDist = Number(event.lapDistanceKm || cat.distanceKm || 1.0);
-        const lapLogs = pLogs.filter((l) => String(l.stationCode).toUpperCase() === 'LAP');
+        const lapLogs = trackLogs.filter((l) => String(l.stationCode).toUpperCase() === 'LAP');
         const validLaps = [];
         const splitDetails = [];
+        const lapDetails = [];
         let overtimeCount = 0;
         let prevDt = startDt;
 
-        lapLogs.forEach((ll, idx) => {
+        lapLogs.forEach((ll) => {
           const dt = parseDateTime(ll.sensedTime);
           const elapsed = (startDt && dt) ? Math.round((dt.getTime() - startDt.getTime()) / 1000) : 0;
           const lapSec = (prevDt && dt) ? Math.max(1, Math.round((dt.getTime() - prevDt.getTime()) / 1000)) : null;
-          if (!startDt || elapsed <= limitSec) {
-            validLaps.push({ ...ll, elapsed });
-            splitDetails.push({
-              code: `LAP #${validLaps.length}`,
-              name: `第 ${validLaps.length} 圈`,
+          const isOvertime = Boolean(startDt && elapsed > limitSec);
+          if (!isOvertime) {
+            validLaps.push({ ...ll, elapsed, lapSec });
+            const lapNum = validLaps.length;
+            const detailObj = {
+              logId: ll.logId,
+              lapNumber: lapNum,
+              overtime: false,
+              code: `LAP #${lapNum}`,
+              name: `第 ${lapNum} 圈`,
+              fullTime: ll.sensedTime,
               time: String(ll.sensedTime).slice(11),
               cumSec: elapsed,
               segSec: lapSec,
-              segPace: lapSec ? formatPace(lapSec, lapDist) : '--:--'
-            });
+              segPace: lapSec ? formatPace(lapSec, lapDist) : '--:--',
+              cumKm: Number((lapNum * lapDist).toFixed(3)),
+              source: ll.source || 'nfc',
+              note: ll.note || ''
+            };
+            splitDetails.push(detailObj);
+            lapDetails.push(detailObj);
             prevDt = dt || prevDt;
           } else {
             overtimeCount++;
+            lapDetails.push({
+              logId: ll.logId,
+              lapNumber: null,
+              overtime: true,
+              code: 'LAP (超時)',
+              name: '超時圈',
+              fullTime: ll.sensedTime,
+              time: String(ll.sensedTime).slice(11),
+              cumSec: elapsed,
+              segSec: lapSec,
+              segPace: lapSec ? formatPace(lapSec, lapDist) : '--:--',
+              cumKm: null,
+              source: ll.source || 'nfc',
+              note: ll.note || '逾限時'
+            });
           }
         });
 
@@ -857,13 +888,19 @@
         const totalDistanceKm = Number((lapCount * lapDist).toFixed(3));
         const lastLap = validLaps[validLaps.length - 1];
         const elapsedSec = lastLap && startDt ? Math.max(0, lastLap.elapsed + penaltySec) : null;
+        const validLapSecs = validLaps.map((l) => l.lapSec).filter((x) => x !== null && x > 0);
+        const bestLapSec = validLapSecs.length ? Math.min(...validLapSecs) : null;
+        const avgLapSec = validLapSecs.length ? Math.round(validLapSecs.reduce((a, b) => a + b, 0) / validLapSecs.length) : null;
         const status = p.raceStatus === 'dnf' ? 'dnf' : (event.status === 'finished' && lapCount > 0 ? 'finished' : (lapCount > 0 ? (p.raceStatus === 'finished' ? 'finished' : 'on_track') : p.raceStatus));
 
         return {
           event, participant: p, category: cat, raceType: 'lap_timed',
+          checkedIn, checkInLog, checkInTime,
           lapCount, overtimeCount, totalDistanceKm, elapsedSec,
+          bestLapSec, avgLapSec, lastLapTime: lastLap ? String(lastLap.sensedTime).slice(11) : '',
           avgPace: elapsedSec && totalDistanceKm > 0 ? formatPace(elapsedSec, totalDistanceKm) : '--:--',
-          splits: {}, splitDetails,
+          splits: {}, splitDetails, lapDetails,
+          etaSec: null, etaTimeStr: '',
           isWarrior800: status === 'finished' && isCategoryWarrior800(cat),
           status
         };
@@ -873,9 +910,10 @@
         let prevTime = startDt;
         let prevKm = 0;
         let maxKm = 0;
+        let lastCumSec = null;
 
         for (const st of evStations) {
-          const found = pLogs.find((l) => String(l.stationCode).toUpperCase() === String(st.stationCode).toUpperCase());
+          const found = trackLogs.find((l) => String(l.stationCode).toUpperCase() === String(st.stationCode).toUpperCase());
           if (found) {
             const dt = parseDateTime(found.sensedTime);
             const cumSec = (startDt && dt) ? Math.max(0, Math.round((dt.getTime() - startDt.getTime()) / 1000)) : null;
@@ -883,9 +921,12 @@
             const stKm = st.stationCode === 'FINISH' ? Number(cat.distanceKm || st.distanceKm || 0) : Number(st.distanceKm || 0);
             const segKm = Math.max(0.1, stKm - prevKm);
             const spObj = {
+              logId: found.logId,
               code: st.stationCode,
               name: st.name,
+              fullTime: found.sensedTime,
               time: String(found.sensedTime).slice(11),
+              source: found.source || 'nfc',
               cumSec,
               segSec,
               segPace: segSec ? formatPace(segSec, segKm) : '--:--'
@@ -895,23 +936,36 @@
             prevTime = dt || prevTime;
             prevKm = stKm;
             maxKm = Math.max(maxKm, stKm);
+            if (cumSec !== null) lastCumSec = cumSec;
           }
         }
 
-        const finLog = pLogs.find((l) => String(l.stationCode).toUpperCase() === 'FINISH');
+        const finLog = trackLogs.find((l) => String(l.stationCode).toUpperCase() === 'FINISH');
         let elapsedSec = null;
         if (finLog && startDt) {
           const fdt = parseDateTime(finLog.sensedTime);
           if (fdt) elapsedSec = Math.max(0, Math.round((fdt.getTime() - startDt.getTime()) / 1000) + penaltySec);
         }
-        const totalDistanceKm = finLog ? Number(cat.distanceKm || maxKm) : maxKm;
-        const status = p.raceStatus === 'dnf' ? 'dnf' : (finLog ? 'finished' : (pLogs.length > 0 ? 'on_track' : p.raceStatus));
+        const catDist = Number(cat.distanceKm || 0);
+        const totalDistanceKm = finLog ? Number(catDist || maxKm) : maxKm;
+        const status = p.raceStatus === 'dnf' ? 'dnf' : (finLog ? 'finished' : (trackLogs.length > 0 ? 'on_track' : p.raceStatus));
+
+        // 預估完賽時間 (ETA)：在途且已過中途站
+        let etaSec = null;
+        let etaTimeStr = '';
+        if (status === 'on_track' && startDt && lastCumSec > 0 && maxKm > 0 && catDist > maxKm) {
+          etaSec = Math.round((lastCumSec / maxKm) * catDist);
+          etaTimeStr = formatDateTime(new Date(startDt.getTime() + etaSec * 1000)).slice(11);
+        }
 
         return {
           event, participant: p, category: cat, raceType: 'distance',
+          checkedIn, checkInLog, checkInTime,
           lapCount: 0, overtimeCount: 0, totalDistanceKm, elapsedSec,
+          bestLapSec: null, avgLapSec: null, lastLapTime: '',
           avgPace: elapsedSec && totalDistanceKm > 0 ? formatPace(elapsedSec, totalDistanceKm) : '--:--',
-          splits, splitDetails,
+          splits, splitDetails, lapDetails: [],
+          etaSec, etaTimeStr,
           isWarrior800: status === 'finished' && isCategoryWarrior800(cat),
           status
         };
@@ -1256,11 +1310,11 @@
       closureBlockers,
       closureWarnings,
       stages: [
-        { step: 1, key: 'setup', tab: 'setup', title: '1. 活動設定', status: s1Status, detail: `${evCats.length} 組｜${activeParts.length} 人` },
-        { step: 2, key: 'recon', tab: 'recon', title: '2. 對帳配號', status: s2Status, detail: `已繳 ${paidParts.length}｜待繳 ${unpaidParts.length}` },
-        { step: 3, key: 'gun', tab: 'gun', title: '3. 整備鳴槍', status: s3Status, detail: hasGunStart ? `已開跑 ${String(event.raceStart).slice(11)}` : `未開跑｜缺卡 ${paidNoChip.length}` },
-        { step: 4, key: 'inrace', tab: 'score', title: '4. 賽事進行', status: s4Status, detail: `報到 ${checkedInParts.length}｜在途 ${onTrackParts.length}｜完賽 ${finishedParts.length}` },
-        { step: 5, key: 'closure', tab: 'score', title: '5. 結案鎖定', status: s5Status, detail: event.status === 'finished' ? '已歸檔' : (closureBlockers.length ? `阻塞 ${closureBlockers.length}` : (closureWarnings.length ? `提醒 ${closureWarnings.length}` : '可結案')) }
+        { step: 1, key: 'setup', tab: 'setup', subTab: '', title: '1. 活動設定', status: s1Status, detail: `${evCats.length} 組｜${activeParts.length} 人` },
+        { step: 2, key: 'recon', tab: 'recon', subTab: '', title: '2. 對帳配號', status: s2Status, detail: `已繳 ${paidParts.length}｜待繳 ${unpaidParts.length}` },
+        { step: 3, key: 'gun', tab: 'chip', subTab: 'start', title: '3. 晶片整備', status: s3Status, detail: hasGunStart ? `已開跑 ${String(event.raceStart).slice(11)}` : `未開跑｜缺卡 ${paidNoChip.length}` },
+        { step: 4, key: 'inrace', tab: 'chip', subTab: 'track', title: '4. 賽道管制', status: s4Status, detail: `報到 ${checkedInParts.length}｜在途 ${onTrackParts.length}｜完賽 ${finishedParts.length}` },
+        { step: 5, key: 'closure', tab: 'score', subTab: '', title: '5. 結案鎖定', status: s5Status, detail: event.status === 'finished' ? '已歸檔' : (closureBlockers.length ? `阻塞 ${closureBlockers.length}` : (closureWarnings.length ? `提醒 ${closureWarnings.length}` : '可結案')) }
       ]
     };
   }
@@ -3150,9 +3204,231 @@
     return out.sort((a, b) => Number(a.allPaid) - Number(b.allPaid) || a.groupCode.localeCompare(b.groupCode));
   }
 
+  /* --------------------------------------------------------------------------
+   * 10. Web NFC v3.1 雙模讀寫與音效核心（移植自路跑晶片計時系統）
+   * -------------------------------------------------------------------------- */
+  const TurNFC = (() => {
+    class SoundFX {
+      constructor() { this.ctx = null; this.enabled = true; }
+      _ensureCtx() {
+        if (!this.enabled) return null;
+        const AudioCtx = global.AudioContext || global.webkitAudioContext;
+        if (!AudioCtx) return null;
+        if (!this.ctx) this.ctx = new AudioCtx();
+        if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+        return this.ctx;
+      }
+      _tone(freq, durationMs, type = 'sine', gainVal = 0.25, delaySec = 0) {
+        const ctx = this._ensureCtx();
+        if (!ctx) return;
+        const now = ctx.currentTime + delaySec;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, now);
+        gain.gain.setValueAtTime(gainVal, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + durationMs / 1000);
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.start(now); osc.stop(now + durationMs / 1000 + 0.02);
+      }
+      beepSuccess() { this._tone(1046.5, 90, 'sine', 0.28, 0); this._tone(1568.0, 140, 'sine', 0.30, 0.09); this.vibrate([80]); }
+      beepWriteVerified() { this._tone(880, 80, 'triangle', 0.25, 0); this._tone(1174.6, 80, 'triangle', 0.25, 0.09); this._tone(1760, 180, 'triangle', 0.30, 0.18); this.vibrate([60, 50, 120]); }
+      beepWarning() { this._tone(520, 110, 'square', 0.18, 0); this._tone(420, 160, 'square', 0.18, 0.13); this.vibrate([120, 60, 120]); }
+      beepError() { this._tone(260, 260, 'sawtooth', 0.22, 0); this.vibrate([220]); }
+      beepGun() { this._tone(180, 180, 'sawtooth', 0.35, 0); this._tone(900, 320, 'triangle', 0.32, 0.05); this.vibrate([200, 80, 200]); }
+      vibrate(pattern) { if (global.navigator?.vibrate) { try { global.navigator.vibrate(pattern); } catch (_) {} } }
+    }
+
+    function translateError(err) {
+      if (!err) return '未知的 NFC 錯誤';
+      const name = err.name || 'Error';
+      const rawMsg = err.message || String(err);
+      const rawTag = ` [${name}: ${rawMsg}]`;
+      if (name === 'NotAllowedError') return 'NFC 權限遭拒或未開啟：請開啟手機 NFC 並允許 Chrome 使用 NFC 裝置。' + rawTag;
+      if (name === 'NotSupportedError') return '此晶片不支援標準 NDEF 寫入（可能為唯讀卡或 MIFARE Classic），請改點「🔗 僅綁定晶片 UID」。' + rawTag;
+      if (name === 'NetworkError' || name === 'IOError') return '晶片傳輸中斷：請緊貼手機背面 NFC 天線靜止 1～2 秒；若反覆失敗請改用「🔗 僅綁定晶片 UID」。' + rawTag;
+      if (name === 'NotReadableError') return '無法讀取晶片（移開太快或晶片損壞），請緊貼天線停留 1 秒重試。' + rawTag;
+      if (name === 'AbortError') return '已取消或等待逾時，請重新點擊按鈕後再貼近晶片。';
+      if (name === 'InvalidStateError') return '手機 NFC 正忙線中，請稍候 1 秒重試。' + rawTag;
+      return rawMsg + rawTag;
+    }
+
+    class NFCManager {
+      constructor() {
+        this.reader = null;
+        this.scanAbortController = null;
+        this.opAbortController = null;
+        this.isScanning = false;
+        this.isBusy = false;
+        this.sound = new SoundFX();
+      }
+      getDiagnostics() {
+        const isSecure = Boolean(global.isSecureContext || global.location?.hostname === 'localhost' || global.location?.hostname === '127.0.0.1');
+        const hasNDEF = 'NDEFReader' in global;
+        const ua = global.navigator?.userAgent || '';
+        const isAndroid = /Android/i.test(ua);
+        let statusMessage = '🟢 Web NFC 就緒（支援寫入、回讀驗證與 UID 綁定）';
+        if (!isSecure) statusMessage = '🔴 非 HTTPS 連線，Web NFC 已停用';
+        else if (!hasNDEF) statusMessage = isAndroid ? '🟡 請改用 Android Chrome 開啟（勿用 LINE/FB 內建瀏覽器）' : '🟡 電腦／iPhone 模擬模式（實機寫卡請用 Android Chrome）';
+        return { supported: isSecure && hasNDEF, isSecure, hasNDEF, isAndroid, statusMessage };
+      }
+      encodeChipPayload({ name, idNumber }) {
+        const cleanName = String(name || '').replace(/\|/g, ' ').trim();
+        const cleanId = String(idNumber || '').replace(/\|/g, '').trim().toUpperCase();
+        return `${cleanName}|${cleanId}`;
+      }
+      decodeNdefMessage(message) {
+        const records = (message && message.records) || [];
+        for (const record of records) {
+          if (!record || !record.data || record.data.byteLength === 0) continue;
+          let text = '';
+          try { text = new TextDecoder(record.encoding || 'utf-8').decode(record.data).trim(); }
+          catch (_) { try { text = new TextDecoder('utf-8').decode(record.data).trim(); } catch (_) { continue; } }
+          if (!text) continue;
+          if (text.startsWith('{')) {
+            try {
+              const obj = JSON.parse(text);
+              const idNumber = String(obj.id || obj.idNumber || '').trim().toUpperCase();
+              const name = String(obj.name || '').trim();
+              if (idNumber || name) return { name, idNumber, bib: String(obj.bib || '').trim(), raw: text, recordType: record.recordType };
+            } catch (_) {}
+          }
+          if (text.includes('|')) {
+            const parts = text.split('|').map((s) => s.trim());
+            if (parts.length === 2) return { name: parts[0], idNumber: parts[1].toUpperCase(), bib: '', raw: text, recordType: record.recordType };
+            if (parts.length >= 3) return { bib: parts[0], name: parts[1], idNumber: parts[2].toUpperCase(), raw: text, recordType: record.recordType };
+          }
+          if (record.recordType === 'text' || record.recordType === 'mime' || record.recordType === 'unknown') {
+            const looksLikeId = /^[A-Z][0-9A-Z]{6,12}$/i.test(text);
+            return { name: looksLikeId ? '' : text, idNumber: looksLikeId ? text.toUpperCase() : '', bib: '', raw: text, recordType: record.recordType };
+          }
+        }
+        return null;
+      }
+      cancelActiveOperation() {
+        if (this.opAbortController) { this.opAbortController.abort(); this.opAbortController = null; }
+        this.isBusy = false;
+      }
+      stopScanning() {
+        if (this.scanAbortController) { this.scanAbortController.abort(); this.scanAbortController = null; }
+        this.reader = null;
+        this.isScanning = false;
+      }
+      async startScanning(onTagRead, onError) {
+        const diag = this.getDiagnostics();
+        if (!diag.supported) throw new Error(diag.statusMessage);
+        this.cancelActiveOperation();
+        this.stopScanning();
+        this.scanAbortController = new AbortController();
+        const ndef = new global.NDEFReader();
+        this.reader = ndef;
+        ndef.addEventListener('readingerror', () => {
+          this.sound.beepError();
+          if (onError) onError(new Error('無法讀取晶片，請緊貼手機背面 NFC 天線 1 秒重試'));
+        });
+        ndef.addEventListener('reading', (event) => {
+          const uid = String(event.serialNumber || '').trim().toUpperCase();
+          const parsed = this.decodeNdefMessage(event.message);
+          if (parsed && (parsed.idNumber || parsed.name || parsed.bib)) {
+            onTagRead({ ...parsed, nfcUid: uid, uidOnly: false, source: 'nfc' });
+            return;
+          }
+          if (uid) {
+            onTagRead({ name: '', idNumber: '', bib: '', raw: '', nfcUid: uid, uidOnly: true, source: 'nfc' });
+            return;
+          }
+          this.sound.beepError();
+          if (onError) onError(new Error('感應到空白晶片且無可辨識 UID，請先寫入晶片或綁定 UID'));
+        });
+        try {
+          await ndef.scan({ signal: this.scanAbortController.signal });
+          this.isScanning = true;
+        } catch (err) {
+          this.stopScanning();
+          throw new Error(translateError(err));
+        }
+      }
+      async writeChip({ name, idNumber }, { onStep } = {}) {
+        const diag = this.getDiagnostics();
+        if (!diag.supported) throw new Error(diag.statusMessage);
+        this.stopScanning();
+        this.cancelActiveOperation();
+        const targetId = String(idNumber || '').trim().toUpperCase();
+        const targetName = String(name || '').trim();
+        const payloadStr = this.encodeChipPayload({ name: targetName, idNumber: targetId });
+        const ac = new AbortController();
+        this.opAbortController = ac;
+        this.isBusy = true;
+        const ndef = new global.NDEFReader();
+        this.reader = ndef;
+        if (onStep) onStep(`📡 請將晶片緊貼手機背面靜止 1～2 秒…（寫入：${maskNdefPayload(payloadStr)}）`);
+        const timer = setTimeout(() => ac.abort(), 30000);
+        try {
+          await ndef.write(
+            { records: [{ recordType: 'text', encoding: 'utf-8', lang: 'zh', data: payloadStr }] },
+            { overwrite: true, signal: ac.signal }
+          );
+          clearTimeout(timer);
+          this.opAbortController = null; this.reader = null; this.isBusy = false;
+          this.sound.beepWriteVerified();
+          return { written: true, name: targetName, idNumber: targetId, raw: payloadStr };
+        } catch (err) {
+          clearTimeout(timer);
+          this.opAbortController = null; this.reader = null; this.isBusy = false;
+          const translated = new Error(translateError(err));
+          translated.originalName = err?.name || '';
+          throw translated;
+        }
+      }
+      async readSingleTag(onStep, timeoutMs = 25000) {
+        const diag = this.getDiagnostics();
+        if (!diag.supported) throw new Error(diag.statusMessage);
+        this.stopScanning();
+        this.cancelActiveOperation();
+        const ac = new AbortController();
+        this.opAbortController = ac;
+        this.isBusy = true;
+        if (onStep) onStep('📡 請將 NFC 晶片緊貼手機背面感應區…');
+        const ndef = new global.NDEFReader();
+        this.reader = ndef;
+        return new Promise((resolve, reject) => {
+          const timer = setTimeout(() => { cleanup(); reject(new Error('等待讀取逾時（25 秒），請重試。')); }, timeoutMs);
+          const cleanup = () => { clearTimeout(timer); if (!ac.signal.aborted) ac.abort(); this.opAbortController = null; this.reader = null; this.isBusy = false; };
+          ac.signal.addEventListener('abort', () => { clearTimeout(timer); this.isBusy = false; });
+          ndef.addEventListener('reading', (event) => {
+            const uid = String(event.serialNumber || '').trim().toUpperCase();
+            const parsed = this.decodeNdefMessage(event.message);
+            const recordTypes = ((event.message && event.message.records) || []).map((r) => r.recordType);
+            cleanup();
+            this.sound.beepSuccess();
+            resolve({ nfcUid: uid, parsed, recordTypes, raw: parsed ? parsed.raw : '' });
+          }, { once: true });
+          ndef.addEventListener('readingerror', () => {
+            cleanup();
+            this.sound.beepError();
+            reject(new Error('讀取晶片失敗：請緊貼天線停留 1 秒重試。'));
+          }, { once: true });
+          ndef.scan({ signal: ac.signal }).catch((err) => { cleanup(); reject(new Error(translateError(err))); });
+        });
+      }
+      async mockWriteChip({ name, idNumber }, { onStep } = {}) {
+        const targetId = String(idNumber || '').trim().toUpperCase();
+        const targetName = String(name || '').trim();
+        const payloadStr = this.encodeChipPayload({ name: targetName, idNumber: targetId });
+        if (onStep) onStep(`[模擬] 寫入中：${maskNdefPayload(payloadStr)}…`);
+        await new Promise((r) => setTimeout(r, 220));
+        this.sound.beepWriteVerified();
+        return { written: true, verified: true, nfcUid: '04:' + Math.random().toString(16).slice(2, 4).toUpperCase() + ':' + Math.random().toString(16).slice(2, 4).toUpperCase() + ':88', name: targetName, idNumber: targetId, raw: payloadStr };
+      }
+    }
+
+    return new NFCManager();
+  })();
+
   global.TurCore = {
     DEFAULT_GAS_URL,
     PAYUNi_FEATURE_ENABLED,
+    NFC: TurNFC,
     onLogoReady,
     pad2, formatDateTime, parseDateTime, formatDuration, formatPace, escapeHtml, maskIdCard, maskNdefPayload,
     COMPOUND_SURNAMES_28, splitFullName, mergeNameParts, zhToEnEventName,

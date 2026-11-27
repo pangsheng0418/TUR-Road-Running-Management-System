@@ -1813,7 +1813,21 @@
 
     const applyPostWrite = async (target, uidVal) => {
       if (uidVal) target.chipUid = uidVal;
-      if (autoChk) target.checkinStatus = 'checked_in';
+      if (autoChk && target.checkinStatus !== 'checked_in') {
+        target.checkinStatus = 'checked_in';
+        const hasChkLog = State.timingLogs.some((l) => l.eventId === State.opEventId && l.bibNumber === target.bibNumber && l.stationCode === 'CHECKIN' && l.isValid !== false);
+        if (!hasChkLog && target.bibNumber) {
+          const chkLog = {
+            logId: `LOG-${Date.now()}-${target.bibNumber}-CHECKIN`, eventId: State.opEventId, stationCode: 'CHECKIN',
+            bibNumber: target.bibNumber, idCardHash: await C.sha256Hex(target.idCard || ''),
+            sensedTime: C.formatDateTime(), lapCount: 0, operator: State.currentUser?.username || 'writer',
+            source: 'write_auto', isValid: true, note: '發卡寫入同步報到'
+          };
+          State.timingLogs.push(chkLog);
+          await C.TurDB.put('timingLogs', chkLog);
+          await enqueueSync('addTimingLog', chkLog, false);
+        }
+      }
       await C.TurDB.put('participants', target);
       rebuildIndices(State.opEventId);
       await enqueueSync('updateParticipant', { participantId: target.participantId, chipUid: target.chipUid, checkinStatus: target.checkinStatus });
@@ -1825,100 +1839,98 @@
         const target = (p && p.eventId === State.opEventId) ? p : State.participants.find((x) => x.eventId === State.opEventId && x.chipUid) || State.participants.find((x) => x.eventId === State.opEventId && x.payStatus === 'PAID');
         if (!target) return toast('本場次尚無可模擬讀取之選手晶片', 'warn');
         State.selectedWriterPid = target.participantId;
-        Feedback.success();
+        C.NFC.sound.beepSuccess();
         showChipInspectResult(target, target.chipUid || 'SIM-UID-READ', `${target.name}|${target.idCard}`);
         appendWriterLog(`🔍 [模擬讀取查看] ${target.bibNumber} ${target.name}｜UID=${target.chipUid || '未綁'}｜報到=${target.checkinStatus}`);
         renderWriterSelected(); renderWriterList();
         return;
       }
       try {
-        const ndef = new NDEFReader();
-        await ndef.scan();
-        appendWriterLog('🔍 請將晶片貼近感應區進行讀取查看...');
-        ndef.onreading = (e) => {
-          const uid = String(e.serialNumber || '').toUpperCase();
-          const dec = new TextDecoder(); let txt = '';
-          for (const rec of e.message.records) if (rec.recordType === 'text') txt = dec.decode(rec.data);
-          const idPart = txt.includes('|') ? txt.split('|')[1].trim().toUpperCase() : '';
-          const m = (idPart && State.idxByIdCard.get(idPart)) || State.idxByUid.get(uid);
-          if (m) { Feedback.success(); State.selectedWriterPid = m.participantId; renderWriterSelected(); renderWriterList(); }
-          else Feedback.error();
-          showChipInspectResult(m, uid, txt);
-          appendWriterLog(`🔍 [讀取查看] UID=${uid} NDEF="${C.maskNdefPayload(txt)}" -> ${m ? `${m.bibNumber} ${m.name}` : '非本場卡片'}`);
-          ndef.onreading = null;
-        };
-      } catch (err) { Feedback.error(); appendWriterLog(`🔴 讀取失敗：${err.message}`); }
+        appendWriterLog('🔍 請將晶片貼近手機背面感應區進行讀取查看…');
+        const tag = await C.NFC.readSingleTag((step) => appendWriterLog(step));
+        const idPart = String(tag.parsed?.idNumber || '').toUpperCase();
+        const m = (idPart && State.idxByIdCard.get(idPart)) || (tag.nfcUid && State.idxByUid.get(tag.nfcUid));
+        if (m) { C.NFC.sound.beepSuccess(); State.selectedWriterPid = m.participantId; renderWriterSelected(); renderWriterList(); }
+        else C.NFC.sound.beepError();
+        showChipInspectResult(m, tag.nfcUid, tag.raw);
+        appendWriterLog(`🔍 [讀取查看] UID=${tag.nfcUid || '-'} NDEF="${C.maskNdefPayload(tag.raw)}" -> ${m ? `${m.bibNumber} ${m.name}` : '非本場卡片'}`);
+      } catch (err) { C.NFC.sound.beepError(); appendWriterLog(`🔴 讀取失敗：${err.message}`); toast(err.message, 'error'); }
+      return;
+    }
+
+    if (mode === 'verify') {
+      if (!p) return toast('請先帶入選手再進行回讀驗證', 'warn');
+      try {
+        appendWriterLog(`✅ [回讀驗證] 請將剛寫入的晶片貼近背面（核對 ${p.name}）…`);
+        const tag = await C.NFC.readSingleTag((step) => appendWriterLog(step));
+        const rId = String(tag.parsed?.idNumber || '').toUpperCase();
+        if (!rId || rId !== String(p.idCard || '').toUpperCase()) {
+          throw new Error(`回讀不符！卡片內容「${C.maskNdefPayload(tag.raw) || '空'}」與 ${p.name} 不一致`);
+        }
+        await applyPostWrite(p, tag.nfcUid || p.chipUid || 'NDEF-VERIFIED');
+        C.NFC.sound.beepWriteVerified();
+        showChipInspectResult(p, tag.nfcUid || p.chipUid, tag.raw);
+        appendWriterLog(`🟢 回讀驗證 100% 一致！UID=${tag.nfcUid || '標準 NDEF'}`);
+        toast(`✅ 回讀驗證通過！UID=${tag.nfcUid || '-'}`, 'success');
+      } catch (err) { C.NFC.sound.beepError(); appendWriterLog(`🔴 回讀驗證失敗：${err.message}`); toast(err.message, 'error'); }
       return;
     }
 
     if (mode === 'write') {
       const payload = `${p.name}|${p.idCard}`;
       if (sim) {
-        const newUid = p.chipUid || `04:${Math.random().toString(16).slice(2, 4).toUpperCase()}:9F:22`;
-        await applyPostWrite(p, newUid);
-        Feedback.writeOk();
+        const res = await C.NFC.mockWriteChip({ name: p.name, idNumber: p.idCard });
+        await applyPostWrite(p, p.chipUid || res.nfcUid);
         appendWriterLog(`✅ [模擬寫入+回讀驗證通過] NDEF="${C.maskNdefPayload(payload)}" (${payload.length}B) UID=${p.chipUid}${autoChk ? '｜已同步報到' : ''}`);
         showChipInspectResult(p, p.chipUid, payload);
         return;
       }
       try {
-        const ndef = new NDEFReader();
-        await ndef.write({ records: [{ recordType: 'text', data: payload }] });
-        Feedback.writeOk();
-        appendWriterLog(`✅ NDEF 寫入完成："${C.maskNdefPayload(payload)}"，啟動回讀驗證...`);
-        await ndef.scan();
-        ndef.onreading = async (e) => {
-          const uid = String(e.serialNumber || '').toUpperCase();
-          await applyPostWrite(p, uid);
-          appendWriterLog(`🟢 回讀驗證通過！UID=${uid}${autoChk ? '｜已同步報到' : ''}`);
-          showChipInspectResult(p, uid, payload);
-          ndef.onreading = null;
-        };
-      } catch (err) { Feedback.error(); appendWriterLog(`🔴 寫入失敗：${err.message}`); }
+        await C.NFC.writeChip({ name: p.name, idNumber: p.idCard }, { onStep: (step) => appendWriterLog(step) });
+        await applyPostWrite(p, p.chipUid || 'NDEF-WRITTEN');
+        appendWriterLog(`✅ NDEF 寫入完成："${C.maskNdefPayload(payload)}"！請按「✅ 回讀驗證」核對資料並擷取硬體 UID`);
+        toast(`✅ 寫入完成！建議點「✅ 回讀驗證」確認卡片並擷取 UID`, 'success');
+      } catch (err) { C.NFC.sound.beepError(); appendWriterLog(`🔴 寫入失敗：${err.message}`); toast(err.message, 'error'); }
     } else if (mode === 'uid') {
       if (sim) {
         const newUid = `MF:${Math.random().toString(16).slice(2, 4).toUpperCase()}:AA:11`;
         await applyPostWrite(p, newUid);
-        Feedback.writeOk();
+        C.NFC.sound.beepWriteVerified();
         appendWriterLog(`🔗 [模擬 UID 綁定] ${p.name} -> ${p.chipUid}${autoChk ? '｜已同步報到' : ''}`);
         showChipInspectResult(p, p.chipUid, `${p.name}|${p.idCard}`);
       } else {
-        const ndef = new NDEFReader();
-        await ndef.scan();
-        ndef.onreading = async (e) => {
-          const uid = String(e.serialNumber || '').toUpperCase();
-          await applyPostWrite(p, uid);
-          Feedback.writeOk(); appendWriterLog(`🔗 UID 綁定成功：${uid}${autoChk ? '｜已同步報到' : ''}`);
-          showChipInspectResult(p, uid, `${p.name}|${p.idCard}`);
-          ndef.onreading = null;
-        };
+        try {
+          appendWriterLog('🔗 請貼近唯讀晶片讀取硬體 UID…');
+          const tag = await C.NFC.readSingleTag((step) => appendWriterLog(step));
+          if (!tag.nfcUid) throw new Error('此晶片未回傳硬體 UID');
+          await applyPostWrite(p, tag.nfcUid);
+          C.NFC.sound.beepWriteVerified();
+          appendWriterLog(`🔗 UID 綁定成功：${tag.nfcUid}${autoChk ? '｜已同步報到' : ''}`);
+          showChipInspectResult(p, tag.nfcUid, `${p.name}|${p.idCard}`);
+        } catch (err) { C.NFC.sound.beepError(); appendWriterLog(`🔴 UID 綁定失敗：${err.message}`); toast(err.message, 'error'); }
       }
     } else if (mode === 'legacy') {
       const sample = State.participants.find((x) => x.eventId === State.opEventId && String(x.payStatus).toUpperCase() === 'PAID');
       if (sim && sample) {
-        Feedback.success();
+        C.NFC.sound.beepSuccess();
         State.selectedWriterPid = sample.participantId;
         if (autoChk) await applyPostWrite(sample, sample.chipUid);
         renderWriterSelected();
         showChipInspectResult(sample, sample.chipUid || 'LEGACY-CARD', `${sample.name}|${sample.idCard}`);
         appendWriterLog(`♻️ [模擬舊晶片共用核准] 讀到 ${sample.name}|${C.maskIdCard(sample.idCard)} -> 本場已繳費 (${sample.bibNumber})${autoChk ? '｜已同步報到' : ''}`);
       } else if (!sim) {
-        const ndef = new NDEFReader();
-        await ndef.scan();
-        ndef.onreading = async (e) => {
-          const uid = String(e.serialNumber || '').toUpperCase();
-          const dec = new TextDecoder(); let txt = '';
-          for (const rec of e.message.records) if (rec.recordType === 'text') txt = dec.decode(rec.data);
-          const idPart = txt.includes('|') ? txt.split('|')[1].trim().toUpperCase() : '';
-          const m = (idPart && State.idxByIdCard.get(idPart)) || State.idxByUid.get(uid);
+        try {
+          appendWriterLog('♻️ 請貼近跑者既有共用晶片進行核准…');
+          const tag = await C.NFC.readSingleTag((step) => appendWriterLog(step));
+          const idPart = String(tag.parsed?.idNumber || '').toUpperCase();
+          const m = (idPart && State.idxByIdCard.get(idPart)) || (tag.nfcUid && State.idxByUid.get(tag.nfcUid));
           if (m) {
-            Feedback.success(); State.selectedWriterPid = m.participantId;
-            if (autoChk) await applyPostWrite(m, m.chipUid || uid);
-            showChipInspectResult(m, uid, txt);
+            C.NFC.sound.beepSuccess(); State.selectedWriterPid = m.participantId;
+            if (autoChk) await applyPostWrite(m, m.chipUid || tag.nfcUid);
+            showChipInspectResult(m, tag.nfcUid, tag.raw);
             appendWriterLog(`♻️ 舊卡核准：${m.name} (${m.bibNumber})${autoChk ? '｜已同步報到' : ''}`);
-          } else { Feedback.error(); showChipInspectResult(null, uid, txt); appendWriterLog(`🔴 非本場晶片攔截：${C.maskNdefPayload(txt) || uid}`); }
-          ndef.onreading = null;
-        };
+          } else { C.NFC.sound.beepError(); showChipInspectResult(null, tag.nfcUid, tag.raw); appendWriterLog(`🔴 非本場晶片攔截：${C.maskNdefPayload(tag.raw) || tag.nfcUid}`); }
+        } catch (err) { C.NFC.sound.beepError(); appendWriterLog(`🔴 舊卡讀取失敗：${err.message}`); toast(err.message, 'error'); }
       }
     }
   }
@@ -2098,7 +2110,7 @@
       $('#opPickedAccountHint').textContent = '請先點選站點';
     }
     if (!ops.length) {
-      $('#opStationCardGrid').innerHTML = '<div class="col-span-full p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold text-center">本活動尚未設定晶片作業員，請承辦人登入後於「6. 權限」建立站點帳密</div>';
+      $('#opStationCardGrid').innerHTML = '<div class="col-span-full p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold text-center">本活動尚未設定晶片作業員，請承辦人登入後於「5. 權限」建立站點帳密</div>';
       return;
     }
     $('#opStationCardGrid').innerHTML = ops.map((op) => {
@@ -2140,6 +2152,8 @@
   }
 
   function logoutZeroTrace() {
+    if (C.NFC?.isScanning) C.NFC.stopScanning();
+    if (C.NFC?.cancelActiveOperation) C.NFC.cancelActiveOperation();
     sessionStorage.removeItem('TUR_V3_SESSION');
     State.currentUser = { username: 'public', displayName: '民眾 / 跑者', role: 'public', allowedStation: '' };
     State.opEventId = '';
@@ -2789,6 +2803,7 @@
     $('#btnWriterCheckin').onclick = () => setWriterRunnerCheckin(State.idxById.get(State.selectedWriterPid), true);
     $('#btnWriterUncheckin').onclick = () => setWriterRunnerCheckin(State.idxById.get(State.selectedWriterPid), false);
     $('#btnNfcWriteNtag').onclick = () => runChipWrite('write', false);
+    if ($('#btnNfcVerifyWrite')) $('#btnNfcVerifyWrite').onclick = () => runChipWrite('verify', false);
     $('#btnNfcBindUid').onclick = () => runChipWrite('uid', false);
     $('#btnNfcReadLegacy').onclick = () => runChipWrite('legacy', false);
     $('#btnNfcReadInspect').onclick = () => runChipWrite('inspect', false);
@@ -2823,19 +2838,27 @@
     $('#quickRunnerButtons').onclick = (e) => { if (e.target.dataset.opScan) handleOperatorSense(e.target.dataset.opScan, 'sim'); };
     $('#btnSimUnknownScan').onclick = () => handleOperatorSense('INVALID-999', 'sim');
     $('#btnToggleNfcScan').onclick = async () => {
-      if (!('NDEFReader' in window)) return toast('請使用 Android Chrome 啟動實體 NFC（電腦請用下方模擬按鈕）', 'warn');
-      if (State.nfcScanning) { State.nfcScanning = false; $('#btnToggleNfcScan').textContent = '📡 啟動 NFC 感應'; return; }
+      if (C.NFC.isScanning || State.nfcScanning) {
+        C.NFC.stopScanning();
+        State.nfcScanning = false;
+        $('#btnToggleNfcScan').textContent = '📡 啟動 NFC';
+        return;
+      }
       try {
-        const ndef = new NDEFReader(); await ndef.scan(); State.nfcScanning = true;
+        await C.NFC.startScanning(
+          (tag) => {
+            const tok = tag.idNumber ? `${tag.name}|${tag.idNumber}` : (tag.bib || tag.nfcUid);
+            handleOperatorSense(tok, 'nfc');
+          },
+          (err) => toast(err.message, 'error')
+        );
+        State.nfcScanning = true;
         $('#btnToggleNfcScan').textContent = '🟢 NFC 感應中（點擊停止）';
-        ndef.onreading = (e) => {
-          if (!State.nfcScanning) return;
-          const uid = String(e.serialNumber || '').toUpperCase();
-          const dec = new TextDecoder(); let txt = '';
-          for (const rec of e.message.records) if (rec.recordType === 'text') txt = dec.decode(rec.data);
-          handleOperatorSense(txt || uid, 'nfc');
-        };
-      } catch (err) { toast(`NFC 失敗：${err.message}`, 'error'); }
+        toast('📡 已啟動實體 NFC 感應', 'success');
+      } catch (err) {
+        State.nfcScanning = false;
+        toast(err.message, 'warn');
+      }
     };
 
     window.addEventListener('online', () => { updateNetworkBadge(); syncPushNow(true); });
@@ -2911,7 +2934,7 @@
 
     // 註冊 PWA Service Worker（僅在 http/https 下啟用，不干擾本機 file:// 開啟）
     if ('serviceWorker' in navigator && /^https?:/i.test(location.protocol)) {
-      navigator.serviceWorker.register('./sw.js?v=5.26').catch(() => {});
+      navigator.serviceWorker.register('./sw.js?v=5.27').catch(() => {});
     }
 
     // 連網且已綁定 GAS 時，背景自動同步雲端最新 Google 試算表資料（不影響開頁秒開速度）

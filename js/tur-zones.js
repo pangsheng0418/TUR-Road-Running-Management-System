@@ -397,9 +397,9 @@
   }
 
   /* --------------------------------------------------------------------------
-   * 專區 1：🏃 進行中活動管理（6 分頁按需渲染 Lazy Render，操作零延遲）
+   * 專區 1：🏃 進行中活動管理（5 分頁按需渲染 Lazy Render，操作零延遲）
    * -------------------------------------------------------------------------- */
-  let z1DirtyTabs = new Set(['setup', 'recon', 'chip', 'gun', 'score', 'ops']);
+  let z1DirtyTabs = new Set(['setup', 'recon', 'chip', 'score', 'ops']);
   let z1RenderedEventId = '';
 
   function getActiveZ1Tab() {
@@ -411,11 +411,12 @@
     const managed = getManagedEvents(App, false);
     const ev = managed.find((e) => e.eventId === App.State.z1EventId);
     if (!ev) return;
+    if (tabName === 'gun') { tabName = 'chip'; App.State.z1ChipSub = 'start'; }
+    if (tabName !== 'chip' && C.NFC?.isScanning) C.NFC.stopScanning();
     if (!force && z1RenderedEventId === ev.eventId && !z1DirtyTabs.has(tabName)) return;
     if (tabName === 'setup') renderZ1Setup(App, ev);
     else if (tabName === 'recon') renderZ1Recon(App, ev);
-    else if (tabName === 'chip') renderZ1ChipOps(App, ev);
-    else if (tabName === 'gun') renderZ1Gun(App, ev);
+    else if (tabName === 'chip') renderZ1ChipControl(App, ev);
     else if (tabName === 'score') renderZ1Score(App, ev);
     else if (tabName === 'ops') renderZ1Ops(App, ev);
     z1RenderedEventId = ev.eventId;
@@ -447,7 +448,7 @@
     sel.innerHTML = managed.map((e) => `<option value="${e.eventId}" ${e.eventId === App.State.z1EventId ? 'selected' : ''}>${C.isTestSuiteId(e.eventId) ? '🧪 ' : ''}${C.escapeHtml(e.nameZh)}${isSuper ? `（承辦：${C.escapeHtml(e.ownerUsername || '-')}）` : ''}</option>`).join('');
     const ev = managed.find((e) => e.eventId === App.State.z1EventId);
 
-    z1DirtyTabs = new Set(['setup', 'recon', 'chip', 'gun', 'score', 'ops']);
+    z1DirtyTabs = new Set(['setup', 'recon', 'chip', 'score', 'ops']);
     z1RenderedEventId = ev.eventId;
     renderZ1StageGateBar(App, ev);
     renderZone1Tab(App, getActiveZ1Tab(), true);
@@ -476,7 +477,7 @@
           ${g.stages.map((s) => {
             const st = stStyles[s.status] || stStyles.locked;
             return `
-              <button type="button" data-jump-z1tab="${s.tab}" class="text-left px-2.5 py-2 rounded-xl border transition hover:shadow ${st.box}">
+              <button type="button" data-jump-z1tab="${s.tab}" data-jump-z1sub="${s.subTab || ''}" class="text-left px-2.5 py-2 rounded-xl border transition hover:shadow ${st.box}">
                 <div class="flex items-center justify-between gap-1">
                   <span class="font-black text-xs">${s.title}</span>
                   <span class="px-1.5 py-0.5 rounded-full text-[10px] font-black ${st.tag}">${st.txt}</span>
@@ -488,8 +489,12 @@
       </div>`;
     $$('[data-jump-z1tab]').forEach((b) => {
       b.onclick = () => {
+        if (b.dataset.jumpZ1sub) App.State.z1ChipSub = b.dataset.jumpZ1sub;
         const targetBtn = document.querySelector(`[data-z1tab="${b.dataset.jumpZ1tab}"]`);
-        if (targetBtn) targetBtn.click();
+        if (targetBtn) {
+          targetBtn.click();
+          if (b.dataset.jumpZ1tab === 'chip') renderZone1Tab(App, 'chip', true);
+        }
       };
     });
   }
@@ -1963,20 +1968,224 @@
   }
 
   /* --------------------------------------------------------------------------
-   * 專區 1 分頁 3：📡 晶片寫入・讀取查看與現場報到人員管制（承辦人/管理員直接作業）
+   * 專區 1 分頁 3：📡 晶片管制（寫卡讀取 → 報到管制 → 起跑與站點 → 賽道即時管制到終點）
+   * 完整比照「路跑晶片計時系統」運作流程
    * -------------------------------------------------------------------------- */
-  function renderZ1ChipOps(App, ev) {
+  const adminScanDebounceMap = new Map();
+
+  async function adminSenseRunner(App, ev, stCodeRaw, tokenRaw, source = 'manual', opts = {}) {
+    const stCode = String(stCodeRaw || '').trim().toUpperCase();
+    const token = String(tokenRaw || '').trim().toUpperCase();
+    if (!ev || !stCode || !token) return { ok: false, level: 'warn', msg: '請輸入或感應有效資料' };
+    if (ev.status === 'finished') {
+      C.NFC.sound.beepError();
+      return { ok: false, level: 'error', msg: '🔒 本活動已結案鎖定，禁止寫入感應紀錄' };
+    }
+
+    const evParts = App.State.participants.filter((p) => p.eventId === ev.eventId);
+    const idFromPipe = token.includes('|') ? token.split('|')[1]?.trim().toUpperCase() : '';
+    let runner = idFromPipe ? evParts.find((p) => String(p.idCard || '').toUpperCase() === idFromPipe) : null;
+    if (!runner) {
+      runner = evParts.find((p) =>
+        String(p.bibNumber || '').toUpperCase() === token ||
+        String(p.chipUid || '').toUpperCase() === token ||
+        String(p.idCard || '').toUpperCase() === token
+      );
+    }
+    if (!runner || String(runner.payStatus || '').toUpperCase() !== 'PAID' || !runner.bibNumber) {
+      C.NFC.sound.beepError();
+      return { ok: false, level: 'error', msg: `🚫 攔截：查無本場已繳費且配號選手（${token}）` };
+    }
+
+    const cat = App.State.categories.find((c) => c.catId === runner.catId) || null;
+    const effStart = (cat && cat.customRaceStart) || ev.raceStart || '';
+    if (stCode !== 'CHECKIN' && !effStart) {
+      C.NFC.sound.beepError();
+      return { ok: false, level: 'error', msg: `🔒 尚未鳴槍開跑，請先於「起跑與站點」設定起跑時間` };
+    }
+
+    const bibU = String(runner.bibNumber).toUpperCase();
+    const evValidLogs = App.State.timingLogs.filter((l) => l.eventId === ev.eventId && l.isValid !== false);
+
+    if (stCode === 'CHECKIN') {
+      const existingChk = evValidLogs.find((l) => String(l.bibNumber).toUpperCase() === bibU && String(l.stationCode).toUpperCase() === 'CHECKIN');
+      if (runner.checkinStatus === 'checked_in' || existingChk) {
+        C.NFC.sound.beepWarning();
+        return {
+          ok: false, level: 'warn', duplicate: true, runner,
+          msg: `⚠️ ${runner.bibNumber} ${runner.name} 已完成報到${existingChk ? `（${String(existingChk.sensedTime).slice(11)}）` : ''}，無須重複感應`
+        };
+      }
+    }
+
+    if (stCode === 'FINISH' && !opts.allowDuplicateFinish) {
+      const existingFin = evValidLogs.find((l) => String(l.bibNumber).toUpperCase() === bibU && String(l.stationCode).toUpperCase() === 'FINISH');
+      if (existingFin) {
+        C.NFC.sound.beepWarning();
+        return {
+          ok: false, level: 'warn', duplicate: true, runner,
+          msg: `⚠️ ${runner.bibNumber} ${runner.name} 已於 ${String(existingFin.sensedTime).slice(11)} 完賽，保留首次衝線紀錄`
+        };
+      }
+    }
+
+    const nowMs = Date.now();
+    if (!opts.bypassDebounce && source === 'nfc' && stCode !== 'CHECKIN') {
+      const cdMs = Math.max(1, Number(ev.debounceSeconds || 15)) * 1000;
+      const dKey = `${ev.eventId}::${stCode}::${bibU}`;
+      const lastMs = adminScanDebounceMap.get(dKey) || 0;
+      if (nowMs - lastMs < cdMs) {
+        const waitSec = Math.ceil((cdMs - (nowMs - lastMs)) / 1000);
+        C.NFC.sound.beepWarning();
+        return { ok: false, level: 'warn', duplicate: true, runner, msg: `⚠️ 防連點略過：${runner.bibNumber} ${runner.name} 剛感應過（剩 ${waitSec} 秒）` };
+      }
+      adminScanDebounceMap.set(dKey, nowMs);
+    }
+
+    let senseMs = nowMs;
+    if (opts.customTime) {
+      const ct = String(opts.customTime).trim();
+      if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(ct)) {
+        return { ok: false, level: 'error', msg: '時間格式須為 YYYY-MM-DD HH:mm:ss' };
+      }
+      const parsed = C.parseDateTime(ct);
+      if (!parsed) return { ok: false, level: 'error', msg: '無效的日期時間' };
+      if (stCode !== 'CHECKIN' && effStart) {
+        const startDt = C.parseDateTime(effStart);
+        if (startDt && parsed.getTime() < startDt.getTime()) {
+          return { ok: false, level: 'error', msg: `🔒 通過時間 (${ct}) 不可早於起跑時間 (${effStart})` };
+        }
+      }
+      senseMs = parsed.getTime();
+    }
+
+    const timeStr = C.formatDateTime(new Date(senseMs));
+    let lapCount = 0;
+    let isValid = true;
+    let note = opts.note || '';
+
+    if (stCode === 'CHECKIN') {
+      runner.checkinStatus = 'checked_in';
+      await C.TurDB.put('participants', runner);
+      await App.enqueueSync('updateParticipant', { participantId: runner.participantId, checkinStatus: 'checked_in' });
+      note = note || '晶片管制報到完成';
+    } else if (stCode === 'LAP') {
+      const prevLaps = evValidLogs.filter((l) => String(l.bibNumber).toUpperCase() === bibU && String(l.stationCode).toUpperCase() === 'LAP').length;
+      lapCount = prevLaps + 1;
+      const startDt = C.parseDateTime(effStart);
+      if (startDt && cat && Number(cat.timeLimitHours) > 0 && ((senseMs - startDt.getTime()) / 1000) > Number(cat.timeLimitHours) * 3600) {
+        note = note || `逾 ${cat.timeLimitHours}H 限時（留存超時圈）`;
+      } else {
+        const lapKm = Number(ev.lapDistanceKm || cat?.distanceKm || 1.0);
+        note = note || `第 ${lapCount} 圈（累計 ${(lapCount * lapKm).toFixed(2)} km）`;
+      }
+      if (runner.raceStatus === 'dns') {
+        runner.raceStatus = 'on_track';
+        await C.TurDB.put('participants', runner);
+        await App.enqueueSync('updateParticipant', { participantId: runner.participantId, raceStatus: 'on_track' });
+      }
+    } else if (stCode === 'FINISH') {
+      runner.raceStatus = 'finished';
+      await C.TurDB.put('participants', runner);
+      await App.enqueueSync('updateParticipant', { participantId: runner.participantId, raceStatus: 'finished' });
+      const startDt = C.parseDateTime(effStart);
+      const sec = startDt ? Math.max(0, Math.round((senseMs - startDt.getTime()) / 1000) + Number(runner.penaltySeconds || 0)) : null;
+      note = note || `🏁 終點完賽 ${C.formatDuration(sec)}`;
+    } else {
+      if (runner.raceStatus === 'dns') {
+        runner.raceStatus = 'on_track';
+        await C.TurDB.put('participants', runner);
+        await App.enqueueSync('updateParticipant', { participantId: runner.participantId, raceStatus: 'on_track' });
+      }
+      note = note || `通過 ${stCode}`;
+    }
+
+    const log = {
+      logId: `LOG-${Date.now()}-${Math.random().toString(36).slice(2, 5)}-${bibU}-${stCode}`,
+      eventId: ev.eventId,
+      stationCode: stCode,
+      bibNumber: runner.bibNumber,
+      idCardHash: await C.sha256Hex(runner.idCard || ''),
+      sensedTime: timeStr,
+      lapCount,
+      operator: App.State.currentUser?.username || 'admin',
+      source,
+      isValid,
+      note
+    };
+    App.State.timingLogs.push(log);
+    await C.TurDB.put('timingLogs', log);
+    await App.enqueueSync('addTimingLog', log, false);
+    C.NFC.sound.beepSuccess();
+
+    return {
+      ok: true, level: 'success', runner, log,
+      msg: `✅ ${runner.bibNumber} ${runner.name} @ ${stCode}（${timeStr.slice(11)}）${note ? ' · ' + note : ''}`
+    };
+  }
+
+  function renderZ1ChipControl(App, ev) {
     const box = $('#z1-chip');
-    if (!box) return;
-    const catMap = new Map(App.State.categories.map((c) => [c.catId, c.name]));
+    if (!box || !ev) return;
+
+    const sub = ['write', 'checkin', 'start', 'track'].includes(App.State.z1ChipSub) ? App.State.z1ChipSub : 'write';
+    App.State.z1ChipSub = sub;
+
     const paid = App.State.participants.filter((p) => p.eventId === ev.eventId && String(p.payStatus).toUpperCase() === 'PAID');
     const chippedCnt = paid.filter((p) => Boolean(p.chipUid)).length;
     const checkedCnt = paid.filter((p) => p.checkinStatus === 'checked_in').length;
-    const chipPct = paid.length ? Math.round((chippedCnt / paid.length) * 100) : 0;
-    const chkPct = paid.length ? Math.round((checkedCnt / paid.length) * 100) : 0;
+    const lbRows = C.computeLeaderboard({
+      event: ev, categories: App.State.categories, stations: App.State.stations,
+      participants: App.State.participants, timingLogs: App.State.timingLogs
+    });
+    const isLap = ev.raceType === 'lap_timed';
+    const finishedCnt = lbRows.filter((r) => r.status === 'finished').length;
+    const totalLapsAll = lbRows.reduce((s, r) => s + Number(r.lapCount || 0), 0);
+
+    const subMeta = [
+      { id: 'write', icon: '✍️', title: '1. 寫卡讀取', badge: `${chippedCnt}/${paid.length}` },
+      { id: 'checkin', icon: '📋', title: '2. 報到管制', badge: `${checkedCnt}/${paid.length}` },
+      { id: 'start', icon: '🔫', title: '3. 起跑與站點', badge: ev.raceStart ? '已開跑' : '未鳴槍' },
+      { id: 'track', icon: '📡', title: '4. 賽道管制', badge: isLap ? `${totalLapsAll} 圈` : `${finishedCnt} 完賽` }
+    ];
+
+    box.innerHTML = `
+      <div class="bg-white p-2.5 rounded-xl border shadow-sm space-y-2">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+          ${subMeta.map((m) => `
+            <button type="button" data-z1-chip-sub="${m.id}" class="px-3 py-2 rounded-xl border-2 font-black transition flex items-center justify-between gap-1 ${sub === m.id ? 'bg-slate-900 border-slate-900 text-amber-300 shadow' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'}">
+              <span>${m.icon} ${m.title}</span>
+              <span class="px-1.5 py-0.5 rounded-full text-[10px] mono ${sub === m.id ? 'bg-amber-400 text-slate-950' : 'bg-white border text-slate-600'}">${m.badge}</span>
+            </button>
+          `).join('')}
+        </div>
+      </div>
+      <div id="z1ChipSubBody" class="space-y-4"></div>`;
+
+    $$('[data-z1-chip-sub]').forEach((b) => {
+      b.onclick = () => {
+        if (C.NFC.isScanning) C.NFC.stopScanning();
+        App.State.z1ChipSub = b.dataset.z1ChipSub;
+        renderZ1ChipControl(App, ev);
+      };
+    });
+
+    const body = $('#z1ChipSubBody');
+    if (sub === 'write') renderZ1ChipSubWrite(App, ev, body, paid, chippedCnt, checkedCnt);
+    else if (sub === 'checkin') renderZ1ChipSubCheckin(App, ev, body, paid, checkedCnt, lbRows);
+    else if (sub === 'start') renderZ1ChipSubStart(App, ev, body);
+    else if (sub === 'track') renderZ1ChipSubTrack(App, ev, body, lbRows);
+  }
+
+  /* ---- 子分頁 1：✍️ 晶片寫入與讀取（移植晶片計時系統 NFC v3.1 核心） ---- */
+  function renderZ1ChipSubWrite(App, ev, body, paid, chippedCnt, checkedCnt) {
+    const catMap = new Map(App.State.categories.map((c) => [c.catId, c.name]));
+    const evNameMap = new Map(App.State.events.map((e) => [e.eventId, e.nameZh]));
+    const diag = C.NFC.getDiagnostics();
     const q = String(App.State.z1ChipSearch || '').trim().toUpperCase();
     const flt = App.State.z1ChipFilter || 'all';
     const autoChk = App.State.z1ChipAutoCheckin !== false;
+    const chipPct = paid.length ? Math.round((chippedCnt / paid.length) * 100) : 0;
 
     const list = paid.filter((p) => {
       if (flt === 'no_chip' && p.chipUid) return false;
@@ -1987,19 +2196,31 @@
       return `${p.bibNumber} ${p.name} ${p.idCard} ${p.chipUid || ''} ${catMap.get(p.catId) || ''}`.toUpperCase().includes(q);
     });
 
-    box.innerHTML = `
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-        <div class="bg-white p-3 rounded-xl border"><div class="text-slate-500">起跑時間</div><div class="text-sm font-black mono text-indigo-800 mt-1">${ev.raceStart || '尚未設定'}</div></div>
-        <div class="bg-white p-3 rounded-xl border"><div class="text-slate-500">已繳費</div><div class="text-2xl font-black mono">${paid.length}</div></div>
-        <div class="bg-sky-50 p-3 rounded-xl border border-sky-200"><div class="text-sky-800 font-bold">📡 已寫卡</div><div class="text-2xl font-black mono text-sky-900">${chippedCnt} <span class="text-xs">(${chipPct}%)</span></div></div>
-        <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-200"><div class="text-emerald-800 font-bold">✅ 已報到</div><div class="text-2xl font-black mono text-emerald-800">${checkedCnt} <span class="text-xs">(${chkPct}%)</span></div></div>
+    if (App.State.z1ChipSelectedPid && !paid.some((p) => p.participantId === App.State.z1ChipSelectedPid)) {
+      App.State.z1ChipSelectedPid = '';
+    }
+    const selRunner = paid.find((p) => p.participantId === App.State.z1ChipSelectedPid) || null;
+
+    body.innerHTML = `
+      <div class="bg-white p-3.5 rounded-xl border shadow-sm flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="px-2.5 py-1 rounded-lg font-bold ${diag.supported ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-950'}">${diag.statusMessage}</span>
+          <span class="px-2 py-1 rounded-lg bg-slate-100 font-bold mono">已寫卡 ${chippedCnt}/${paid.length} (${chipPct}%)</span>
+        </div>
+        <div class="flex flex-wrap gap-1.5">
+          <button type="button" id="btnZ1TapReadReal" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-amber-300 font-black">🔍 實體貼卡讀卡測試</button>
+          <button type="button" id="btnZ1TapReadSim" class="px-2.5 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-800 font-bold">🧪 模擬讀卡</button>
+        </div>
       </div>
 
-      <div class="bg-white p-3.5 rounded-xl border shadow-sm space-y-2.5 text-xs">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <div class="flex flex-wrap items-center gap-2">
-            <input id="z1ChipSearch" value="${C.escapeHtml(App.State.z1ChipSearch || '')}" placeholder="🔎 號碼布 / 姓名 / UID" class="px-3 py-1.5 border rounded-lg w-56" />
-            <select id="z1ChipFilter" class="px-2.5 py-1.5 border rounded-lg bg-slate-50 font-bold">
+      <div id="z1ChipTapResult" class="hidden p-3.5 rounded-xl border-2 text-xs space-y-1"></div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 text-xs">
+        <!-- 左：已繳費選手清單 -->
+        <div class="lg:col-span-5 bg-white p-3.5 rounded-xl border shadow-sm space-y-2.5">
+          <div class="flex flex-wrap gap-2">
+            <input id="z1ChipSearch" value="${C.escapeHtml(App.State.z1ChipSearch || '')}" placeholder="🔎 號碼布 / 姓名 / 身分證 / UID" class="flex-1 min-w-[140px] px-2.5 py-1.5 border rounded-lg" />
+            <select id="z1ChipFilter" class="px-2 py-1.5 border rounded-lg bg-slate-50 font-bold">
               <option value="all" ${flt === 'all' ? 'selected' : ''}>全部 (${paid.length})</option>
               <option value="no_chip" ${flt === 'no_chip' ? 'selected' : ''}>⏳ 未寫卡 (${paid.length - chippedCnt})</option>
               <option value="has_chip" ${flt === 'has_chip' ? 'selected' : ''}>✅ 已寫卡 (${chippedCnt})</option>
@@ -2007,99 +2228,951 @@
               <option value="checked" ${flt === 'checked' ? 'selected' : ''}>🟢 已報到 (${checkedCnt})</option>
             </select>
           </div>
-          <label class="flex items-center gap-1.5 font-bold text-emerald-900 cursor-pointer">
-            <input id="z1ChipAutoChk" type="checkbox" ${autoChk ? 'checked' : ''} /> 寫卡同步報到
-          </label>
-        </div>
-        <div id="z1ChipInspectBox" class="hidden p-3 rounded-xl bg-sky-50 border-2 border-sky-300 text-xs"></div>
-      </div>
-
-      <div class="bg-white rounded-xl border shadow-sm overflow-x-auto">
-        <table class="w-full text-xs text-left">
-          <thead class="bg-slate-100 border-b">
-            <tr>
-              <th class="p-2">號碼布</th><th class="p-2">選手 / 組別</th><th class="p-2">晶片 UID</th>
-              <th class="p-2">報到</th><th class="p-2">操作</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y">
+          <div class="divide-y max-h-[460px] overflow-y-auto">
             ${list.map((p) => {
+              const isPicked = p.participantId === App.State.z1ChipSelectedPid;
               const isChk = p.checkinStatus === 'checked_in';
               return `
-                <tr class="${isChk ? 'bg-emerald-50/30' : ''}">
-                  <td class="p-2 mono font-black">${p.bibNumber || '<span class="text-rose-500">未配號</span>'}</td>
-                  <td class="p-2"><b>${C.escapeHtml(p.name)}</b> <span class="text-slate-500 text-[11px]">${C.escapeHtml(catMap.get(p.catId) || '')}</span></td>
-                  <td class="p-2 mono text-[11px]">${p.chipUid ? `<span class="text-sky-800 font-bold">✅ ${C.escapeHtml(p.chipUid)}</span>` : '<span class="text-slate-400">⏳ 尚未寫入</span>'}</td>
-                  <td class="p-2">
-                    <button data-z1-chip-chk="${p.participantId}" class="px-2.5 py-1 rounded-lg font-bold ${isChk ? 'bg-emerald-600 text-white' : 'bg-amber-100 hover:bg-emerald-600 hover:text-white text-amber-950'}">
-                      ${isChk ? '✅ 已報到（點此取消）' : '📋 辦理報到'}
-                    </button>
-                  </td>
-                  <td class="p-2 whitespace-nowrap">
-                    <div class="flex flex-wrap gap-1">
-                      <button data-z1-chip-write="${p.participantId}" class="px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold">✍️ 寫入晶片</button>
-                      <button data-z1-chip-read="${p.participantId}" class="px-2.5 py-1 rounded-lg bg-sky-100 hover:bg-sky-200 text-sky-900 font-bold">🔍 讀取查看</button>
+                <div class="py-2 px-1.5 flex items-center justify-between gap-2 ${isPicked ? 'bg-sky-50 rounded-lg ring-1 ring-sky-300' : ''}">
+                  <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-1 font-bold">
+                      <span class="mono font-black text-slate-900">${p.bibNumber || '<span class="text-rose-600">未配號</span>'}</span>
+                      <span>${C.escapeHtml(p.name)}</span>
+                      <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px]">${C.escapeHtml(catMap.get(p.catId) || '')}</span>
                     </div>
-                  </td>
-                </tr>`;
-            }).join('') || '<tr><td colspan="5" class="p-6 text-center text-slate-400">本場尚無符合條件之已繳費選手</td></tr>'}
-          </tbody>
-        </table>
+                    <div class="text-[10px] mono mt-0.5 flex flex-wrap items-center gap-1.5">
+                      <span class="${p.chipUid ? 'text-sky-800 font-bold' : 'text-slate-400'}">${p.chipUid ? `✅ ${C.escapeHtml(p.chipUid)}` : '⏳ 未寫卡'}</span>
+                      <span class="px-1 py-0.5 rounded font-sans font-bold ${isChk ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">${isChk ? '已報到' : '未報到'}</span>
+                    </div>
+                  </div>
+                  <button type="button" data-z1-pick-chip="${p.participantId}" class="px-2.5 py-1 rounded-lg font-bold shrink-0 ${isPicked ? 'bg-sky-600 text-white' : 'bg-slate-900 hover:bg-slate-800 text-white'}">帶入寫卡</button>
+                </div>`;
+            }).join('') || '<div class="py-8 text-center text-slate-400">查無符合條件之已繳費選手</div>'}
+          </div>
+        </div>
+
+        <!-- 右：共用晶片寫入與回讀驗證控制台 -->
+        <div class="lg:col-span-7 bg-white p-4 rounded-xl border shadow-sm space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+            <h3 class="font-black text-sm">✍️ 晶片寫入與回讀驗證</h3>
+            <label class="inline-flex items-center gap-1.5 font-bold text-emerald-900 cursor-pointer">
+              <input id="z1ChipAutoChk" type="checkbox" ${autoChk ? 'checked' : ''} class="accent-emerald-600" />
+              <span>寫卡同步報到</span>
+            </label>
+          </div>
+
+          ${selRunner ? `
+            <div class="p-3.5 rounded-xl bg-emerald-50 border-2 border-emerald-300 space-y-1">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="font-black text-sm text-slate-900">
+                  <span class="mono text-indigo-800">${C.escapeHtml(selRunner.bibNumber || '未配號')}</span> · ${C.escapeHtml(selRunner.name)}
+                  <span class="text-xs font-bold text-slate-600">(${C.escapeHtml(catMap.get(selRunner.catId) || '-')})</span>
+                </div>
+                <span class="px-2 py-0.5 rounded-full text-[11px] font-black ${selRunner.checkinStatus === 'checked_in' ? 'bg-emerald-600 text-white' : 'bg-amber-200 text-amber-950'}">${selRunner.checkinStatus === 'checked_in' ? '✅ 已報到' : '⏳ 未報到'}</span>
+              </div>
+              <div class="mono text-[11px] text-slate-700">寫入字串：<b>${C.escapeHtml(selRunner.name)}|${C.escapeHtml(C.maskIdCard(selRunner.idCard))}</b> ｜ 晶片 UID：<b>${C.escapeHtml(selRunner.chipUid || '尚未綁定')}</b></div>
+            </div>
+          ` : `
+            <div class="p-4 rounded-xl bg-slate-50 border border-dashed text-center text-slate-500">請從左側點選一位選手「帶入寫卡」</div>
+          `}
+
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <button type="button" id="btnZ1WriteNtag" ${selRunner ? '' : 'disabled'} class="p-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-black">✍️ 寫入 NTAG</button>
+            <button type="button" id="btnZ1VerifyChip" ${selRunner ? '' : 'disabled'} class="p-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 disabled:opacity-40 text-white font-black">✅ 回讀驗證</button>
+            <button type="button" id="btnZ1BindUid" ${selRunner ? '' : 'disabled'} class="p-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 disabled:opacity-40 text-white font-black">🔗 綁定 UID</button>
+            <button type="button" id="btnZ1SimWrite" ${selRunner ? '' : 'disabled'} class="p-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white font-bold">🧪 模擬寫卡</button>
+          </div>
+
+          <div id="z1ChipVerifyBox" class="hidden p-3.5 rounded-xl border-2 text-xs space-y-2">
+            <div id="z1ChipVerifyTitle" class="font-black text-sm"></div>
+            <div id="z1ChipVerifyDetail" class="leading-relaxed"></div>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" id="btnZ1CancelNfc" class="hidden px-3 py-1 rounded-lg bg-slate-200 hover:bg-slate-300 font-bold text-slate-800">✕ 取消等待</button>
+              <button type="button" id="btnZ1PostVerify" class="hidden px-3 py-1 rounded-lg bg-teal-600 text-white font-black">✅ 立即回讀驗證並擷取 UID</button>
+              <button type="button" id="btnZ1FallbackUid" class="hidden px-3 py-1 rounded-lg bg-sky-600 text-white font-black">🔗 改用僅綁定 UID</button>
+            </div>
+          </div>
+        </div>
       </div>`;
+
+    const setVerifyBox = (status, title, detail, { showCancel = false, showVerify = false, showUidFallback = false } = {}) => {
+      const vb = $('#z1ChipVerifyBox');
+      if (!vb) return;
+      const styles = {
+        working: 'p-3.5 rounded-xl border-2 border-sky-400 bg-sky-50 text-sky-950 text-xs space-y-2',
+        success: 'p-3.5 rounded-xl border-2 border-emerald-400 bg-emerald-50 text-emerald-950 text-xs space-y-2',
+        error: 'p-3.5 rounded-xl border-2 border-rose-400 bg-rose-50 text-rose-950 text-xs space-y-2'
+      };
+      vb.className = styles[status] || styles.working;
+      $('#z1ChipVerifyTitle').textContent = title;
+      $('#z1ChipVerifyDetail').textContent = detail;
+      $('#btnZ1CancelNfc').classList.toggle('hidden', !showCancel);
+      $('#btnZ1PostVerify').classList.toggle('hidden', !showVerify);
+      $('#btnZ1FallbackUid').classList.toggle('hidden', !showUidFallback);
+    };
+
+    const showTapCard = (matched, uid, rawTxt) => {
+      const boxEl = $('#z1ChipTapResult');
+      if (!boxEl) return;
+      boxEl.classList.remove('hidden');
+      if (!matched) {
+        boxEl.className = 'p-3.5 rounded-xl border-2 border-rose-400 bg-rose-50 text-rose-950 text-xs space-y-1';
+        boxEl.innerHTML = `<div class="font-black">🔴 讀卡結果：查無本場對應選手</div><div class="mono">UID：${C.escapeHtml(uid || '-')} ｜ NDEF：${C.escapeHtml(C.maskNdefPayload(rawTxt) || '（空）')}</div>`;
+        return;
+      }
+      const idU = String(matched.idCard || '').toUpperCase();
+      const joined = App.State.participants
+        .filter((x) => String(x.idCard || '').toUpperCase() === idU && String(x.payStatus).toUpperCase() !== 'CANCELLED')
+        .map((x) => `${evNameMap.get(x.eventId) || x.eventId} [${x.bibNumber || '未配號'}]`);
+      const logs = App.State.timingLogs.filter((l) => l.eventId === ev.eventId && l.bibNumber === matched.bibNumber && l.isValid !== false);
+      boxEl.className = 'p-3.5 rounded-xl border-2 border-sky-400 bg-sky-50 text-sky-950 text-xs space-y-1';
+      boxEl.innerHTML = `
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <span class="font-black text-sm">🔍 貼卡讀取成功：${C.escapeHtml(matched.bibNumber || '未配號')} ${C.escapeHtml(matched.name)}（${C.escapeHtml(catMap.get(matched.catId) || '-')}）</span>
+          <span class="px-2 py-0.5 rounded-full font-bold ${matched.checkinStatus === 'checked_in' ? 'bg-emerald-600 text-white' : 'bg-amber-200 text-amber-950'}">${matched.checkinStatus === 'checked_in' ? '✅ 已報到' : '⏳ 未報到'}</span>
+        </div>
+        <div class="mono text-slate-700">UID：<b>${C.escapeHtml(uid || matched.chipUid || '-')}</b> ｜ NDEF：<b>${C.escapeHtml(C.maskNdefPayload(rawTxt || `${matched.name}|${matched.idCard}`))}</b></div>
+        <div class="text-slate-600">已報名場次：${C.escapeHtml(joined.join('、') || ev.nameZh)} ｜ 本場通過：${logs.length ? logs.map((l) => `${l.stationCode}(${String(l.sensedTime).slice(11)})`).join(' → ') : '尚無紀錄'}</div>`;
+    };
+
+    const saveRunnerChip = async (runner, uidVal) => {
+      if (uidVal) runner.chipUid = uidVal;
+      const shouldAutoChk = App.State.z1ChipAutoCheckin !== false;
+      if (shouldAutoChk && runner.checkinStatus !== 'checked_in') {
+        runner.checkinStatus = 'checked_in';
+        const hasChkLog = App.State.timingLogs.some((l) => l.eventId === ev.eventId && l.bibNumber === runner.bibNumber && l.stationCode === 'CHECKIN' && l.isValid !== false);
+        if (!hasChkLog && runner.bibNumber) {
+          const chkLog = {
+            logId: `LOG-${Date.now()}-${runner.bibNumber}-CHECKIN`, eventId: ev.eventId, stationCode: 'CHECKIN',
+            bibNumber: runner.bibNumber, idCardHash: await C.sha256Hex(runner.idCard || ''),
+            sensedTime: C.formatDateTime(), lapCount: 0, operator: App.State.currentUser?.username || 'admin',
+            source: 'write_auto', isValid: true, note: '寫卡同步報到'
+          };
+          App.State.timingLogs.push(chkLog);
+          await C.TurDB.put('timingLogs', chkLog);
+          await App.enqueueSync('addTimingLog', chkLog, false);
+        }
+      }
+      await C.TurDB.put('participants', runner);
+      await App.enqueueSync('updateParticipant', { participantId: runner.participantId, chipUid: runner.chipUid, checkinStatus: runner.checkinStatus });
+      App.rebuildIndices(ev.eventId);
+      renderZ1StageGateBar(App, ev);
+    };
 
     $('#z1ChipSearch').oninput = (e) => {
       App.State.z1ChipSearch = e.target.value;
       const pos = e.target.selectionStart;
-      renderZ1ChipOps(App, ev);
+      renderZ1ChipControl(App, ev);
       const inp = $('#z1ChipSearch'); if (inp) { inp.focus(); inp.setSelectionRange(pos, pos); }
     };
-    $('#z1ChipFilter').onchange = (e) => { App.State.z1ChipFilter = e.target.value; renderZ1ChipOps(App, ev); };
+    $('#z1ChipFilter').onchange = (e) => { App.State.z1ChipFilter = e.target.value; renderZ1ChipControl(App, ev); };
     $('#z1ChipAutoChk').onchange = (e) => { App.State.z1ChipAutoCheckin = e.target.checked; };
+    $$('[data-z1-pick-chip]').forEach((b) => {
+      b.onclick = () => { App.State.z1ChipSelectedPid = b.dataset.z1PickChip; renderZ1ChipControl(App, ev); };
+    });
 
-    $$('[data-z1-chip-chk]').forEach((b) => {
-      b.onclick = async () => {
-        const p = App.State.participants.find((x) => x.participantId === b.dataset.z1ChipChk);
-        if (!p) return;
-        p.checkinStatus = p.checkinStatus === 'checked_in' ? 'pending' : 'checked_in';
-        await C.TurDB.put('participants', p);
-        await App.enqueueSync('updateParticipant', { participantId: p.participantId, checkinStatus: p.checkinStatus });
-        App.renderAll();
-        App.toast(`${p.checkinStatus === 'checked_in' ? '✅ 已辦理現場報到' : '↩️ 已取消報到'}：${p.bibNumber} ${p.name}`, 'success');
-      };
-    });
-    $$('[data-z1-chip-write]').forEach((b) => {
-      b.onclick = async () => {
-        const p = App.State.participants.find((x) => x.participantId === b.dataset.z1ChipWrite);
-        if (!p) return;
-        if (!p.bibNumber) return App.toast('請先於分頁 2 自動配發號碼布後再寫入晶片', 'warn');
-        const payload = `${p.name}|${p.idCard}`;
-        let newUid = p.chipUid || `04:${Math.random().toString(16).slice(2, 4).toUpperCase()}:${Math.random().toString(16).slice(2, 4).toUpperCase()}:88`;
-        if ('NDEFReader' in window && confirm(`偵測到支援 Web NFC！\n確定 = 寫入實體晶片\n取消 = 本機快速模擬綁定`)) {
-          try {
-            const ndef = new NDEFReader();
-            await ndef.write({ records: [{ recordType: 'text', data: payload }] });
-          } catch (err) { return App.toast(`NFC 寫入失敗：${err.message}`, 'error'); }
+    $('#btnZ1CancelNfc').onclick = () => {
+      C.NFC.cancelActiveOperation();
+      setVerifyBox('error', '已取消等待感應', '可重新點擊上方寫入或驗證按鈕。');
+    };
+
+    const runWrite = async (isSim) => {
+      if (!selRunner) return App.toast('請先帶入選手', 'warn');
+      if (!selRunner.bibNumber) return App.toast('請先於「2. 對帳配號」配發號碼布後再寫卡', 'warn');
+      if (ev.status === 'finished') return App.toast('🔒 本活動已結案，禁止寫入晶片', 'error');
+      setVerifyBox('working', isSim ? '🧪 模擬寫入晶片中…' : '📡 等待貼近 NFC 晶片寫入…', `對象：${selRunner.bibNumber} ${selRunner.name}`, { showCancel: !isSim });
+      try {
+        const res = isSim
+          ? await C.NFC.mockWriteChip({ name: selRunner.name, idNumber: selRunner.idCard }, { onStep: (s) => setVerifyBox('working', '🧪 模擬寫卡…', s) })
+          : await C.NFC.writeChip({ name: selRunner.name, idNumber: selRunner.idCard }, { onStep: (s) => setVerifyBox('working', '📡 請貼緊手機背面感應區…', s, { showCancel: true }) });
+        await saveRunnerChip(selRunner, res.nfcUid || selRunner.chipUid || 'NDEF-WRITTEN');
+        renderZ1ChipControl(App, ev);
+        setVerifyBox('success', `✅ 寫入成功（${selRunner.bibNumber} ${selRunner.name}）`,
+          isSim ? `模擬 UID：${selRunner.chipUid}，可直接使用於各站點感應。` : '已寫入 NDEF！建議點下方「立即回讀驗證」核對資料並擷取晶片硬體 UID。',
+          { showVerify: !isSim });
+        App.toast(`✅ 已寫入晶片：${selRunner.bibNumber} ${selRunner.name}`, 'success');
+      } catch (err) {
+        C.NFC.sound.beepError();
+        setVerifyBox('error', '❌ 晶片寫入失敗', err.message, { showUidFallback: true });
+        App.toast(err.message, 'error');
+      }
+    };
+
+    const runVerify = async () => {
+      if (!selRunner) return;
+      setVerifyBox('working', '🔍 回讀驗證中：請將剛寫入的晶片貼近背面…', `核對 ${selRunner.name}|${C.maskIdCard(selRunner.idCard)} 並擷取 UID`, { showCancel: true });
+      try {
+        const tag = await C.NFC.readSingleTag((s) => setVerifyBox('working', '🔍 等待貼卡回讀…', s, { showCancel: true }));
+        const rId = String(tag.parsed?.idNumber || '').toUpperCase();
+        if (!rId || rId !== String(selRunner.idCard || '').toUpperCase()) {
+          throw new Error(`回讀不符！卡片內容「${C.maskNdefPayload(tag.raw) || '空'}」與選手 ${selRunner.name} 不一致`);
         }
-        p.chipUid = newUid;
-        if (App.State.z1ChipAutoCheckin !== false) p.checkinStatus = 'checked_in';
-        await C.TurDB.put('participants', p);
-        await App.enqueueSync('updateParticipant', { participantId: p.participantId, chipUid: p.chipUid, checkinStatus: p.checkinStatus });
-        App.rebuildIndices(ev.eventId);
-        App.renderAll();
-        App.toast(`📡 已寫入晶片 ${p.bibNumber} ${p.name} (UID: ${p.chipUid})${p.checkinStatus === 'checked_in' ? '｜同步完成報到' : ''}`, 'success');
+        await saveRunnerChip(selRunner, tag.nfcUid || selRunner.chipUid || 'NDEF-VERIFIED');
+        C.NFC.sound.beepWriteVerified();
+        renderZ1ChipControl(App, ev);
+        setVerifyBox('success', `✅ 回讀驗證 100% 一致！（UID: ${tag.nfcUid || '標準 NDEF'}）`, `讀回：${C.maskNdefPayload(tag.raw)}`);
+        App.toast(`✅ 回讀驗證通過！UID=${tag.nfcUid || '-'}`, 'success');
+      } catch (err) {
+        C.NFC.sound.beepError();
+        setVerifyBox('error', '❌ 回讀驗證失敗', err.message, { showVerify: true, showUidFallback: true });
+      }
+    };
+
+    const runBindUid = async () => {
+      if (!selRunner) return;
+      if (!selRunner.bibNumber) return App.toast('請先配發號碼布', 'warn');
+      setVerifyBox('working', '🔗 UID 綁定模式：請貼近唯讀晶片…', '直接擷取晶片硬體 UID 並綁定至此選手（免寫入記憶體）。', { showCancel: true });
+      try {
+        const tag = await C.NFC.readSingleTag((s) => setVerifyBox('working', '🔗 讀取 UID 中…', s, { showCancel: true }));
+        if (!tag.nfcUid) throw new Error('此晶片未回傳硬體 UID');
+        await saveRunnerChip(selRunner, tag.nfcUid);
+        C.NFC.sound.beepWriteVerified();
+        renderZ1ChipControl(App, ev);
+        setVerifyBox('success', `✅ UID 綁定成功（${tag.nfcUid}）`, `${selRunner.bibNumber} ${selRunner.name} 已完成晶片綁定`);
+        App.toast(`🔗 已綁定 UID：${tag.nfcUid}`, 'success');
+      } catch (err) {
+        C.NFC.sound.beepError();
+        setVerifyBox('error', '❌ UID 綁定失敗', err.message);
+      }
+    };
+
+    $('#btnZ1WriteNtag').onclick = () => runWrite(false);
+    $('#btnZ1SimWrite').onclick = () => runWrite(true);
+    $('#btnZ1VerifyChip').onclick = runVerify;
+    $('#btnZ1PostVerify').onclick = runVerify;
+    $('#btnZ1BindUid').onclick = runBindUid;
+    $('#btnZ1FallbackUid').onclick = runBindUid;
+
+    $('#btnZ1TapReadReal').onclick = async () => {
+      const boxEl = $('#z1ChipTapResult');
+      boxEl.classList.remove('hidden');
+      boxEl.className = 'p-3.5 rounded-xl border-2 border-sky-400 bg-sky-50 text-sky-950 text-xs font-bold';
+      boxEl.textContent = '📡 請將任意 NFC 晶片緊貼手機背面感應區…';
+      try {
+        const tag = await C.NFC.readSingleTag();
+        const rId = String(tag.parsed?.idNumber || '').toUpperCase();
+        const m = paid.find((p) => (rId && String(p.idCard || '').toUpperCase() === rId) || (tag.nfcUid && String(p.chipUid || '').toUpperCase() === tag.nfcUid));
+        if (m) { App.State.z1ChipSelectedPid = m.participantId; renderZ1ChipControl(App, ev); }
+        showTapCard(m, tag.nfcUid, tag.raw);
+      } catch (err) {
+        boxEl.className = 'p-3.5 rounded-xl border-2 border-rose-400 bg-rose-50 text-rose-900 text-xs font-bold';
+        boxEl.textContent = `❌ 讀卡失敗：${err.message}`;
+      }
+    };
+    $('#btnZ1TapReadSim').onclick = () => {
+      const sample = selRunner || paid.find((p) => p.chipUid) || paid[0];
+      if (!sample) return App.toast('本場尚無已繳費選手可模擬', 'warn');
+      C.NFC.sound.beepSuccess();
+      showTapCard(sample, sample.chipUid || 'SIM-UID-01', `${sample.name}|${sample.idCard}`);
+    };
+  }
+
+  /* ---- 子分頁 2：📋 報到管制（含即時 NFC 感應報到、報到時間紀錄與防重複） ---- */
+  function renderZ1ChipSubCheckin(App, ev, body, paid, checkedCnt, lbRows) {
+    const catMap = new Map(App.State.categories.map((c) => [c.catId, c.name]));
+    const chkTimeMap = new Map();
+    lbRows.forEach((r) => { if (r.checkInTime) chkTimeMap.set(r.participant.participantId, r.checkInTime); });
+    const chkPct = paid.length ? Math.round((checkedCnt / paid.length) * 100) : 0;
+    const q = String(App.State.z1ChkSearch || '').trim().toUpperCase();
+    const flt = App.State.z1ChkFilter || 'all';
+
+    const list = paid.filter((p) => {
+      const isChk = p.checkinStatus === 'checked_in';
+      if (flt === 'checked' && !isChk) return false;
+      if (flt === 'unchecked' && isChk) return false;
+      if (!q) return true;
+      return `${p.bibNumber} ${p.name} ${p.idCard} ${p.chipUid || ''} ${catMap.get(p.catId) || ''}`.toUpperCase().includes(q);
+    });
+
+    body.innerHTML = `
+      <div class="grid grid-cols-3 gap-3 text-xs">
+        <div class="bg-white p-3 rounded-xl border"><div class="text-slate-500">已繳費人數</div><div class="text-2xl font-black mono">${paid.length}</div></div>
+        <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-200"><div class="text-emerald-800 font-bold">✅ 已報到</div><div class="text-2xl font-black mono text-emerald-800">${checkedCnt} <span class="text-xs">(${chkPct}%)</span></div></div>
+        <div class="bg-amber-50 p-3 rounded-xl border border-amber-200"><div class="text-amber-900 font-bold">⏳ 未報到</div><div class="text-2xl font-black mono text-amber-900">${paid.length - checkedCnt}</div></div>
+      </div>
+
+      <!-- 即時報到感應與快刷列 -->
+      <div class="bg-white p-3.5 rounded-xl border shadow-sm space-y-2.5 text-xs">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="font-black text-sm">📡 現場晶片報到感應（不計成績與圈數）</div>
+          <button type="button" id="btnZ1ChkToggleNfc" class="px-3.5 py-1.5 rounded-lg font-black ${C.NFC.isScanning ? 'bg-rose-600 text-white' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}">
+            ${C.NFC.isScanning ? '🛑 停止 NFC 報到感應' : '📡 啟動 NFC 報到感應'}
+          </button>
+        </div>
+        <form id="z1ChkManualForm" class="flex flex-wrap gap-2">
+          <input id="z1ChkManualInput" placeholder="輸入號碼布 / 身分證 / UID 按 Enter 快速報到" autocomplete="off" class="flex-1 min-w-[200px] px-3 py-2 border-2 rounded-lg font-bold mono uppercase" />
+          <button type="submit" class="px-4 py-2 rounded-lg bg-slate-900 text-white font-black">✅ 報到</button>
+        </form>
+        <div id="z1ChkBanner" class="hidden p-2.5 rounded-lg border font-bold"></div>
+      </div>
+
+      <div class="bg-white p-3.5 rounded-xl border shadow-sm space-y-2.5 text-xs">
+        <div class="flex flex-wrap items-center gap-2">
+          <input id="z1ChkSearch" value="${C.escapeHtml(App.State.z1ChkSearch || '')}" placeholder="🔎 搜尋號碼布 / 姓名 / UID" class="flex-1 min-w-[180px] px-2.5 py-1.5 border rounded-lg" />
+          <select id="z1ChkFilter" class="px-2.5 py-1.5 border rounded-lg bg-slate-50 font-bold">
+            <option value="all" ${flt === 'all' ? 'selected' : ''}>全部 (${paid.length})</option>
+            <option value="unchecked" ${flt === 'unchecked' ? 'selected' : ''}>⏳ 未報到 (${paid.length - checkedCnt})</option>
+            <option value="checked" ${flt === 'checked' ? 'selected' : ''}>✅ 已報到 (${checkedCnt})</option>
+          </select>
+        </div>
+        <div class="overflow-x-auto max-h-[460px]">
+          <table class="w-full text-left">
+            <thead class="bg-slate-100 sticky top-0">
+              <tr><th class="p-2">號碼布</th><th class="p-2">選手 / 組別</th><th class="p-2">晶片 UID</th><th class="p-2">報到時間</th><th class="p-2">操作</th></tr>
+            </thead>
+            <tbody class="divide-y">
+              ${list.map((p) => {
+                const isChk = p.checkinStatus === 'checked_in';
+                const cTime = chkTimeMap.get(p.participantId) || (isChk ? '已報到' : '-');
+                return `
+                  <tr class="${isChk ? 'bg-emerald-50/40' : ''}">
+                    <td class="p-2 mono font-black">${p.bibNumber || '<span class="text-rose-500">未配號</span>'}</td>
+                    <td class="p-2"><b>${C.escapeHtml(p.name)}</b> <span class="text-slate-500 text-[11px]">${C.escapeHtml(catMap.get(p.catId) || '')}</span></td>
+                    <td class="p-2 mono text-[11px]">${p.chipUid ? `<span class="text-sky-800 font-bold">${C.escapeHtml(p.chipUid)}</span>` : '<span class="text-slate-400">未寫卡</span>'}</td>
+                    <td class="p-2 mono font-bold ${isChk ? 'text-emerald-800' : 'text-slate-400'}">${C.escapeHtml(cTime)}</td>
+                    <td class="p-2">
+                      <button type="button" data-z1-toggle-chk="${p.participantId}" class="px-2.5 py-1 rounded-lg font-bold ${isChk ? 'bg-emerald-600 text-white' : 'bg-amber-100 hover:bg-emerald-600 hover:text-white text-amber-950'}">
+                        ${isChk ? '✅ 已報到（點取消）' : '📋 辦理報到'}
+                      </button>
+                    </td>
+                  </tr>`;
+              }).join('') || '<tr><td colspan="5" class="p-6 text-center text-slate-400">查無符合條件之選手</td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+
+    const showBanner = (res) => {
+      const bn = $('#z1ChkBanner');
+      if (!bn) return;
+      bn.classList.remove('hidden');
+      const cls = res.level === 'success' ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : (res.level === 'warn' ? 'bg-amber-50 border-amber-300 text-amber-950' : 'bg-rose-50 border-rose-300 text-rose-900');
+      bn.className = `p-2.5 rounded-lg border font-bold ${cls}`;
+      bn.textContent = res.msg;
+    };
+
+    $('#z1ChkManualForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const inp = $('#z1ChkManualInput');
+      const val = inp.value.trim();
+      if (!val) return;
+      const res = await adminSenseRunner(App, ev, 'CHECKIN', val, 'manual', { bypassDebounce: true });
+      inp.value = '';
+      renderZ1StageGateBar(App, ev);
+      renderZ1ChipControl(App, ev);
+      showBanner(res);
+      const nextInp = $('#z1ChkManualInput'); if (nextInp) nextInp.focus();
+    };
+
+    $('#btnZ1ChkToggleNfc').onclick = async () => {
+      if (C.NFC.isScanning) {
+        C.NFC.stopScanning();
+        renderZ1ChipControl(App, ev);
+        return App.toast('已停止 NFC 報到感應', 'info');
+      }
+      try {
+        await C.NFC.startScanning(async (tag) => {
+          const token = tag.idNumber ? `${tag.name}|${tag.idNumber}` : (tag.bib || tag.nfcUid);
+          const res = await adminSenseRunner(App, ev, 'CHECKIN', token, 'nfc', { bypassDebounce: true });
+          renderZ1StageGateBar(App, ev);
+          renderZ1ChipControl(App, ev);
+          showBanner(res);
+        }, (err) => App.toast(err.message, 'error'));
+        renderZ1ChipControl(App, ev);
+        App.toast('📡 已啟動 NFC 報到感應，請選手貼近晶片', 'success');
+      } catch (err) {
+        App.toast(err.message, 'warn');
+      }
+    };
+
+    $('#z1ChkSearch').oninput = (e) => {
+      App.State.z1ChkSearch = e.target.value;
+      const pos = e.target.selectionStart;
+      renderZ1ChipControl(App, ev);
+      const inp = $('#z1ChkSearch'); if (inp) { inp.focus(); inp.setSelectionRange(pos, pos); }
+    };
+    $('#z1ChkFilter').onchange = (e) => { App.State.z1ChkFilter = e.target.value; renderZ1ChipControl(App, ev); };
+
+    $$('[data-z1-toggle-chk]').forEach((b) => {
+      b.onclick = async () => {
+        const p = App.State.participants.find((x) => x.participantId === b.dataset.z1ToggleChk);
+        if (!p) return;
+        const willCheck = p.checkinStatus !== 'checked_in';
+        if (willCheck) {
+          if (p.bibNumber) {
+            await adminSenseRunner(App, ev, 'CHECKIN', p.bibNumber, 'manual', { bypassDebounce: true });
+          } else {
+            p.checkinStatus = 'checked_in';
+            await C.TurDB.put('participants', p);
+            await App.enqueueSync('updateParticipant', { participantId: p.participantId, checkinStatus: 'checked_in' });
+          }
+        } else {
+          p.checkinStatus = 'pending';
+          await C.TurDB.put('participants', p);
+          await App.enqueueSync('updateParticipant', { participantId: p.participantId, checkinStatus: 'pending' });
+          for (const l of App.State.timingLogs) {
+            if (l.eventId === ev.eventId && String(l.bibNumber).toUpperCase() === String(p.bibNumber || '').toUpperCase() && String(l.stationCode).toUpperCase() === 'CHECKIN' && l.isValid !== false) {
+              l.isValid = false;
+              await C.TurDB.put('timingLogs', l);
+              await App.enqueueSync('adjustTimingLog', { log: l });
+            }
+          }
+        }
+        renderZ1StageGateBar(App, ev);
+        renderZ1ChipControl(App, ev);
+        App.toast(`${willCheck ? '✅ 已辦理報到' : '↩️ 已取消報到'}：${p.bibNumber || ''} ${p.name}`, 'success');
       };
     });
-    $$('[data-z1-chip-read]').forEach((b) => {
+  }
+
+  /* ---- 子分頁 3：🔫 起跑與站點（統一鳴槍＋分組個別起跑微調＋站點配置） ---- */
+  function renderZ1ChipSubStart(App, ev, body) {
+    const cats = App.State.categories.filter((c) => c.eventId === ev.eventId);
+    const isLap = ev.raceType === 'lap_timed';
+    const gate = C.evaluateEventStageGates({
+      event: ev, categories: App.State.categories, stations: App.State.stations,
+      participants: App.State.participants, timingLogs: App.State.timingLogs,
+      syncQueue: App.State.syncQueue, hasCloudGas: Boolean(App.State.gasUrl)
+    });
+
+    body.innerHTML = `
+      <div class="p-3.5 rounded-xl border-2 ${gate.gunWarnings.length ? 'bg-amber-50 border-amber-300' : 'bg-emerald-50 border-emerald-300'} text-xs space-y-2">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="font-black ${gate.gunWarnings.length ? 'text-amber-950' : 'text-emerald-950'}">
+            ${gate.gunWarnings.length ? `⚠️ 開跑前提醒（${gate.gunWarnings.length} 項）` : '✅ 賽前檢核通過'}
+          </div>
+          ${gate.metrics.paidNoBibCount > 0 ? '<button type="button" id="btnZ1GunFixBib" class="px-3 py-1 rounded-lg bg-slate-900 text-white font-bold">🏷️ 補配號碼布</button>' : ''}
+        </div>
+        ${gate.gunWarnings.length ? `<ul class="list-disc list-inside text-amber-900 space-y-0.5">${gate.gunWarnings.map((w) => `<li>${C.escapeHtml(w)}</li>`).join('')}</ul>` : ''}
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 text-xs">
+        <div class="space-y-3">
+          <div class="bg-slate-900 text-white p-5 rounded-2xl space-y-3 shadow">
+            <div class="text-amber-400 font-bold">🏁 統一律定起跑時間</div>
+            <div class="text-3xl font-black mono text-amber-300" id="z1GunDisplay">${ev.raceStart || '尚未設定'}</div>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" id="btnZ1GunNow" class="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 font-black text-sm shadow">🔫 立即統一鳴槍</button>
+            </div>
+            <div class="pt-2 border-t border-slate-700 flex gap-2">
+              <input id="z1CustomGunTime" value="${ev.raceStart || C.formatDateTime()}" placeholder="YYYY-MM-DD HH:mm:ss" class="flex-1 px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 mono text-white" />
+              <button type="button" id="btnZ1ApplyGunTime" class="px-3 py-2 rounded-lg bg-amber-400 text-slate-950 font-black">套用時間</button>
+            </div>
+          </div>
+
+          <!-- 分組個別起跑時間微調（比照晶片計時系統） -->
+          <details class="bg-white rounded-xl border shadow-sm overflow-hidden">
+            <summary class="px-4 py-3 cursor-pointer font-black text-slate-800 flex items-center justify-between">
+              <span class="flex items-center gap-1.5"><span class="acc-arrow inline-block text-slate-400">▶</span><span>⏱️ 分組個別起跑時間微調（${cats.length} 組）</span></span>
+              <span class="text-[11px] text-sky-700">展開設定</span>
+            </summary>
+            <div class="px-4 pb-4 pt-2 border-t space-y-2">
+              ${cats.map((c) => {
+                const eff = c.customRaceStart || ev.raceStart || '';
+                const effDt = C.parseDateTime(eff);
+                const cutoffStr = isLap && effDt && Number(c.timeLimitHours) > 0
+                  ? ` · 截止 ${C.formatDateTime(new Date(effDt.getTime() + Number(c.timeLimitHours) * 3600000))}`
+                  : '';
+                return `
+                  <div class="p-2.5 rounded-xl bg-slate-50 border space-y-1.5">
+                    <div class="flex flex-wrap items-center justify-between gap-1">
+                      <span class="font-black text-slate-900">${C.escapeHtml(c.name)}</span>
+                      <span class="mono text-[11px] ${c.customRaceStart ? 'text-indigo-700 font-bold' : 'text-slate-500'}">
+                        ${c.customRaceStart ? `自訂：${c.customRaceStart}` : `跟隨統一 (${ev.raceStart || '未設'})`}${cutoffStr}
+                      </span>
+                    </div>
+                    <div class="flex flex-wrap gap-1.5">
+                      <button type="button" data-cat-gun-now="${c.catId}" class="px-2.5 py-1 rounded-lg bg-emerald-600 text-white font-bold">🔫 分組鳴槍</button>
+                      <input type="text" data-cat-gun-inp="${c.catId}" value="${C.escapeHtml(c.customRaceStart || ev.raceStart || '')}" placeholder="YYYY-MM-DD HH:mm:ss" class="flex-1 min-w-[155px] px-2 py-1 border rounded-lg bg-white mono" />
+                      <button type="button" data-cat-gun-set="${c.catId}" class="px-2.5 py-1 rounded-lg bg-sky-600 text-white font-bold">套用</button>
+                      ${c.customRaceStart ? `<button type="button" data-cat-gun-clr="${c.catId}" class="px-2 py-1 rounded-lg bg-slate-200 text-slate-700 font-bold">重設</button>` : ''}
+                    </div>
+                  </div>`;
+              }).join('')}
+            </div>
+          </details>
+        </div>
+
+        <div id="z1ChipStationsHost"></div>
+      </div>`;
+
+    if ($('#btnZ1GunFixBib')) $('#btnZ1GunFixBib').onclick = () => App.autoAssignBibsForEvent(ev.eventId);
+
+    const applyGun = async (timeStr) => {
+      if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(timeStr)) {
+        return App.toast('起跑時間強制包含完整日期與整數秒：YYYY-MM-DD HH:mm:ss', 'error');
+      }
+      if (!gate.metrics.hasTimingStation) {
+        return App.toast('🔒 請先於右側建立 FINISH 或 LAP 站點後再鳴槍！', 'error');
+      }
+      if (ev.raceStart && ev.raceStart !== timeStr) {
+        if (!confirm(`⚠️ 本活動已於 ${ev.raceStart} 鳴槍！確定覆蓋起跑時間為 ${timeStr} 嗎？`)) return;
+      } else if (gate.gunWarnings.length) {
+        if (!confirm(`⚠️ 尚有 ${gate.gunWarnings.length} 項開跑前提醒：\n- ${gate.gunWarnings.join('\n- ')}\n\n確定仍要立即鳴槍開跑？`)) return;
+      }
+      ev.raceStart = timeStr;
+      if (ev.status === 'open' && confirm('鳴槍開跑後，是否一併將本活動切換為「停止報名 (closed)」？')) {
+        ev.status = 'closed';
+      }
+      await C.TurDB.put('events', ev);
+      for (const p of App.State.participants) {
+        if (p.eventId === ev.eventId && String(p.payStatus).toUpperCase() === 'PAID' && p.raceStatus === 'dns') {
+          p.raceStatus = 'on_track';
+          await C.TurDB.put('participants', p);
+        }
+      }
+      await App.enqueueSync('saveEvent', { event: ev });
+      await App.enqueueSync('triggerGunStart', { eventId: ev.eventId, raceStart: timeStr });
+      C.NFC.sound.beepGun();
+      App.renderAll();
+      App.toast(`🔫 鳴槍時間已寫入：${timeStr}`, 'success');
+    };
+    $('#btnZ1GunNow').onclick = () => applyGun(C.formatDateTime());
+    $('#btnZ1ApplyGunTime').onclick = () => applyGun($('#z1CustomGunTime').value.trim());
+
+    const saveCatStart = async (catId, timeVal) => {
+      const cat = App.State.categories.find((c) => c.catId === catId);
+      if (!cat) return;
+      if (timeVal && !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(timeVal)) {
+        return App.toast('分組起跑時間格式須為 YYYY-MM-DD HH:mm:ss', 'error');
+      }
+      cat.customRaceStart = timeVal;
+      await C.TurDB.put('categories', cat);
+      await App.enqueueSync('saveCategory', { category: cat });
+      if (timeVal) C.NFC.sound.beepGun();
+      renderZ1ChipControl(App, ev);
+      App.toast(timeVal ? `✅ 分組「${cat.name}」起跑時間已設為 ${timeVal}` : `↩️ 分組「${cat.name}」已改回跟隨統一鳴槍`, 'success');
+    };
+    $$('[data-cat-gun-now]').forEach((b) => { b.onclick = () => saveCatStart(b.dataset.catGunNow, C.formatDateTime()); });
+    $$('[data-cat-gun-set]').forEach((b) => {
       b.onclick = () => {
-        const p = App.State.participants.find((x) => x.participantId === b.dataset.z1ChipRead);
+        const inp = document.querySelector(`[data-cat-gun-inp="${b.dataset.catGunSet}"]`);
+        saveCatStart(b.dataset.catGunSet, (inp?.value || '').trim());
+      };
+    });
+    $$('[data-cat-gun-clr]').forEach((b) => { b.onclick = () => saveCatStart(b.dataset.catGunClr, ''); });
+
+    renderEventStationsManager(App, ev, $('#z1ChipStationsHost'), () => {
+      z1DirtyTabs.add('ops');
+      z1DirtyTabs.add('setup');
+      renderZ1StageGateBar(App, ev);
+      renderZ1ChipControl(App, ev);
+    });
+  }
+
+  /* ---- 子分頁 4：📡 賽道即時管制（各站通過進度 → 終點／繞圈全矩陣點擊補登） ---- */
+  function renderZ1ChipSubTrack(App, ev, body, lbRows) {
+    const isLap = ev.raceType === 'lap_timed';
+    const cats = App.State.categories.filter((c) => c.eventId === ev.eventId);
+    const raceStations = App.State.stations
+      .filter((s) => s.eventId === ev.eventId && String(s.stationCode).toUpperCase() !== 'CHECKIN')
+      .sort((a, b) => Number(a.orderIndex) - Number(b.orderIndex));
+
+    const totalPaid = lbRows.length;
+    const checkedCnt = lbRows.filter((r) => r.checkedIn || r.status === 'finished' || r.status === 'on_track').length;
+    const finishedCnt = lbRows.filter((r) => r.status === 'finished').length;
+    const onTrackCnt = lbRows.filter((r) => r.status === 'on_track').length;
+    const totalLapsAll = lbRows.reduce((s, r) => s + Number(r.lapCount || 0), 0);
+    const totalKmAll = lbRows.reduce((s, r) => s + Number(r.totalDistanceKm || 0), 0);
+    const topKm = lbRows.length ? Math.max(...lbRows.map((r) => Number(r.totalDistanceKm || 0))) : 0;
+
+    const flt = App.State.z1TrackFilter || { q: '', catId: 'all', status: 'all', senseSt: raceStations[0]?.stationCode || 'FINISH' };
+    if (raceStations.length && !raceStations.some((s) => s.stationCode === flt.senseSt) && flt.senseSt !== 'CHECKIN') {
+      flt.senseSt = raceStations[0].stationCode;
+    }
+    App.State.z1TrackFilter = flt;
+
+    const q = String(flt.q || '').trim().toUpperCase();
+    const filtered = lbRows.filter((r) => {
+      if (flt.catId !== 'all' && r.participant.catId !== flt.catId) return false;
+      if (flt.status === 'finished' && r.status !== 'finished') return false;
+      if (flt.status === 'on_track' && r.status !== 'on_track') return false;
+      if (flt.status === 'checked_in' && !r.checkedIn) return false;
+      if (flt.status === 'not_checked_in' && r.checkedIn) return false;
+      if (flt.status === 'dnf' && r.status !== 'dnf') return false;
+      if (!q) return true;
+      return `${r.participant.bibNumber} ${r.participant.name} ${r.participant.idCard} ${r.category.name}`.toUpperCase().includes(q);
+    });
+
+    const statusBadge = {
+      finished: '<span class="px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">已完賽</span>',
+      on_track: '<span class="px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-[10px]">賽道上</span>',
+      dnf: '<span class="px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-800 font-bold text-[10px]">DNF</span>',
+      dns: '<span class="px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-bold text-[10px]">未起跑</span>'
+    };
+
+    body.innerHTML = `
+      <!-- KPI 看板 -->
+      ${isLap ? `
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-xs">
+          <div class="bg-white p-3 rounded-xl border"><div class="text-slate-500">已配號</div><div class="text-xl font-black mono">${totalPaid}</div></div>
+          <div class="bg-sky-50 p-3 rounded-xl border border-sky-200"><div class="text-sky-800 font-bold">已報到</div><div class="text-xl font-black mono text-sky-900">${checkedCnt}</div></div>
+          <div class="bg-indigo-50 p-3 rounded-xl border border-indigo-200"><div class="text-indigo-800 font-bold">累積總圈數</div><div class="text-xl font-black mono text-indigo-900">${totalLapsAll} 圈</div></div>
+          <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-200"><div class="text-emerald-800 font-bold">全場總里程</div><div class="text-xl font-black mono text-emerald-800">${totalKmAll.toFixed(1)} km</div></div>
+          <div class="bg-amber-50 p-3 rounded-xl border border-amber-200"><div class="text-amber-900 font-bold">最高里程</div><div class="text-xl font-black mono text-amber-900">${topKm.toFixed(2)} km</div></div>
+        </div>
+      ` : `
+        <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-xs">
+          <div class="bg-white p-3 rounded-xl border"><div class="text-slate-500">已配號</div><div class="text-xl font-black mono">${totalPaid}</div></div>
+          <div class="bg-sky-50 p-3 rounded-xl border border-sky-200"><div class="text-sky-800 font-bold">已報到</div><div class="text-xl font-black mono text-sky-900">${checkedCnt}</div></div>
+          <div class="bg-amber-50 p-3 rounded-xl border border-amber-200"><div class="text-amber-900 font-bold">賽道上</div><div class="text-xl font-black mono text-amber-900">${onTrackCnt}</div></div>
+          <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-200"><div class="text-emerald-800 font-bold">已完賽</div><div class="text-xl font-black mono text-emerald-800">${finishedCnt}</div></div>
+          <div class="bg-slate-50 p-3 rounded-xl border"><div class="text-slate-500">未報到</div><div class="text-xl font-black mono text-slate-600">${totalPaid - checkedCnt}</div></div>
+        </div>
+      `}
+
+      <!-- 各站通過人數進度 -->
+      <div class="bg-white p-3.5 rounded-xl border shadow-sm space-y-2 text-xs">
+        <div class="font-black text-slate-800">📍 各管制點即時通過進度</div>
+        <div class="grid grid-cols-2 sm:grid-cols-${Math.min(6, Math.max(2, raceStations.length + 1))} gap-2">
+          <div class="p-2 rounded-lg bg-sky-50 border border-sky-200">
+            <div class="font-bold text-sky-900">📋 報到檢錄</div>
+            <div class="mono font-black text-base text-sky-950">${checkedCnt} / ${totalPaid}</div>
+          </div>
+          ${raceStations.map((st) => {
+            const passed = isLap
+              ? lbRows.filter((r) => r.lapCount > 0).length
+              : lbRows.filter((r) => Boolean(r.splits[st.stationCode])).length;
+            const pct = totalPaid ? Math.round((passed / totalPaid) * 100) : 0;
+            return `
+              <div class="p-2 rounded-lg bg-slate-50 border">
+                <div class="flex items-center justify-between gap-1">
+                  <span class="font-black mono text-slate-900">${C.escapeHtml(st.stationCode)}</span>
+                  <span class="text-[10px] text-slate-500">${Number(st.distanceKm || 0)}km</span>
+                </div>
+                <div class="text-[11px] text-slate-600 truncate">${C.escapeHtml(st.name)}</div>
+                <div class="mono font-black text-sm text-indigo-800 mt-0.5">${passed}/${totalPaid} <span class="text-[10px] font-bold">(${pct}%)</span></div>
+              </div>`;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- 後台即時站點感應 / 快刷列 -->
+      <div class="bg-white p-3.5 rounded-xl border shadow-sm space-y-2 text-xs">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="font-black text-sm">📡 總部即時站點感應／快刷</div>
+          <button type="button" id="btnZ1TrackToggleNfc" class="px-3 py-1.5 rounded-lg font-black ${C.NFC.isScanning ? 'bg-rose-600 text-white' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}">
+            ${C.NFC.isScanning ? '🛑 停止 NFC 感應' : '📡 啟動該站 NFC 感應'}
+          </button>
+        </div>
+        <form id="z1TrackSenseForm" class="flex flex-wrap gap-2">
+          <select id="z1TrackSenseSt" class="px-2.5 py-2 border-2 border-indigo-300 rounded-lg bg-indigo-50/50 font-black">
+            <option value="CHECKIN" ${flt.senseSt === 'CHECKIN' ? 'selected' : ''}>CHECKIN（報到檢錄）</option>
+            ${raceStations.map((s) => `<option value="${C.escapeHtml(s.stationCode)}" ${flt.senseSt === s.stationCode ? 'selected' : ''}>${C.escapeHtml(s.stationCode)}（${C.escapeHtml(s.name)}）</option>`).join('')}
+          </select>
+          <input id="z1TrackQuickInput" placeholder="輸入號碼布 / 身分證 / UID 按 Enter 立即記錄" autocomplete="off" class="flex-1 min-w-[200px] px-3 py-2 border-2 rounded-lg font-bold mono uppercase" />
+          <button type="submit" class="px-4 py-2 rounded-lg bg-slate-900 text-white font-black">⚡ 記錄通過</button>
+        </form>
+        <div id="z1TrackSenseBanner" class="hidden p-2.5 rounded-lg border font-bold"></div>
+      </div>
+
+      <!-- 單格補登 / 修訂內嵌面板（點擊任一站點格開啟） -->
+      <div id="z1TrackCellEditor" class="hidden bg-sky-50 border-2 border-sky-400 p-3.5 rounded-xl space-y-2 text-xs"></div>
+
+      <!-- 逐圈明細管理內嵌面板（繞圈賽點擊展開） -->
+      <div id="z1TrackLapEditor" class="hidden bg-indigo-50 border-2 border-indigo-400 p-3.5 rounded-xl space-y-2 text-xs"></div>
+
+      <!-- 全賽道跑者管制矩陣總表 -->
+      <div class="bg-white p-3.5 rounded-xl border shadow-sm space-y-2.5 text-xs">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="flex flex-wrap items-center gap-2 flex-1">
+            <input id="z1TrackSearch" value="${C.escapeHtml(flt.q)}" placeholder="🔎 號碼布 / 姓名 / 身分證" class="min-w-[160px] flex-1 max-w-xs px-2.5 py-1.5 border rounded-lg" />
+            <select id="z1TrackCatFilter" class="px-2.5 py-1.5 border rounded-lg bg-slate-50 font-bold">
+              <option value="all" ${flt.catId === 'all' ? 'selected' : ''}>全部組別</option>
+              ${cats.map((c) => `<option value="${c.catId}" ${flt.catId === c.catId ? 'selected' : ''}>${C.escapeHtml(c.name)}</option>`).join('')}
+            </select>
+            <select id="z1TrackStatusFilter" class="px-2.5 py-1.5 border rounded-lg bg-slate-50 font-bold">
+              <option value="all" ${flt.status === 'all' ? 'selected' : ''}>全部狀態</option>
+              <option value="finished" ${flt.status === 'finished' ? 'selected' : ''}>已完賽</option>
+              <option value="on_track" ${flt.status === 'on_track' ? 'selected' : ''}>賽道上</option>
+              <option value="checked_in" ${flt.status === 'checked_in' ? 'selected' : ''}>已報到</option>
+              <option value="not_checked_in" ${flt.status === 'not_checked_in' ? 'selected' : ''}>未報到</option>
+              <option value="dnf" ${flt.status === 'dnf' ? 'selected' : ''}>DNF</option>
+            </select>
+          </div>
+          <span class="text-[11px] text-slate-500 font-bold">💡 點擊任一站點時間格即可補登或修改</span>
+        </div>
+
+        <div class="overflow-x-auto max-h-[520px]">
+          <table class="w-full text-left">
+            <thead class="bg-slate-100 sticky top-0 z-10">
+              ${isLap ? `
+                <tr>
+                  <th class="p-2">總/組名次</th>
+                  <th class="p-2">號碼布 / 姓名</th>
+                  <th class="p-2">組別</th>
+                  <th class="p-2">報到時間</th>
+                  <th class="p-2">有效圈數</th>
+                  <th class="p-2">累積里程</th>
+                  <th class="p-2">累積耗時</th>
+                  <th class="p-2">最速 / 均圈</th>
+                  <th class="p-2">平均配速</th>
+                  <th class="p-2">逐圈管理</th>
+                </tr>
+              ` : `
+                <tr>
+                  <th class="p-2">名次</th>
+                  <th class="p-2">號碼布 / 姓名</th>
+                  <th class="p-2">組別</th>
+                  <th class="p-2">狀態</th>
+                  <th class="p-2">報到</th>
+                  ${raceStations.map((st) => `<th class="p-2 whitespace-nowrap">${C.escapeHtml(st.stationCode)}<div class="text-[10px] font-normal text-slate-500">${C.escapeHtml(st.name)}</div></th>`).join('')}
+                  <th class="p-2">分段配速 / ETA</th>
+                  <th class="p-2">完賽成績</th>
+                </tr>
+              `}
+            </thead>
+            <tbody class="divide-y">
+              ${isLap ? (filtered.map((r) => `
+                <tr class="hover:bg-slate-50">
+                  <td class="p-2 mono font-black text-amber-700 whitespace-nowrap">${r.overallRank} <span class="text-slate-400 font-normal">/ ${r.catRank}</span></td>
+                  <td class="p-2 whitespace-nowrap"><b class="mono">${C.escapeHtml(r.participant.bibNumber)}</b> ${C.escapeHtml(r.participant.name)}</td>
+                  <td class="p-2 whitespace-nowrap text-slate-600">${C.escapeHtml(r.category.name)}</td>
+                  <td class="p-2 mono whitespace-nowrap">
+                    <button type="button" data-cell-edit="${r.participant.participantId}" data-cell-st="CHECKIN" data-cell-log="${C.escapeHtml(r.checkInLog?.logId || '')}" class="px-2 py-0.5 rounded border border-dashed ${r.checkedIn ? 'border-emerald-400 bg-emerald-50 text-emerald-800 font-bold' : 'border-slate-300 text-slate-400 hover:border-sky-400'}">
+                      ${r.checkInTime ? `✅ ${r.checkInTime}` : (r.checkedIn ? '✅ 已報到' : '+ 報到')}
+                    </button>
+                  </td>
+                  <td class="p-2 mono font-black text-indigo-800 whitespace-nowrap">${r.lapCount} 圈${r.overtimeCount ? ` <span class="text-[10px] text-rose-600">(+${r.overtimeCount}超時)</span>` : ''}</td>
+                  <td class="p-2 mono font-black text-emerald-700 whitespace-nowrap">${r.totalDistanceKm.toFixed(2)} km</td>
+                  <td class="p-2 mono whitespace-nowrap">${r.elapsedSec !== null ? C.formatDuration(r.elapsedSec) : '--'}</td>
+                  <td class="p-2 mono text-[11px] whitespace-nowrap">${r.bestLapSec !== null ? C.formatDuration(r.bestLapSec) : '--'} / ${r.avgLapSec !== null ? C.formatDuration(r.avgLapSec) : '--'}</td>
+                  <td class="p-2 mono whitespace-nowrap">${C.escapeHtml(r.avgPace)}</td>
+                  <td class="p-2 whitespace-nowrap">
+                    <button type="button" data-open-lap-mgr="${r.participant.participantId}" class="px-2.5 py-1 rounded-lg bg-indigo-100 hover:bg-indigo-200 text-indigo-900 font-bold">🔁 逐圈 (${r.lapDetails.length})</button>
+                  </td>
+                </tr>`).join('') || '<tr><td colspan="10" class="p-6 text-center text-slate-400">查無符合條件之選手</td></tr>'
+              ) : (filtered.map((r) => `
+                <tr class="hover:bg-slate-50 align-top">
+                  <td class="p-2 mono font-black text-amber-700 whitespace-nowrap">${r.overallRank} <span class="text-slate-400 font-normal">/ ${r.catRank}</span></td>
+                  <td class="p-2 whitespace-nowrap"><b class="mono">${C.escapeHtml(r.participant.bibNumber)}</b> ${C.escapeHtml(r.participant.name)}</td>
+                  <td class="p-2 whitespace-nowrap text-slate-600">${C.escapeHtml(r.category.name)}</td>
+                  <td class="p-2 whitespace-nowrap">${statusBadge[r.status] || r.status}</td>
+                  <td class="p-2 mono whitespace-nowrap">
+                    <button type="button" data-cell-edit="${r.participant.participantId}" data-cell-st="CHECKIN" data-cell-log="${C.escapeHtml(r.checkInLog?.logId || '')}" class="px-2 py-0.5 rounded border border-dashed ${r.checkedIn ? 'border-emerald-400 bg-emerald-50 text-emerald-800 font-bold' : 'border-slate-300 text-slate-400 hover:border-sky-400'}">
+                      ${r.checkInTime ? `✅ ${r.checkInTime}` : (r.checkedIn ? '✅ 已報到' : '+ 報到')}
+                    </button>
+                  </td>
+                  ${raceStations.map((st) => {
+                    const sp = r.splits[st.stationCode];
+                    return `
+                      <td class="p-2 mono whitespace-nowrap">
+                        <button type="button" data-cell-edit="${r.participant.participantId}" data-cell-st="${C.escapeHtml(st.stationCode)}" data-cell-log="${C.escapeHtml(sp?.logId || '')}" class="px-2 py-0.5 rounded border border-dashed ${sp ? 'border-sky-400 bg-sky-50 text-sky-900 font-bold' : 'border-slate-300 text-slate-400 hover:border-amber-400 hover:text-amber-700'}">
+                          ${sp ? sp.time : '+ 補登'}
+                        </button>
+                      </td>`;
+                  }).join('')}
+                  <td class="p-2 text-[11px] mono">
+                    ${r.splitDetails.map((sp) => `<div>${C.escapeHtml(sp.code)}: <b>${sp.segPace}</b></div>`).join('') || ''}
+                    ${r.etaTimeStr ? `<div class="text-indigo-700 font-bold">預估完賽 ${r.etaTimeStr}</div>` : ''}
+                    ${!r.splitDetails.length && !r.etaTimeStr ? '<span class="text-slate-400">--</span>' : ''}
+                  </td>
+                  <td class="p-2 mono font-black whitespace-nowrap ${r.elapsedSec !== null ? 'text-emerald-700' : 'text-slate-400'}">
+                    ${r.elapsedSec !== null ? C.formatDuration(r.elapsedSec) : '--'}
+                    ${r.elapsedSec !== null ? `<div class="text-[10px] font-normal text-slate-500">${C.escapeHtml(r.avgPace)}</div>` : ''}
+                  </td>
+                </tr>`).join('') || `<tr><td colspan="${7 + raceStations.length}" class="p-6 text-center text-slate-400">查無符合條件之選手</td></tr>`)}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+
+    const showSenseBanner = (res) => {
+      const bn = $('#z1TrackSenseBanner');
+      if (!bn) return;
+      bn.classList.remove('hidden');
+      const cls = res.level === 'success' ? 'bg-emerald-50 border-emerald-300 text-emerald-900' : (res.level === 'warn' ? 'bg-amber-50 border-amber-300 text-amber-950' : 'bg-rose-50 border-rose-300 text-rose-900');
+      bn.className = `p-2.5 rounded-lg border font-bold ${cls}`;
+      bn.textContent = res.msg;
+    };
+
+    $('#z1TrackSenseSt').onchange = (e) => {
+      flt.senseSt = e.target.value;
+      if (C.NFC.isScanning) { C.NFC.stopScanning(); renderZ1ChipControl(App, ev); }
+    };
+
+    $('#z1TrackSenseForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const inp = $('#z1TrackQuickInput');
+      const val = inp.value.trim();
+      if (!val) return;
+      const res = await adminSenseRunner(App, ev, flt.senseSt, val, 'manual', { bypassDebounce: true });
+      inp.value = '';
+      renderZ1StageGateBar(App, ev);
+      renderZ1ChipControl(App, ev);
+      showSenseBanner(res);
+      const nextInp = $('#z1TrackQuickInput'); if (nextInp) nextInp.focus();
+    };
+
+    $('#btnZ1TrackToggleNfc').onclick = async () => {
+      if (C.NFC.isScanning) {
+        C.NFC.stopScanning();
+        renderZ1ChipControl(App, ev);
+        return App.toast('已停止 NFC 感應', 'info');
+      }
+      try {
+        await C.NFC.startScanning(async (tag) => {
+          const token = tag.idNumber ? `${tag.name}|${tag.idNumber}` : (tag.bib || tag.nfcUid);
+          const res = await adminSenseRunner(App, ev, flt.senseSt, token, 'nfc');
+          renderZ1StageGateBar(App, ev);
+          renderZ1ChipControl(App, ev);
+          showSenseBanner(res);
+        }, (err) => App.toast(err.message, 'error'));
+        renderZ1ChipControl(App, ev);
+        App.toast(`📡 已啟動 ${flt.senseSt} 站 NFC 感應`, 'success');
+      } catch (err) {
+        App.toast(err.message, 'warn');
+      }
+    };
+
+    $('#z1TrackSearch').oninput = (e) => {
+      flt.q = e.target.value;
+      const pos = e.target.selectionStart;
+      renderZ1ChipControl(App, ev);
+      const inp = $('#z1TrackSearch'); if (inp) { inp.focus(); inp.setSelectionRange(pos, pos); }
+    };
+    $('#z1TrackCatFilter').onchange = (e) => { flt.catId = e.target.value; renderZ1ChipControl(App, ev); };
+    $('#z1TrackStatusFilter').onchange = (e) => { flt.status = e.target.value; renderZ1ChipControl(App, ev); };
+
+    // 點擊任一站點時間格 → 開啟內嵌補登 / 修訂 / 作廢面板
+    $$('[data-cell-edit]').forEach((btn) => {
+      btn.onclick = () => {
+        const pid = btn.dataset.cellEdit;
+        const stCode = btn.dataset.cellSt;
+        const logId = btn.dataset.cellLog;
+        const p = App.State.participants.find((x) => x.participantId === pid);
         if (!p) return;
-        const logs = App.State.timingLogs.filter((l) => l.eventId === ev.eventId && l.bibNumber === p.bibNumber && l.isValid !== false);
-        const insp = $('#z1ChipInspectBox');
-        insp.classList.remove('hidden');
-        insp.innerHTML = `
-          <div class="font-black text-sky-950">🔍 晶片讀取檢視結果：${p.bibNumber || '未配號'} ${C.escapeHtml(p.name)}（${C.escapeHtml(catMap.get(p.catId) || '-')}）</div>
-          <div class="mono text-slate-700 mt-1">NDEF 內容：<b>${C.escapeHtml(p.name)}|${C.escapeHtml(C.maskIdCard(p.idCard))}</b> ｜ 晶片 UID：<b>${C.escapeHtml(p.chipUid || '尚未寫入')}</b> ｜ 報到狀態：<b>${p.checkinStatus === 'checked_in' ? '✅ 已報到' : '⏳ 未報到'}</b></div>
-          <div class="text-slate-600 mt-0.5">本場已通過站點：<span class="mono">${logs.length ? logs.map((l) => `${l.stationCode}(${String(l.sensedTime).slice(11)})`).join(' → ') : '尚無感應紀錄'}</span></div>`;
+        const existLog = logId ? App.State.timingLogs.find((l) => l.logId === logId) : null;
+        const stObj = App.State.stations.find((s) => s.eventId === ev.eventId && String(s.stationCode).toUpperCase() === stCode);
+        const stLabel = stCode === 'CHECKIN' ? 'CHECKIN（報到檢錄）' : `${stCode}${stObj ? `（${stObj.name}）` : ''}`;
+        const ed = $('#z1TrackCellEditor');
+        ed.classList.remove('hidden');
+        ed.innerHTML = `
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-sky-200 pb-1.5">
+            <div class="font-black text-sky-950">⏱️ ${existLog ? '修訂' : '補登'}站點時間：${C.escapeHtml(p.bibNumber)} ${C.escapeHtml(p.name)} @ ${C.escapeHtml(stLabel)}</div>
+            <button type="button" id="btnCloseCellEd" class="text-slate-500 hover:text-slate-900 font-bold">✕ 關閉</button>
+          </div>
+          <div class="flex flex-wrap items-end gap-2">
+            <div class="flex-1 min-w-[200px]">
+              <label class="font-bold text-[11px] block">通過日期與時間 (YYYY-MM-DD HH:mm:ss)</label>
+              <input id="cellEdTime" value="${C.escapeHtml(existLog ? existLog.sensedTime : C.formatDateTime())}" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mono font-bold mt-0.5" />
+            </div>
+            <button type="button" id="btnCellEdNow" class="px-2.5 py-1.5 rounded-lg bg-white border font-bold">帶入現在時間</button>
+            <button type="button" id="btnCellEdSave" class="px-4 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-black">💾 儲存</button>
+            ${existLog ? '<button type="button" id="btnCellEdVoid" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold">🗑️ 作廢此筆</button>' : ''}
+          </div>`;
+        $('#btnCloseCellEd').onclick = () => ed.classList.add('hidden');
+        $('#btnCellEdNow').onclick = () => { $('#cellEdTime').value = C.formatDateTime(); };
+        $('#btnCellEdSave').onclick = async () => {
+          const tm = $('#cellEdTime').value.trim();
+          if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(tm)) return App.toast('格式須為 YYYY-MM-DD HH:mm:ss', 'error');
+          const cat = App.State.categories.find((c) => c.catId === p.catId);
+          const effStart = (cat && cat.customRaceStart) || ev.raceStart;
+          if (stCode !== 'CHECKIN' && effStart) {
+            const sDt = C.parseDateTime(effStart);
+            const tDt = C.parseDateTime(tm);
+            if (sDt && tDt && tDt.getTime() < sDt.getTime()) {
+              return App.toast(`🔒 通過時間 (${tm}) 不可早於起跑時間 (${effStart})`, 'error');
+            }
+          }
+          if (existLog) {
+            existLog.sensedTime = tm;
+            existLog.source = 'manual';
+            existLog.note = '後台修訂時間';
+            await C.TurDB.put('timingLogs', existLog);
+            await App.enqueueSync('adjustTimingLog', { log: existLog });
+            App.toast(`✅ 已更新 ${p.bibNumber} @ ${stCode} 時間為 ${tm}`, 'success');
+          } else {
+            const res = await adminSenseRunner(App, ev, stCode, p.bibNumber, 'manual', { customTime: tm, bypassDebounce: true, allowDuplicateFinish: true, note: '矩陣補登' });
+            if (!res.ok) return App.toast(res.msg, 'error');
+            App.toast(res.msg, 'success');
+          }
+          renderZ1StageGateBar(App, ev);
+          renderZ1ChipControl(App, ev);
+        };
+        if ($('#btnCellEdVoid')) {
+          $('#btnCellEdVoid').onclick = async () => {
+            if (!confirm(`確定作廢 ${p.bibNumber} @ ${stCode}（${existLog.sensedTime}）這筆感應紀錄嗎？`)) return;
+            existLog.isValid = false;
+            await C.TurDB.put('timingLogs', existLog);
+            await App.enqueueSync('adjustTimingLog', { log: existLog });
+            if (stCode === 'CHECKIN') {
+              p.checkinStatus = 'pending';
+              await C.TurDB.put('participants', p);
+              await App.enqueueSync('updateParticipant', { participantId: p.participantId, checkinStatus: 'pending' });
+            } else if (stCode === 'FINISH') {
+              const hasOtherFin = App.State.timingLogs.some((l) => l.eventId === ev.eventId && String(l.bibNumber).toUpperCase() === String(p.bibNumber).toUpperCase() && String(l.stationCode).toUpperCase() === 'FINISH' && l.isValid !== false);
+              if (!hasOtherFin) {
+                p.raceStatus = 'on_track';
+                await C.TurDB.put('participants', p);
+                await App.enqueueSync('updateParticipant', { participantId: p.participantId, raceStatus: 'on_track' });
+              }
+            }
+            renderZ1StageGateBar(App, ev);
+            renderZ1ChipControl(App, ev);
+            App.toast(`🗑️ 已作廢 ${p.bibNumber} @ ${stCode}`, 'info');
+          };
+        }
+      };
+    });
+
+    // 繞圈賽：展開逐圈明細與補刪圈面板
+    $$('[data-open-lap-mgr]').forEach((btn) => {
+      btn.onclick = () => {
+        const pid = btn.dataset.openLapMgr;
+        const row = lbRows.find((r) => r.participant.participantId === pid);
+        if (!row) return;
+        const p = row.participant;
+        const lapBox = $('#z1TrackLapEditor');
+        lapBox.classList.remove('hidden');
+        lapBox.innerHTML = `
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-200 pb-1.5">
+            <div class="font-black text-indigo-950">🔁 逐圈明細管理：${C.escapeHtml(p.bibNumber)} ${C.escapeHtml(p.name)}（有效 ${row.lapCount} 圈 / ${row.totalDistanceKm.toFixed(2)} km）</div>
+            <button type="button" id="btnCloseLapEd" class="text-slate-500 hover:text-slate-900 font-bold">✕ 關閉</button>
+          </div>
+          <div class="flex flex-wrap items-end gap-2">
+            <input id="lapAddTime" value="${C.formatDateTime()}" placeholder="YYYY-MM-DD HH:mm:ss" class="px-2.5 py-1.5 border rounded-lg bg-white mono font-bold w-52" />
+            <button type="button" id="btnLapAddSubmit" class="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-black">+ 補登一圈</button>
+          </div>
+          <div class="max-h-56 overflow-y-auto bg-white rounded-lg border">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-100 sticky top-0">
+                <tr><th class="p-1.5">圈次</th><th class="p-1.5">通過時間</th><th class="p-1.5">單圈耗時</th><th class="p-1.5">單圈配速</th><th class="p-1.5">累積里程</th><th class="p-1.5">操作</th></tr>
+              </thead>
+              <tbody class="divide-y mono">
+                ${row.lapDetails.map((ld) => `
+                  <tr class="${ld.overtime ? 'bg-rose-50 text-rose-700' : ''}">
+                    <td class="p-1.5 font-black">${ld.overtime ? '超時' : `#${ld.lapNumber}`}</td>
+                    <td class="p-1.5">${C.escapeHtml(ld.fullTime)}</td>
+                    <td class="p-1.5">${ld.segSec !== null ? C.formatDuration(ld.segSec) : '--'}</td>
+                    <td class="p-1.5">${C.escapeHtml(ld.segPace)}</td>
+                    <td class="p-1.5">${ld.cumKm !== null ? `${ld.cumKm.toFixed(2)} km` : '不計入'}</td>
+                    <td class="p-1.5"><button type="button" data-void-lap="${C.escapeHtml(ld.logId)}" class="px-2 py-0.5 rounded bg-rose-100 text-rose-700 font-sans font-bold">作廢</button></td>
+                  </tr>`).join('') || '<tr><td colspan="6" class="p-4 text-center text-slate-400 font-sans">尚無繞圈紀錄</td></tr>'}
+              </tbody>
+            </table>
+          </div>`;
+        $('#btnCloseLapEd').onclick = () => lapBox.classList.add('hidden');
+        $('#btnLapAddSubmit').onclick = async () => {
+          const tm = $('#lapAddTime').value.trim();
+          const res = await adminSenseRunner(App, ev, 'LAP', p.bibNumber, 'manual', { customTime: tm, bypassDebounce: true, note: '後台補圈' });
+          if (!res.ok) return App.toast(res.msg, 'error');
+          renderZ1StageGateBar(App, ev);
+          renderZ1ChipControl(App, ev);
+          App.toast(res.msg, 'success');
+        };
+        $$('[data-void-lap]').forEach((vb) => {
+          vb.onclick = async () => {
+            const lg = App.State.timingLogs.find((x) => x.logId === vb.dataset.voidLap);
+            if (!lg) return;
+            lg.isValid = false;
+            await C.TurDB.put('timingLogs', lg);
+            await App.enqueueSync('adjustTimingLog', { log: lg });
+            renderZ1StageGateBar(App, ev);
+            renderZ1ChipControl(App, ev);
+            App.toast('🗑️ 已作廢該圈紀錄', 'info');
+          };
+        });
       };
     });
   }
@@ -2346,81 +3419,6 @@
         App.toast(`🗑️ 已刪除站點「${stObj.stationCode}」`, 'info');
         if (onChanged) onChanged();
       };
-    });
-  }
-
-  function renderZ1Gun(App, ev) {
-    const gate = C.evaluateEventStageGates({
-      event: ev, categories: App.State.categories, stations: App.State.stations,
-      participants: App.State.participants, timingLogs: App.State.timingLogs,
-      syncQueue: App.State.syncQueue, hasCloudGas: Boolean(App.State.gasUrl)
-    });
-    const box = $('#z1-gun');
-    box.innerHTML = `
-      <div class="p-3.5 rounded-xl border-2 ${gate.gunWarnings.length ? 'bg-amber-50 border-amber-300' : 'bg-emerald-50 border-emerald-300'} text-xs space-y-2">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <div class="font-black ${gate.gunWarnings.length ? 'text-amber-950' : 'text-emerald-950'}">
-            ${gate.gunWarnings.length ? `⚠️ 開跑前提醒（${gate.gunWarnings.length} 項）` : '✅ 賽前檢核通過'}
-          </div>
-          ${gate.metrics.paidNoBibCount > 0 ? '<button id="btnZ1GunFixBib" class="px-3 py-1 rounded-lg bg-slate-900 text-white font-bold">🏷️ 補配號碼布</button>' : ''}
-        </div>
-        ${gate.gunWarnings.length ? `<ul class="list-disc list-inside text-amber-900 space-y-0.5">${gate.gunWarnings.map((w) => `<li>${C.escapeHtml(w)}</li>`).join('')}</ul>` : ''}
-      </div>
-
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 text-xs">
-        <div class="bg-slate-900 text-white p-5 rounded-2xl space-y-3 shadow">
-          <div class="text-amber-400 font-bold">🏁 起跑時間</div>
-          <div class="text-3xl font-black mono text-amber-300" id="z1GunDisplay">${ev.raceStart || '尚未設定'}</div>
-          <div class="flex flex-wrap gap-2">
-            <button id="btnZ1GunNow" class="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 font-black text-sm shadow">🔫 立即鳴槍</button>
-          </div>
-          <div class="pt-2 border-t border-slate-700 flex gap-2">
-            <input id="z1CustomGunTime" value="${ev.raceStart || C.formatDateTime()}" placeholder="YYYY-MM-DD HH:mm:ss" class="flex-1 px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 mono text-white" />
-            <button id="btnZ1ApplyGunTime" class="px-3 py-2 rounded-lg bg-amber-400 text-slate-950 font-black">套用時間</button>
-          </div>
-        </div>
-
-        <div id="z1GunStationsHost"></div>
-      </div>`;
-
-    if ($('#btnZ1GunFixBib')) $('#btnZ1GunFixBib').onclick = () => App.autoAssignBibsForEvent(ev.eventId);
-
-    const applyGun = async (timeStr) => {
-      if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(timeStr)) {
-        return App.toast('起跑時間強制包含完整日期與整數秒：YYYY-MM-DD HH:mm:ss', 'error');
-      }
-      if (!gate.metrics.hasTimingStation) {
-        return App.toast('🔒 階段 3 防呆攔截：請先建立 FINISH 或 LAP 站點後再鳴槍！', 'error');
-      }
-      if (ev.raceStart && ev.raceStart !== timeStr) {
-        if (!confirm(`⚠️ 本活動已於 ${ev.raceStart} 鳴槍開跑！確定要覆蓋起跑時間為 ${timeStr} 嗎？（所有完賽成績將依新時間重算）`)) return;
-      } else if (gate.gunWarnings.length) {
-        if (!confirm(`⚠️ 尚有 ${gate.gunWarnings.length} 項開跑前提醒：\n- ${gate.gunWarnings.join('\n- ')}\n\n確定仍要立即鳴槍開跑？`)) return;
-      }
-      ev.raceStart = timeStr;
-      if (ev.status === 'open' && confirm('鳴槍開跑後，是否一併將本活動切換為「停止報名 (closed)」以防開跑後誤報名？')) {
-        ev.status = 'closed';
-      }
-      await C.TurDB.put('events', ev);
-      for (const p of App.State.participants) {
-        if (p.eventId === ev.eventId && String(p.payStatus).toUpperCase() === 'PAID' && p.raceStatus === 'dns') {
-          p.raceStatus = 'on_track';
-          await C.TurDB.put('participants', p);
-        }
-      }
-      await App.enqueueSync('saveEvent', { event: ev });
-      await App.enqueueSync('triggerGunStart', { eventId: ev.eventId, raceStart: timeStr });
-      App.renderAll();
-      App.toast(`🔫 鳴槍時間已寫入：${timeStr}（賽道計時站點已解除開跑前鎖定）`, 'success');
-    };
-    $('#btnZ1GunNow').onclick = () => applyGun(C.formatDateTime());
-    $('#btnZ1ApplyGunTime').onclick = () => applyGun($('#z1CustomGunTime').value.trim());
-
-    renderEventStationsManager(App, ev, $('#z1GunStationsHost'), () => {
-      z1DirtyTabs.add('ops');
-      z1DirtyTabs.add('setup');
-      renderZ1StageGateBar(App, ev);
-      renderZ1Gun(App, ev);
     });
   }
 
@@ -2753,7 +3751,7 @@
 
     // 掛載本活動管制點與站點配置元件（變動時即時重整站點與作業員選單）
     renderEventStationsManager(App, ev, $('#z1OpsStationsHost'), () => {
-      z1DirtyTabs.add('gun');
+      z1DirtyTabs.add('chip');
       z1DirtyTabs.add('setup');
       renderZ1StageGateBar(App, ev);
       renderZ1Ops(App, ev);
