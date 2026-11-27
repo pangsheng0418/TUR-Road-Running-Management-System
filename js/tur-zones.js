@@ -771,59 +771,17 @@
             </div>
           </div>
 
-          <!-- 📝 承辦人自訂擴充報名欄位設計器（8 種欄位類型 ＋ 6 組一鍵範本） -->
+          <!-- ↕️ 報名表欄位填列順序調整（上方先調整順序；下方再依需求自由擴充自訂欄位） -->
           <div class="bg-white p-4 rounded-xl border-2 border-indigo-200 shadow-sm space-y-3">
-            <div class="border-b pb-2">
-              <h3 class="font-black text-sm text-indigo-950">📝 活動專屬自訂填列欄位（承辦人自由擴充）</h3>
-              <p class="text-[11px] text-slate-500 mt-0.5">保留 TUR 預設 14 項標準欄位，承辦人可依活動需求自由加開 8 種不同類型填列欄位。</p>
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+              <div>
+                <h3 class="font-black text-sm text-indigo-950">↕️ 報名表欄位填列順序調整</h3>
+                <p class="text-[11px] text-slate-500 mt-0.5">點選 ↑ / ↓ 自由上下調整所有欄位順序，前台報名表即刻套用並重新編號。</p>
+              </div>
+              <button type="button" id="btnZ1ResetFieldOrder" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] shrink-0">↺ 恢復預設順序</button>
             </div>
 
-            <!-- 一鍵快速加入常用範本 -->
-            <div class="space-y-1">
-              <div class="text-[11px] font-bold text-indigo-700">⚡ 一鍵帶入常用欄位範本：</div>
-              <div class="flex flex-wrap gap-1.5">
-                ${(C.CUSTOM_FIELD_PRESETS || []).map((pr, idx) => `
-                  <button type="button" data-preset-cf="${idx}" class="px-2 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-bold text-[11px] border border-indigo-200">+ ${C.escapeHtml(pr.label)} <span class="opacity-65">(${pr.type})</span></button>
-                `).join('')}
-              </div>
-            </div>
-
-            <!-- 新增自訂欄位表單 -->
-            <div class="p-3 rounded-xl bg-slate-50 border space-y-2">
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div>
-                  <label class="font-bold text-[11px]">欄位名稱 *</label>
-                  <input id="z1CfLabel" type="text" placeholder="例如：紀念衣尺寸、接駁車梯次" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5" />
-                </div>
-                <div>
-                  <label class="font-bold text-[11px]">欄位類型（8 種）</label>
-                  <select id="z1CfType" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5">
-                    ${(C.CUSTOM_FIELD_TYPES || []).map((t) => `<option value="${t.id}">${C.escapeHtml(t.label)}</option>`).join('')}
-                  </select>
-                </div>
-              </div>
-              <div id="z1CfOptionsRow" class="hidden">
-                <label class="font-bold text-[11px]">選項清單（以半形逗號 <code>,</code> 分隔）*</label>
-                <input id="z1CfOptions" type="text" placeholder="例如：S, M, L, XL, 2XL" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5" />
-              </div>
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
-                <div class="sm:col-span-2">
-                  <label class="font-bold text-[11px]">輸入提示文字（選填）</label>
-                  <input id="z1CfPlaceholder" type="text" placeholder="例如：請填寫預計完賽時間或備註" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5" />
-                </div>
-                <label class="flex items-center gap-1.5 py-1.5 font-bold cursor-pointer">
-                  <input id="z1CfReq" type="checkbox" /> 設為必填欄位
-                </label>
-              </div>
-              <button type="button" id="btnZ1AddCustomField" class="w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-black">+ 加入此自訂欄位至本活動報名表</button>
-            </div>
-
-            <!-- 報名表全部欄位填列順序調整（預設欄位 ＋ 自訂欄位統一自由上下調整排序） -->
-            <div class="space-y-1.5 pt-1 border-t">
-              <div class="flex flex-wrap items-center justify-between gap-2">
-                <div class="text-[11px] font-black text-indigo-950">↕️ 報名表欄位填列順序（點 ↑ ↓ 自由調整，前台報名表立即套用）</div>
-                <button type="button" id="btnZ1ResetFieldOrder" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px]">↺ 恢復預設順序</button>
-              </div>
+            <div class="space-y-1.5">
               <div class="p-2 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-between text-[11px] text-slate-600">
                 <div><b>1. 報名組別</b> <span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 text-[10px] font-bold">必填</span></div>
                 <span class="text-[10px] text-slate-400 font-bold">固定首位</span>
@@ -857,6 +815,54 @@
                     </div>`;
                 }).join('');
               })()}
+            </div>
+
+            <!-- 📝 活動專屬自訂填列欄位（置於排序清單最下方，由承辦人依需求自由增加） -->
+            <div class="pt-3 border-t space-y-2.5">
+              <div>
+                <h4 class="font-black text-xs sm:text-sm text-indigo-950">📝 活動專屬自訂填列欄位（承辦人自由擴充）</h4>
+                <p class="text-[11px] text-slate-500 mt-0.5">依活動需要於下方點選常用範本或自建欄位，新增後會自動加入上方順序清單供調整位置。</p>
+              </div>
+
+              <!-- 一鍵快速加入常用範本（僅留住址與紀念衣尺寸） -->
+              <div class="space-y-1">
+                <div class="text-[11px] font-bold text-indigo-700">⚡ 一鍵帶入常用欄位範本：</div>
+                <div class="flex flex-wrap gap-1.5">
+                  ${(C.CUSTOM_FIELD_PRESETS || []).map((pr, idx) => `
+                    <button type="button" data-preset-cf="${idx}" class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-bold text-[11px] border border-indigo-200">+ ${C.escapeHtml(pr.label)} <span class="opacity-65">(${pr.type})</span></button>
+                  `).join('')}
+                </div>
+              </div>
+
+              <!-- 新增自訂欄位表單 -->
+              <div class="p-3 rounded-xl bg-slate-50 border space-y-2">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label class="font-bold text-[11px]">欄位名稱 *</label>
+                    <input id="z1CfLabel" type="text" placeholder="例如：紀念衣尺寸、接駁車梯次" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5" />
+                  </div>
+                  <div>
+                    <label class="font-bold text-[11px]">欄位類型（8 種）</label>
+                    <select id="z1CfType" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5">
+                      ${(C.CUSTOM_FIELD_TYPES || []).map((t) => `<option value="${t.id}">${C.escapeHtml(t.label)}</option>`).join('')}
+                    </select>
+                  </div>
+                </div>
+                <div id="z1CfOptionsRow" class="hidden">
+                  <label class="font-bold text-[11px]">選項清單（以半形逗號 <code>,</code> 分隔）*</label>
+                  <input id="z1CfOptions" type="text" placeholder="例如：S, M, L, XL, 2XL" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5" />
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
+                  <div class="sm:col-span-2">
+                    <label class="font-bold text-[11px]">輸入提示文字（選填）</label>
+                    <input id="z1CfPlaceholder" type="text" placeholder="選填" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5" />
+                  </div>
+                  <label class="flex items-center gap-1.5 py-1.5 font-bold cursor-pointer">
+                    <input id="z1CfReq" type="checkbox" /> 設為必填欄位
+                  </label>
+                </div>
+                <button type="button" id="btnZ1AddCustomField" class="w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-black">+ 加入此自訂欄位至本活動報名表</button>
+              </div>
             </div>
           </div>
         </div>
