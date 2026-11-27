@@ -72,13 +72,25 @@
     };
   }
 
-  function ensureActiveEvent(data) {
-    if (S.activeEventId && data.events.some((e) => e.eventId === S.activeEventId)) {
-      return data.events.find((e) => e.eventId === S.activeEventId);
+  function getLiveEligibleEvents(data) {
+    return (data.events || []).filter((e) => {
+      if (!C.isEventBibConfirmed(e)) return false;
+      return (data.participants || []).some((p) =>
+        p.eventId === e.eventId &&
+        String(p.payStatus || '').toUpperCase() === 'PAID' &&
+        Boolean(String(p.bibNumber || '').trim())
+      );
+    });
+  }
+
+  function ensureActiveEvent(data, onlyLiveEligible = false) {
+    const pool = onlyLiveEligible ? getLiveEligibleEvents(data) : (data.events || []);
+    if (S.activeEventId && pool.some((e) => e.eventId === S.activeEventId)) {
+      return pool.find((e) => e.eventId === S.activeEventId);
     }
-    const liveEv = data.events.find((e) => e.status !== 'finished' && e.raceStart);
-    const finEv = data.events.find((e) => e.status === 'finished');
-    const chosen = liveEv || finEv || data.events[0] || null;
+    const liveEv = pool.find((e) => e.status !== 'finished' && e.raceStart);
+    const finEv = pool.find((e) => e.status === 'finished');
+    const chosen = liveEv || finEv || pool[0] || null;
     S.activeEventId = chosen ? chosen.eventId : '';
     return chosen;
   }
@@ -132,21 +144,36 @@
   }
 
   /* --------------------------------------------------------------------------
-   * （一）即時賽事：活動明細 → 分組進度 / 站點通過 / 成績排名（組別區分）
+   * （一）即時賽事：僅列出完成繳費＋最終配號確認之活動與正式出賽選手
    * -------------------------------------------------------------------------- */
   function renderLiveTab(App, box, data) {
-    const ev = ensureActiveEvent(data);
-    if (!ev) {
-      box.innerHTML = '<div class="bg-slate-900 text-slate-300 p-10 rounded-2xl text-center">目前尚無賽事資料。</div>';
+    const liveEvents = getLiveEligibleEvents(data);
+    const ev = ensureActiveEvent(data, true);
+    if (!ev || !liveEvents.length) {
+      box.innerHTML = `
+        <div class="bg-slate-900 text-slate-200 p-10 rounded-2xl border border-slate-800 text-center space-y-2">
+          <div class="text-3xl">🏁</div>
+          <div class="text-base font-black text-white">目前尚無已完成繳費與最終配號確認的即時賽事</div>
+          <div class="text-xs text-slate-400">賽事須由主辦單位於「核帳／名單」完成「✅ 確認完成最終配號」後，才會公開顯示於即時賽事名單。</div>
+        </div>`;
       return;
     }
+
+    // 嚴格僅納入「已繳費 PAID ＋ 已配號 bibNumber」之正式參賽選手（完全隱藏未繳費／已取消／未配號）
+    const officialParts = data.participants.filter((p) =>
+      p.eventId === ev.eventId &&
+      String(p.payStatus || '').toUpperCase() === 'PAID' &&
+      Boolean(String(p.bibNumber || '').trim())
+    );
+    const scopedData = { ...data, participants: officialParts };
+
     const rows = C.computeLeaderboard({
       event: ev, categories: data.categories, stations: data.stations,
-      participants: data.participants, timingLogs: data.timingLogs
+      participants: officialParts, timingLogs: data.timingLogs
     });
     const A = C.computeEventProgressAnalytics({
       event: ev, categories: data.categories, stations: data.stations,
-      participants: data.participants, timingLogs: data.timingLogs
+      participants: officialParts, timingLogs: data.timingLogs
     });
     const evCats = data.categories.filter((c) => c.eventId === ev.eventId);
     const evSts = data.allStations.filter((s) => s.eventId === ev.eventId).sort((a, b) => Number(a.orderIndex) - Number(b.orderIndex));
@@ -154,25 +181,23 @@
 
     const statusBadge = ev.status === 'finished'
       ? '<span class="px-2.5 py-0.5 rounded-full bg-slate-700 text-slate-200 font-black text-[11px]">📦 已結案</span>'
-      : (ev.raceStart
-        ? '<span class="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-black text-[11px]">🟢 進行中</span>'
-        : '<span class="px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-black text-[11px]">📝 報名中</span>');
+      : '<span class="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-black text-[11px]">✅ 已配號定案・進行中</span>';
 
     box.innerHTML = `
       <div class="bg-slate-950 text-slate-100 rounded-2xl p-4 sm:p-5 space-y-4 shadow-lg border border-slate-800">
-        <!-- 活動明細選擇列 -->
+        <!-- 活動明細選擇列（僅列已完成繳費與最終配號確認之活動） -->
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
           <div class="space-y-1 flex-1 min-w-[240px]">
             <div class="flex flex-wrap items-center gap-2">
-              <span class="text-xs font-bold text-amber-400">📊 即時賽事</span>
+              <span class="text-xs font-bold text-amber-400">📊 即時賽事（僅列已繳費配號定案活動）</span>
               ${statusBadge}
               <span class="px-2 py-0.5 rounded bg-slate-800 text-sky-300 text-[11px] font-bold">${ev.raceType === 'lap_timed' ? `🔁 繞圈賽 (${ev.lapDistanceKm || 1}km/圈)` : '🏃 距離賽'}</span>
             </div>
             <div class="flex flex-wrap items-center gap-2 pt-1">
               <select id="scLiveEventSelect" class="bg-slate-950 border border-slate-700 text-amber-300 rounded-xl px-3 py-2 text-xs sm:text-sm font-black max-w-full">
-                ${data.events.map((e) => {
-                  const cnt = data.participants.filter((p) => p.eventId === e.eventId).length;
-                  const tag = e.status === 'finished' ? '已結案' : (e.raceStart ? '進行中' : '報名中');
+                ${liveEvents.map((e) => {
+                  const cnt = data.participants.filter((p) => p.eventId === e.eventId && String(p.payStatus || '').toUpperCase() === 'PAID' && Boolean(String(p.bibNumber || '').trim())).length;
+                  const tag = e.status === 'finished' ? '已結案' : '已配號進行中';
                   return `<option value="${e.eventId}" ${e.eventId === ev.eventId ? 'selected' : ''}>[${tag}] ${C.escapeHtml(e.nameZh)} (${cnt}人)</option>`;
                 }).join('')}
               </select>
@@ -181,8 +206,8 @@
           </div>
           <div class="flex gap-2.5 text-right mono text-xs">
             <div class="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800">
-              <div class="text-[10px] text-slate-400">有效報名 / 報到</div>
-              <div class="text-base font-black text-white">${sum.activeTotal} / <span class="text-indigo-300">${sum.checkedIn}</span></div>
+              <div class="text-[10px] text-slate-400">正式參賽 / 報到</div>
+              <div class="text-base font-black text-white">${sum.paid} / <span class="text-indigo-300">${sum.checkedIn}</span></div>
             </div>
             <div class="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800">
               <div class="text-[10px] text-slate-400">進行中 / 已完賽</div>
@@ -222,7 +247,7 @@
     if (S.liveSub === 'groups') {
       renderLiveGroupsSub(subBox, A);
     } else if (S.liveSub === 'stations') {
-      renderLiveStationsSub(subBox, ev, A, evSts, data);
+      renderLiveStationsSub(subBox, ev, A, evSts, scopedData);
     } else {
       renderLiveRankingSub(App, subBox, ev, A, rows, evCats);
     }

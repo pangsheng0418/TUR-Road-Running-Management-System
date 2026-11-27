@@ -1450,6 +1450,11 @@
 
     const payMode = C.getEventPaymentMode(ev);
     const isPayuniEv = payMode === 'ONLINE_PAYUNi';
+    const bibInfo = C.getEventBibConfirmInfo(ev);
+    const paidWithBib = paid.filter((p) => Boolean(String(p.bibNumber || '').trim()));
+    const paidNoBib = paid.filter((p) => !String(p.bibNumber || '').trim());
+    const chippedCnt = parts.filter((p) => Boolean(String(p.chipUid || '').trim())).length;
+    const isFinishedEv = ev.status === 'finished';
     const box = $(targetSelector);
     if (!box) return;
     box.innerHTML = `
@@ -1457,7 +1462,36 @@
         <div class="bg-white p-3 rounded-xl border"><div class="text-slate-500">總報名</div><div class="text-2xl font-black mono">${parts.length}</div></div>
         <div class="bg-rose-50 p-3 rounded-xl border border-rose-200"><div class="text-rose-700 font-bold">待對帳</div><div class="text-2xl font-black mono text-rose-700">${unpaid.length}</div></div>
         <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-200"><div class="text-emerald-700 font-bold">已繳費</div><div class="text-2xl font-black mono text-emerald-700">${paid.length}</div></div>
-        <div class="bg-sky-50 p-3 rounded-xl border border-sky-200"><div class="text-sky-700 font-bold">已配號</div><div class="text-2xl font-black mono text-sky-700">${parts.filter((p) => p.bibNumber).length}</div></div>
+        <div class="bg-sky-50 p-3 rounded-xl border border-sky-200"><div class="text-sky-700 font-bold">已配號</div><div class="text-2xl font-black mono text-sky-700">${paidWithBib.length} / ${paid.length}</div></div>
+      </div>
+
+      <!-- 🏷️ 賽前最後確認配號與交棒作業（晶片計時 ／ 即時賽事總開關） -->
+      <div class="p-3.5 rounded-2xl border-2 shadow-sm space-y-2.5 text-xs ${bibInfo.confirmed ? 'bg-emerald-50/80 border-emerald-400' : 'bg-amber-50/80 border-amber-400'}">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <div class="space-y-0.5">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="font-black text-sm ${bibInfo.confirmed ? 'text-emerald-950' : 'text-amber-950'}">🏷️ 最後確認配號與交棒作業</span>
+              ${bibInfo.confirmed
+                ? '<span class="px-2.5 py-0.5 rounded-full bg-emerald-600 text-white font-black text-[11px]">✅ 已完成最終配號確認（已開放晶片計時／即時賽事）</span>'
+                : '<span class="px-2.5 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black text-[11px]">⏳ 尚未確認配號（此場尚未出現在晶片計時與即時賽事）</span>'}
+            </div>
+            <div class="text-[11px] ${bibInfo.confirmed ? 'text-emerald-900' : 'text-amber-900'}">
+              ${bibInfo.confirmed
+                ? `確認狀態：已截止報名並鎖定交棒${bibInfo.confirmedAt ? `（${C.escapeHtml(bibInfo.confirmedAt)}${bibInfo.confirmedBy ? ` · ${C.escapeHtml(bibInfo.confirmedBy)}` : ''}）` : ''}｜正式參賽 ${paidWithBib.length} 人`
+                : `待補配號：<b>${paidNoBib.length}</b> 人 ｜ 已寫晶片：<b>${chippedCnt}</b> 人 ｜ 待繳費：<b>${unpaid.length}</b> 人（確認後將自動截止報名並交付晶片計時與即時賽事）`}
+            </div>
+          </div>
+          <div class="flex flex-wrap items-center gap-1.5">
+            <button type="button" id="btnZ1AutoBib" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold" title="保留既有號碼布，僅為已繳費未配號選手補配">🏷️ 補缺配號</button>
+            <button type="button" id="btnZ1ReassignAllBib" ${chippedCnt > 0 || isFinishedEv ? 'disabled' : ''} class="px-3 py-1.5 rounded-lg font-bold border ${chippedCnt > 0 || isFinishedEv ? 'bg-slate-200 border-slate-300 text-slate-500 cursor-not-allowed' : 'bg-white hover:bg-indigo-50 border-indigo-400 text-indigo-900'}" title="${chippedCnt > 0 ? `已有 ${chippedCnt} 人寫入晶片 UID，防呆鎖定禁止重整` : '依各組起始號從頭連續編排（無跳號）'}">
+              ${chippedCnt > 0 ? `🔒 已寫卡(${chippedCnt})禁止重整` : '🔢 全組重整連號'}
+            </button>
+            ${!bibInfo.confirmed && unpaid.length > 0 && !isFinishedEv ? `<button type="button" id="btnZ1CancelUnpaid" class="px-3 py-1.5 rounded-lg bg-rose-100 hover:bg-rose-200 border border-rose-300 text-rose-900 font-bold">🧹 逾期未繳轉取消 (${unpaid.length})</button>` : ''}
+            ${!isFinishedEv ? (bibInfo.confirmed
+              ? '<button type="button" id="btnZ1UnlockFinalBib" class="px-3.5 py-1.5 rounded-lg bg-white hover:bg-amber-100 border-2 border-amber-500 text-amber-950 font-black">🔓 臨時解鎖補登</button>'
+              : '<button type="button" id="btnZ1ConfirmFinalBib" class="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow">✅ 確認完成最終配號</button>') : ''}
+          </div>
+        </div>
       </div>
 
       <div class="bg-white p-3 rounded-xl border shadow-sm space-y-2.5 text-xs">
@@ -1465,7 +1499,6 @@
           <div class="flex flex-wrap gap-1.5">
             <button id="btnZ1BatchPaid" class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold">✅ 批次入帳</button>
             ${groupsUnpaid.map((gc) => `<button data-group-paid="${gc}" class="px-3 py-1.5 rounded-lg bg-amber-500 text-slate-950 font-black">👥 入帳 ${gc}</button>`).join('')}
-            <button id="btnZ1AutoBib" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white font-bold">🏷️ 自動配號</button>
           </div>
           <div class="flex flex-wrap gap-1.5">
             <button id="btnZ1ExportPaidXlsx" class="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-black">📋 繳費名單 .xlsx</button>
@@ -1764,6 +1797,23 @@
       };
     });
     $('#btnZ1AutoBib').onclick = () => App.autoAssignBibsForEvent(ev.eventId);
+    if ($('#btnZ1ReassignAllBib')) $('#btnZ1ReassignAllBib').onclick = () => App.reassignAllBibsForEvent(ev.eventId);
+    if ($('#btnZ1ConfirmFinalBib')) $('#btnZ1ConfirmFinalBib').onclick = () => App.confirmFinalBibsForEvent(ev.eventId);
+    if ($('#btnZ1UnlockFinalBib')) $('#btnZ1UnlockFinalBib').onclick = () => App.unlockBibConfirmation(ev.eventId);
+    if ($('#btnZ1CancelUnpaid')) {
+      $('#btnZ1CancelUnpaid').onclick = async () => {
+        if (!unpaid.length) return;
+        if (!confirm(`⚠️ 確定將本場尚未繳費的 ${unpaid.length} 筆報名全數轉列為「CANCELLED（逾期取消）」嗎？\n\n已繳費選手不受影響，取消後可乾淨執行最終配號確認。`)) return;
+        for (const p of unpaid) {
+          p.payStatus = 'CANCELLED';
+          await C.TurDB.put('participants', p);
+          await App.enqueueSync('updateParticipant', { participantId: p.participantId, payStatus: 'CANCELLED' });
+        }
+        App.rebuildIndices(ev.eventId);
+        App.renderAll();
+        App.toast(`🧹 已將 ${unpaid.length} 筆逾期未繳費名單轉列取消`, 'warn');
+      };
+    }
     $('#btnZ1ExportPaidXlsx').onclick = () => exportPaidRoster(App, ev, 'xlsx');
     $('#btnZ1ExportPaidCsv').onclick = () => exportPaidRoster(App, ev, 'csv');
     $('#btnZ1ExportXlsx').onclick = () => export3SheetExcel(App, ev, false);

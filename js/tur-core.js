@@ -421,9 +421,31 @@
       paymentMode: paymentMode === 'ONLINE_PAYUNi' ? 'ONLINE_PAYUNi' : 'MANUAL_ATM',
       earlyBirdEnabled: true,
       earlyBirdEnd: '2026-12-31 23:59:59', // YYYY-MM-DD HH:mm:ss（含此時間點前適用早鳥價，可隨時核取關閉或改期）
+      bibConfirmed: false,
+      bibConfirmedAt: '',
+      bibConfirmedBy: '',
       addons: DEFAULT_TUR_ADDONS.map((a) => ({ ...a })),
       customFields: [{ ...DEFAULT_ADDONS_NOTE_FIELD }]
     };
+  }
+
+  function getEventBibConfirmInfo(ev) {
+    if (!ev) return { confirmed: false, confirmedAt: '', confirmedBy: '' };
+    const sc = parseJsonSafe(ev.formSchemaJson, defaultFormSchema());
+    const st = String(ev.status || '').toLowerCase();
+    let confirmed = false;
+    if (st === 'finished') confirmed = true;
+    else if (typeof sc?.bibConfirmed === 'boolean') confirmed = sc.bibConfirmed;
+    else confirmed = st === 'closed';
+    return {
+      confirmed,
+      confirmedAt: String(sc?.bibConfirmedAt || ''),
+      confirmedBy: String(sc?.bibConfirmedBy || '')
+    };
+  }
+
+  function isEventBibConfirmed(ev) {
+    return getEventBibConfirmInfo(ev).confirmed;
   }
 
   function normalizeEarlyBirdEnd(raw) {
@@ -2469,7 +2491,7 @@
         organizerZh: '南區超馬聯盟', organizerEn: 'South Taiwan Ultra Alliance', location: '花蓮太平洋公園海濱環道',
         raceType: 'lap_timed', lapDistanceKm: 0.8, debounceSeconds: 15, status: 'closed',
         regStart: '2026-09-01 00:00:00', regEnd: '2026-11-20 23:59:59', raceStart: '2026-12-19 07:00:00',
-        maxQuota: 200, bannerUrl: 'dyn-coast', brochureText: '', formSchemaJson: formJsonPayuni, certConfigJson: mkCertJson('吳家豪')
+        maxQuota: 200, bannerUrl: 'dyn-coast', brochureText: '', formSchemaJson: JSON.stringify({ ...defaultFormSchema('ONLINE_PAYUNi'), bibConfirmed: true, bibConfirmedAt: '2026-11-20 18:00:00', bibConfirmedBy: 'org_south' }), certConfigJson: mkCertJson('吳家豪')
       },
       {
         eventId: 'TUR-2026-FIN100', ownerUsername: 'org_north',
@@ -2806,6 +2828,9 @@
       ...defaultFormSchema(paymentMode),
       earlyBirdEnabled: opts.ebOn !== undefined ? Boolean(opts.ebOn) : true,
       earlyBirdEnd: opts.ebEnd !== undefined ? opts.ebEnd : '2026-12-31 23:59:59',
+      bibConfirmed: Boolean(opts.bibConfirmed),
+      bibConfirmedAt: opts.bibConfirmed ? '2026-11-20 18:00:00' : '',
+      bibConfirmedBy: opts.bibConfirmed ? '測試承辦人' : '',
       customFields: [{ ...DEFAULT_ADDONS_NOTE_FIELD }, ...(opts.cf || [])]
     });
 
@@ -2901,7 +2926,7 @@
         regStart: '2026-09-01 00:00:00', regEnd: '2026-11-20 23:59:59', raceStart: '2026-12-12 05:00:00',
         maxQuota: 150, bannerUrl: 'banner-5',
         brochureText: '【測試情境 07】報名已截止（驗證 /lookup 鎖定費用但可改聯絡資料），專供測試晶片寫入、讀取查看、報到檢錄與鳴槍開跑。',
-        formSchemaJson: mkSchema('MANUAL_ATM', { ebOn: false }),
+        formSchemaJson: mkSchema('MANUAL_ATM', { ebOn: false, bibConfirmed: true }),
         certConfigJson: mkCert('林測試總監')
       },
       {
@@ -2912,7 +2937,7 @@
         regStart: '2026-09-10 00:00:00', regEnd: '2026-11-15 23:59:59', raceStart: '2026-11-27 05:00:00',
         maxQuota: 120, bannerUrl: 'dyn-night',
         brochureText: '【測試情境 08】繞圈限時賽已鳴槍進行中，內含多圈有效感應、手動補圈與 1 筆逾限時超時無效圈，可立即測試 LAP 刷圈與排行榜。',
-        formSchemaJson: mkSchema('ONLINE_PAYUNi', { ebOn: false }),
+        formSchemaJson: mkSchema('ONLINE_PAYUNi', { ebOn: false, bibConfirmed: true }),
         certConfigJson: mkCert('林測試總監')
       },
       {
@@ -2923,7 +2948,7 @@
         regStart: '2026-09-15 00:00:00', regEnd: '2026-11-18 23:59:59', raceStart: '2026-11-27 06:00:00',
         maxQuota: 150, bannerUrl: 'banner-4',
         brochureText: '【測試情境 09】涵蓋外部已繳名單 (EXTERNAL_IMPORT)、手動補登成績與匯出已完成報名繳費名單 (PAID Excel/CSV) 功能。',
-        formSchemaJson: mkSchema('MANUAL_ATM', { ebOn: false }),
+        formSchemaJson: mkSchema('MANUAL_ATM', { ebOn: false, bibConfirmed: true }),
         certConfigJson: mkCert('陳南區總監')
       },
       {
@@ -2934,7 +2959,7 @@
         regStart: '2026-01-10 00:00:00', regEnd: '2026-03-20 23:59:59', raceStart: '2026-04-12 05:00:00',
         maxQuota: 200, bannerUrl: 'banner-6',
         brochureText: '【測試情境 10】已通過 5 階段結案封存於專區 2，含 4 位完賽（2 位八百壯士 100K）、1 DNF、1 DNS，並預設套用官方自訂底圖與 10 圖層排版。',
-        formSchemaJson: mkSchema('MANUAL_ATM', { ebOn: false }),
+        formSchemaJson: mkSchema('MANUAL_ATM', { ebOn: false, bibConfirmed: true }),
         certConfigJson: certWithCustomBg
       }
     ];
@@ -3468,7 +3493,7 @@
     COMPOUND_SURNAMES_28, splitFullName, mergeNameParts, zhToEnEventName,
     verifyTaiwanIdChecksum, inferGenderFromId, calcAge, sha256Hex,
     CURATED_BANNERS, DEFAULT_BROCHURE_TEMPLATE, DEFAULT_TUR_ADDONS, DEFAULT_ADDONS_NOTE_FIELD, CUSTOM_FIELD_TYPES, CUSTOM_FIELD_PRESETS, DEFAULT_REG_FIELDS, getEffectiveRegFieldOrder, HISTORY_IMPORT_SPEC, EXTERNAL_IMPORT_SPEC, PAYMENT_MODES,
-    getBannerStyle, sanitizeBrochureText, normalizeEventData, defaultFormSchema, getEventPaymentMode, normalizeEarlyBirdEnd, getEventEarlyBirdConfig, isEarlyBirdActive, getEffectiveCategoryPrice, defaultCertConfig, parseJsonSafe,
+    getBannerStyle, sanitizeBrochureText, normalizeEventData, defaultFormSchema, getEventBibConfirmInfo, isEventBibConfirmed, getEventPaymentMode, normalizeEarlyBirdEnd, getEventEarlyBirdConfig, isEarlyBirdActive, getEffectiveCategoryPrice, defaultCertConfig, parseJsonSafe,
     TurDB, validateGasUrl, buildGasQueryUrl, gasGet, gasPost,
     isCategoryWarrior800, isWarrior800Eligible, computeLeaderboard, computeEventProgressAnalytics, evaluateEventStageGates,
     isCertEligible, buildUnifiedHistoryRecords, parseExternalRosterRows,

@@ -443,7 +443,7 @@
   }
 
   /* --------------------------------------------------------------------------
-   * Auto-Assign Bibs (Used by Stage 2 & PAYUNi Instant Auto-Checkout)
+   * Bib Assignment Engine（方式 A：補缺配號 ＋ 方式 B：全組重整連號 ＋ 最終配號確認鎖定）
    * -------------------------------------------------------------------------- */
   async function autoAssignBibsForEvent(eventId, specificPids = null) {
     const cats = State.categories.filter((c) => c.eventId === eventId);
@@ -475,9 +475,128 @@
     rebuildIndices(eventId);
     renderAll();
     if (!specificPids) {
-      toast(count ? `🏷️ 自動配號完成！新配發 ${count} 組號碼布` : '目前所有已繳費選手皆已配號', count ? 'success' : 'info');
+      toast(count ? `🏷️ 補缺配號完成！新配發 ${count} 組號碼布（既有號碼維持不變）` : '目前所有已繳費選手皆已配號', count ? 'success' : 'info');
     }
     return count;
+  }
+
+  // 方式 B：全組重整連號（雙重防呆：1. 已有晶片 UID 禁止重整 2. 二次確認提醒）
+  async function reassignAllBibsForEvent(eventId) {
+    const ev = State.events.find((e) => e.eventId === eventId);
+    if (!ev) return { ok: false };
+    const evParts = State.participants.filter((p) => p.eventId === eventId);
+    const chipped = evParts.filter((p) => Boolean(String(p.chipUid || '').trim()));
+    if (chipped.length > 0) {
+      toast(`🔒 防呆攔截：本場已有 ${chipped.length} 位選手寫入晶片 UID，禁止執行「全組重整連號」！請改用「🏷️ 補缺配號」。`, 'error');
+      return { ok: false, reason: 'chip_locked' };
+    }
+    const paidParts = evParts.filter((p) => String(p.payStatus).toUpperCase() === 'PAID');
+    if (!paidParts.length) {
+      toast('本場尚無已繳費選手可配號', 'warn');
+      return { ok: false };
+    }
+    if (!confirm(
+      `⚠️ 確定要執行「🔢 全組重整連號」嗎？\n\n` +
+      `• 對象：共 ${paidParts.length} 位已繳費選手（未繳費／已取消不配號）\n` +
+      `• 規則：依各組起始號從頭連續編排，同團報成員排在一起，100% 無空號\n` +
+      `• 注意：原有已配發號碼布可能會異動！請確認「尚未印製號碼布」且「尚未寄發最終報到通知」。`
+    )) return { ok: false };
+
+    const cats = State.categories.filter((c) => c.eventId === eventId);
+    const used = new Set();
+    let count = 0;
+
+    for (const cat of cats) {
+      const prefix = String(cat.bibPrefix || 'R').toUpperCase();
+      const startStr = String(cat.bibStartNum || '001');
+      const width = Math.max(3, startStr.length);
+      let num = parseInt(startStr, 10) || 1;
+      const catPaid = paidParts
+        .filter((p) => p.catId === cat.catId)
+        .sort((a, b) => {
+          const ga = String(a.groupCode || 'ZZZZ');
+          const gb = String(b.groupCode || 'ZZZZ');
+          if (ga !== gb) return ga.localeCompare(gb);
+          return String(a.createdAt || a.participantId).localeCompare(String(b.createdAt || b.participantId));
+        });
+      for (const p of catPaid) {
+        let bib = `${prefix}${String(num).padStart(width, '0')}`;
+        while (used.has(bib)) { num++; bib = `${prefix}${String(num).padStart(width, '0')}`; }
+        used.add(bib);
+        num++;
+        if (p.bibNumber !== bib) {
+          p.bibNumber = bib;
+          await C.TurDB.put('participants', p);
+          await enqueueSync('updateParticipant', { participantId: p.participantId, bibNumber: bib });
+        }
+        count++;
+      }
+    }
+    rebuildIndices(eventId);
+    renderAll();
+    toast(`🔢 全組重整連號完成！共重整 ${count} 位已繳費選手號碼布（100% 連續無空號）`, 'success');
+    return { ok: true, count };
+  }
+
+  // 最終配號確認與鎖定：自動截止報名 (closed) + bibConfirmed = true → 開放晶片計時與即時賽事
+  async function confirmFinalBibsForEvent(eventId) {
+    const ev = State.events.find((e) => e.eventId === eventId);
+    if (!ev) return;
+    if (ev.status === 'finished') return toast('本活動已結案封存', 'info');
+    const evParts = State.participants.filter((p) => p.eventId === eventId);
+    const paidParts = evParts.filter((p) => String(p.payStatus).toUpperCase() === 'PAID');
+    const unpaidParts = evParts.filter((p) => ['UNPAID', 'PENDING_PAY'].includes(String(p.payStatus).toUpperCase()));
+    if (!paidParts.length) return toast('⚠️ 本場尚無任何已繳費選手，無法完成最終配號確認', 'error');
+
+    const missingBib = paidParts.filter((p) => !String(p.bibNumber || '').trim()).length;
+    const msg = `✅ 確定要「確認完成最終配號」嗎？\n\n` +
+      `• 已繳費正式出賽：${paidParts.length} 人${missingBib ? `（將自動補配尚未配號的 ${missingBib} 人）` : '（100% 皆已配號）'}\n` +
+      (unpaidParts.length ? `• 尚有未繳費：${unpaidParts.length} 人（將不會出現在即時賽事與晶片名單）\n` : '') +
+      `• 確認後系統將：\n` +
+      `  1. 自動將活動改為「已截止報名」並鎖定選手改組\n` +
+      `  2. 正式開放「📡 三、晶片計時」選取本活動進行寫卡與感應\n` +
+      `  3. 正式於「🏆 二、成績查詢 → 即時賽事」公開顯示本場正式出賽名單`;
+    if (!confirm(msg)) return;
+
+    if (missingBib > 0) {
+      await autoAssignBibsForEvent(eventId, paidParts.filter((p) => !p.bibNumber).map((p) => p.participantId));
+    }
+    const bibSet = new Set();
+    for (const p of paidParts) {
+      const b = String(p.bibNumber || '').toUpperCase();
+      if (!b) return toast(`⚠️ 選手「${p.name}」仍缺少號碼布，無法鎖定`, 'error');
+      if (bibSet.has(b)) return toast(`⚠️ 發現重複號碼布「${b}」，請修正後再確認配號！`, 'error');
+      bibSet.add(b);
+    }
+
+    const sc = C.parseJsonSafe(ev.formSchemaJson, C.defaultFormSchema());
+    sc.bibConfirmed = true;
+    sc.bibConfirmedAt = C.formatDateTime();
+    sc.bibConfirmedBy = State.currentUser?.displayName || State.currentUser?.username || 'admin';
+    ev.formSchemaJson = JSON.stringify(sc);
+    ev.status = 'closed';
+    await C.TurDB.put('events', ev);
+    await enqueueSync('saveEvent', { event: ev });
+    rebuildIndices(eventId);
+    renderAll();
+    toast(`✅ 「${ev.nameZh}」已完成最終配號確認（${paidParts.length} 人）！已截止報名並正式開放「晶片計時」與「即時賽事」！`, 'success');
+  }
+
+  async function unlockBibConfirmation(eventId) {
+    const ev = State.events.find((e) => e.eventId === eventId);
+    if (!ev || ev.status === 'finished') return;
+    if (!confirm(`🔓 確定要「臨時解鎖補登」嗎？\n\n解鎖後可進行臨時補繳核帳或補配號（既有已配號碼與已寫入晶片不會變動）。\n補登完成後請記得再按一次「✅ 確認完成最終配號」！`)) return;
+    const sc = C.parseJsonSafe(ev.formSchemaJson, C.defaultFormSchema());
+    sc.bibConfirmed = false;
+    ev.formSchemaJson = JSON.stringify(sc);
+    await C.TurDB.put('events', ev);
+    await enqueueSync('saveEvent', { event: ev });
+    renderAll();
+    toast('🔓 已臨時解鎖配號，補登核帳後請再次按「確認完成最終配號」', 'warn');
+  }
+
+  function getChipReadyEvents() {
+    return State.events.filter((e) => e.status !== 'finished' && C.isEventBibConfirmed(e));
   }
 
   /* --------------------------------------------------------------------------
@@ -508,8 +627,9 @@
     const u = State.currentUser;
     const isAdminOrOrg = u && (u.role === 'super_admin' || u.role === 'organizer');
     const openCnt = State.events.filter((e) => e.status === 'open' || e.status === 'auto').length;
-    const activeCnt = State.events.filter((e) => e.status !== 'finished').length;
+    const chipReadyCnt = getChipReadyEvents().length;
     const finCnt = State.events.filter((e) => e.status === 'finished').length;
+    const activeCnt = chipReadyCnt;
     const syncTag = State.syncMode === 'offline' ? '📴 單機離線' : (navigator.onLine ? '🌐 雲端連線' : '⚠️ 斷網暫存');
     const adminTag = u.role === 'super_admin'
       ? `🛡️ 已登入：${u.displayName}`
@@ -1148,7 +1268,10 @@
                   <span class="font-black text-slate-900 truncate">${C.escapeHtml(ev.nameZh)}</span>
                   ${unpaid > 0 ? `<span class="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black shrink-0">待核 ${unpaid}</span>` : '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold shrink-0">已核清</span>'}
                 </div>
-                <div class="text-[11px] text-slate-500 mono mt-1">報名 ${parts.length} ｜ 已繳 ${paid}${isSuper ? ` ｜ 承辦 ${C.escapeHtml(ev.ownerUsername || '-')}` : ''}</div>
+                <div class="text-[11px] text-slate-500 mono mt-1 flex flex-wrap items-center justify-between gap-1">
+                  <span>報名 ${parts.length} ｜ 已繳 ${paid}${isSuper ? ` ｜ 承辦 ${C.escapeHtml(ev.ownerUsername || '-')}` : ''}</span>
+                  ${C.isEventBibConfirmed(ev) ? '<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">✅ 已定案配號</span>' : '<span class="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-bold text-[10px]">⏳ 未確認配號</span>'}
+                </div>
               </button>`;
           }).join('')}
         </div>
@@ -2451,12 +2574,22 @@
     updateNetworkBadge();
 
     if (!isOp) {
-      const activeEvs = State.events.filter((e) => e.status !== 'finished');
+      const chipEvs = getChipReadyEvents();
+      const unconfirmedCnt = State.events.filter((e) => e.status !== 'finished' && !C.isEventBibConfirmed(e)).length;
       const sel = $('#opInlineEventSelect');
       if (sel) {
         const prev = sel.value;
-        sel.innerHTML = activeEvs.map((e) => `<option value="${e.eventId}">${C.escapeHtml(e.nameZh)} (${e.raceType === 'lap_timed' ? '繞圈賽' : '距離賽'})</option>`).join('') || '<option value="">目前無進行中活動</option>';
-        if (prev && activeEvs.some((e) => e.eventId === prev)) sel.value = prev;
+        sel.innerHTML = chipEvs.map((e) => `<option value="${e.eventId}">✅ ${C.escapeHtml(e.nameZh)} (${e.raceType === 'lap_timed' ? '繞圈賽' : '距離賽'})</option>`).join('')
+          || '<option value="">目前無「已完成最終配號確認」之進行中活動</option>';
+        if (prev && chipEvs.some((e) => e.eventId === prev)) sel.value = prev;
+      }
+      const hintEl = $('#opInlinePickedHint');
+      if (hintEl && !chipEvs.length) {
+        hintEl.textContent = unconfirmedCnt > 0
+          ? `⏳ 尚有 ${unconfirmedCnt} 場活動尚未完成「最後確認配號」，請主辦人至核帳／名單區確認配號後再進行晶片作業`
+          : '目前尚無可作業之進行中活動';
+      } else if (hintEl && unconfirmedCnt > 0 && !State.pickedOpUser) {
+        hintEl.textContent = `僅顯示已完成最終配號確認之 ${chipEvs.length} 場活動（另有 ${unconfirmedCnt} 場尚在報名／核帳階段）`;
       }
       renderOpInlineStationGrid();
       return;
@@ -2514,8 +2647,9 @@
     if (isWriter) {
       $('#nfcSupportBadge').textContent = 'NDEFReader' in window ? '🟢 支援 Web NFC' : '🟡 模擬演練模式';
       const u = State.currentUser;
-      const availEvs = State.events.filter((e) => e.status !== 'finished' && (u.allowedEventId === 'ALL' || !u.allowedEventId || e.eventId === u.allowedEventId || e.eventId === State.opEventId));
-      const listEvs = availEvs.length ? availEvs : State.events.filter((e) => e.status !== 'finished');
+      const chipEvs = getChipReadyEvents();
+      const availEvs = chipEvs.filter((e) => u.allowedEventId === 'ALL' || !u.allowedEventId || e.eventId === u.allowedEventId || e.eventId === State.opEventId);
+      const listEvs = availEvs.length ? availEvs : chipEvs;
       const selEv = $('#writerEventSelect');
       if (selEv) {
         selEv.innerHTML = listEvs.map((e) => `<option value="${e.eventId}" ${e.eventId === ev.eventId ? 'selected' : ''}>${C.escapeHtml(e.nameZh)} (${e.raceType === 'lap_timed' ? '繞圈賽' : '距離賽'})</option>`).join('');
@@ -2965,8 +3099,9 @@
     State.pickedOpUser = null;
     $('#opPickedAccountHint').textContent = '請先點選卡片';
 
-    const activeEvs = State.events.filter((e) => e.status !== 'finished');
-    $('#opLoginEventSelect').innerHTML = activeEvs.map((e) => `<option value="${e.eventId}">${C.escapeHtml(e.nameZh)}</option>`).join('');
+    const chipEvs = getChipReadyEvents();
+    $('#opLoginEventSelect').innerHTML = chipEvs.map((e) => `<option value="${e.eventId}">✅ ${C.escapeHtml(e.nameZh)}</option>`).join('')
+      || '<option value="">無已完成最終配號確認之活動</option>';
     renderOpStationCards();
     if (defaultTab === 'organizer') $('#loginModeOrg')?.click();
     else if (defaultTab === 'operator') $('#loginModeOp')?.click();
@@ -3834,7 +3969,8 @@
   const AppBridge = {
     State, toast, enqueueSync, syncPushNow, syncPullFromGas, syncBidirectional,
     syncPullOnlyFromCloud, syncForcePushAllToCloud, setSyncMode, buildConfigJsContent,
-    updateNetworkBadge, autoAssignBibsForEvent, rebuildIndices, renderAll, switchView, openLoginModal
+    updateNetworkBadge, autoAssignBibsForEvent, reassignAllBibsForEvent, confirmFinalBibsForEvent, unlockBibConfirmation,
+    rebuildIndices, renderAll, switchView, openLoginModal
   };
 
   /* --------------------------------------------------------------------------
@@ -3906,7 +4042,7 @@
 
     // 註冊 PWA Service Worker（僅在 http/https 下啟用，不干擾本機 file:// 開啟）
     if ('serviceWorker' in navigator && /^https?:/i.test(location.protocol)) {
-      navigator.serviceWorker.register('./sw.js?v=6.1').catch(() => {});
+      navigator.serviceWorker.register('./sw.js?v=6.2').catch(() => {});
     }
 
     // 僅在 🌐 雲端連線模式且連網已綁定 GAS 時，背景自動同步雲端最新資料（單機離線模式絕不自動請求）
