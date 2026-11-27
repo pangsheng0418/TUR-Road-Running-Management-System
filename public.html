@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>跑管家｜公開成績查詢・八百壯士英雄榜・完賽證書</title>
+  <title>跑管家｜成績與證書</title>
   <!-- PWA / 手機主畫面 App 圖示與全螢幕模式 -->
-  <link rel="manifest" href="manifest.webmanifest?v=5.22" />
+  <link rel="manifest" href="manifest.webmanifest?v=5.23" />
   <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png" />
   <link rel="icon" type="image/png" sizes="512x512" href="assets/icon-512.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png" />
@@ -45,20 +45,19 @@
         <img src="assets/tur-logo.jpg" alt="TUR Taiwan Ultra Runners" class="h-7 sm:h-8 w-auto object-contain" />
       </div>
       <div>
-        <h1 class="font-black text-base sm:text-lg leading-tight">TUR 成績與證書查詢</h1>
-        <p class="text-xs text-slate-400">公開查詢自動隱蔽個資與報到時間</p>
+        <h1 class="font-black text-base sm:text-lg leading-tight">TUR 成績與證書</h1>
       </div>
     </div>
     <div class="flex flex-wrap items-center gap-2 text-xs">
       <!-- 全站字體大小即時調整器 -->
-      <div id="pubFontSizeSwitcher" class="flex items-center bg-slate-800 border border-slate-700 rounded-lg p-0.5" title="調整畫面字體大小">
+      <div id="pubFontSizeSwitcher" class="flex items-center bg-slate-800 border border-slate-700 rounded-lg p-0.5" title="調整字體大小">
         <button type="button" data-font-scale="normal" class="px-2 py-1 rounded text-xs font-bold">A</button>
         <button type="button" data-font-scale="large" class="px-2 py-1 rounded text-xs font-bold">A+</button>
         <button type="button" data-font-scale="xlarge" class="px-2 py-1 rounded text-xs font-bold">A++</button>
       </div>
       <select id="pubEventSelect" class="bg-slate-800 border border-slate-700 text-amber-300 rounded-lg px-3 py-1.5 max-w-[260px] sm:max-w-xs font-bold"></select>
-      <button id="btnPubReloadDemo" title="載入最新 6 場全情境示範資料" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold whitespace-nowrap">⚡ 示範資料</button>
-      <a href="index.html" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 whitespace-nowrap">← 返回報名</a>
+      <button id="btnPubReloadDemo" title="載入示範資料" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold whitespace-nowrap">⚡ 示範資料</button>
+      <a href="index.html" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 whitespace-nowrap">← 報名頁</a>
     </div>
   </div>
   <div class="max-w-7xl mx-auto px-4 pb-2.5 flex gap-2 overflow-x-auto text-xs sm:text-sm">
@@ -79,11 +78,11 @@
     <!-- 2. 全階段 6 張 KPI 統計卡（點擊卡片可直接篩選下方選手名單） -->
     <div id="pubKpiGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs"></div>
 
-    <!-- 3. 詳細統計分析（可一鍵展開／收合，讓畫面聚焦好閱讀） -->
+    <!-- 3. 詳細統計分析（可收合） -->
     <details open class="bg-slate-900/60 border border-slate-800 rounded-2xl overflow-hidden">
       <summary class="px-4 py-3 cursor-pointer flex items-center justify-between text-xs sm:text-sm font-bold text-slate-200 hover:bg-slate-900">
-        <span class="flex items-center gap-2"><span class="acc-arrow inline-block text-amber-400">▶</span><span>📈 詳細統計分析（節點通過・分組明細・性別與國籍）</span></span>
-        <span class="text-xs text-slate-400 font-normal">點擊收合 / 展開</span>
+        <span class="flex items-center gap-2"><span class="acc-arrow inline-block text-amber-400">▶</span><span>📈 詳細統計</span></span>
+        <span class="text-xs text-slate-400 font-normal">收合 / 展開</span>
       </summary>
       <div id="pubAnalyticsGrid" class="p-4 pt-1 grid grid-cols-1 lg:grid-cols-12 gap-4 text-xs">
         <div id="pubCheckpointFunnel" class="lg:col-span-6 bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3"></div>
@@ -91,11 +90,11 @@
       </div>
     </details>
 
-    <!-- 4. 搜尋、組別與階段快篩工具列 -->
+    <!-- 4. 搜尋與篩選 -->
     <div class="bg-slate-900 p-3.5 rounded-2xl border border-slate-800 space-y-3 text-xs">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <div class="flex flex-wrap items-center gap-2">
-          <input id="liveSearch" type="text" placeholder="搜尋號碼布 / 選手姓名 / 國籍 / 團報名稱" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white w-64" />
+          <input id="liveSearch" type="text" placeholder="號碼布 / 姓名 / 跑團" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white w-60" />
           <select id="liveCatFilter" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200"></select>
         </div>
         <div id="liveStats" class="text-slate-300 font-bold"></div>
@@ -103,18 +102,18 @@
       <div id="liveStagePills" class="flex flex-wrap gap-1.5"></div>
     </div>
 
-    <!-- 5. 選手全階段動態進度表（報名 → 繳費 → 報到 → 各管制節點 → 完賽） -->
+    <!-- 5. 選手動態進度表 -->
     <div class="bg-slate-900 rounded-2xl border border-slate-800 overflow-x-auto">
       <table class="w-full text-xs text-left">
         <thead class="bg-slate-800 text-slate-200">
           <tr>
-            <th class="p-3 whitespace-nowrap">名次 / 階段</th>
+            <th class="p-3 whitespace-nowrap">名次 / 狀態</th>
             <th class="p-3 whitespace-nowrap">號碼布 / 組別</th>
-            <th class="p-3 whitespace-nowrap">選手 / 國籍 / 跑團</th>
-            <th class="p-3 min-w-[330px]">動態進度節點（報名 → 繳費 → 報到 → 各管制站 → 完賽）</th>
-            <th class="p-3 whitespace-nowrap">有效里程 / 成績</th>
+            <th class="p-3 whitespace-nowrap">選手</th>
+            <th class="p-3 min-w-[300px]">動態進度</th>
+            <th class="p-3 whitespace-nowrap">里程 / 成績</th>
             <th class="p-3 whitespace-nowrap">均速</th>
-            <th class="p-3 whitespace-nowrap">操作</th>
+            <th class="p-3 whitespace-nowrap">證書</th>
           </tr>
         </thead>
         <tbody id="liveBody" class="divide-y divide-slate-800"></tbody>
@@ -122,41 +121,36 @@
     </div>
   </section>
 
-  <!-- 分頁 2：歷年成績查詢（多維度統計分析 ＋ 任一完賽紀錄一鍵產製個人證書） -->
+  <!-- 分頁 2：歷年成績 -->
   <section id="ptab-history" class="ppanel hidden space-y-4">
     <div class="bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-3 text-xs">
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <h2 class="font-black text-base sm:text-lg text-white">📚 歷年成績查詢</h2>
-          <p class="text-xs text-slate-400">僅列已結案且具正式完賽成績之紀錄；點選單一賽事後下方自動省略重複賽事名稱。</p>
-        </div>
+        <h2 class="font-black text-base sm:text-lg text-white">📚 歷年成績</h2>
         <button id="btnHisReset" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold">↺ 重設</button>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
-        <input id="hisSearch" type="text" placeholder="🔎 搜尋姓名 / 號碼布 / 賽事" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white" />
+        <input id="hisSearch" type="text" placeholder="🔎 姓名 / 號碼布 / 賽事" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white" />
         <select id="hisYearFilter" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200"></select>
         <select id="hisEventFilter" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200"></select>
         <select id="hisRunnerFilter" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200"></select>
         <select id="hisBadgeFilter" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-slate-200">
           <option value="all">全部紀錄</option>
-          <option value="finished">✅ 僅顯示完賽（可製證）</option>
-          <option value="warrior">★ 僅顯示八百壯士 100K+</option>
+          <option value="finished">✅ 僅完賽</option>
+          <option value="warrior">★ 八百壯士</option>
         </select>
       </div>
     </div>
 
-    <!-- 歷年查詢 4 張動態 KPI 卡 -->
     <div id="hisKpiGrid" class="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs"></div>
 
-    <!-- 雙欄多維度統計分析（左：各年度統計｜右：選手累計排行 / 活動場次統計） -->
     <div id="hisAnalyticsGrid" class="grid grid-cols-1 lg:grid-cols-12 gap-4 text-xs">
       <div id="hisYearStats" class="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2.5"></div>
       <div class="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-2.5">
         <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
-          <h3 class="font-black text-sm text-amber-300">📊 歷年多維度排行統計（點擊即可快篩）</h3>
+          <h3 class="font-black text-sm text-amber-300">📊 排行統計</h3>
           <div class="flex gap-1.5">
-            <button id="btnHisRankRunner" class="px-2.5 py-1 rounded-lg bg-amber-400 text-slate-950 font-black">🏃 依選手累計</button>
-            <button id="btnHisRankEvent" class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 font-bold">🏁 依活動統計</button>
+            <button id="btnHisRankRunner" class="px-2.5 py-1 rounded-lg bg-amber-400 text-slate-950 font-black">🏃 依選手</button>
+            <button id="btnHisRankEvent" class="px-2.5 py-1 rounded-lg bg-slate-800 text-slate-300 font-bold">🏁 依活動</button>
           </div>
         </div>
         <div id="hisRankingStats" class="space-y-1.5 max-h-60 overflow-y-auto"></div>
@@ -169,14 +163,14 @@
       <table class="w-full text-xs text-left">
         <thead class="bg-slate-800 text-slate-200">
           <tr>
-            <th class="p-3 whitespace-nowrap">年度 / 日期</th>
-            <th id="hisThEvent" class="p-3">賽事名稱</th>
+            <th class="p-3 whitespace-nowrap">日期</th>
+            <th id="hisThEvent" class="p-3">賽事</th>
             <th class="p-3 whitespace-nowrap">組別</th>
-            <th class="p-3 whitespace-nowrap">姓名 / 號碼布</th>
-            <th class="p-3 whitespace-nowrap">有效距離</th>
+            <th class="p-3 whitespace-nowrap">選手</th>
+            <th class="p-3 whitespace-nowrap">距離</th>
             <th class="p-3 whitespace-nowrap">成績 / 均速</th>
-            <th class="p-3 whitespace-nowrap">榮譽標註</th>
-            <th class="p-3 whitespace-nowrap">個人證書</th>
+            <th class="p-3 whitespace-nowrap">榮譽</th>
+            <th class="p-3 whitespace-nowrap">證書</th>
           </tr>
         </thead>
         <tbody id="hisBody" class="divide-y divide-slate-800"></tbody>
@@ -184,65 +178,57 @@
     </div>
   </section>
 
-  <!-- 分頁 3：八百壯士 100K+ 英雄榜（分年度查詢 ＋ 星等排行 ＋ 統計分析展開） -->
+  <!-- 分頁 3：八百壯士 -->
   <section id="ptab-warriors" class="ppanel hidden space-y-4">
-    <div class="bg-gradient-to-r from-slate-900 via-amber-950/80 to-slate-900 p-5 rounded-2xl border border-amber-500/40 flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <div class="text-xs font-bold text-amber-300">TUR 100K+ ULTRA HALL OF FAME</div>
-        <h2 class="text-xl font-black text-white mt-1">🏅 八百壯士超馬英雄榜（依承辦人與歷屆標示統計）</h2>
-        <p class="text-xs text-amber-100/80 mt-1">凡承辦人開立活動時明確標示為「八百壯士」之完賽組別，以及歷屆成績匯入時手動標示之跑者，均精準跨年度歸併登錄並可製作專屬完賽證書！</p>
-      </div>
+    <div class="bg-gradient-to-r from-slate-900 via-amber-950/80 to-slate-900 p-4 rounded-2xl border border-amber-500/40 flex flex-wrap items-center justify-between gap-3">
+      <h2 class="text-xl font-black text-white">🏅 八百壯士英雄榜</h2>
       <div class="flex gap-2 text-xs">
-        <button id="btnWarViewYear" class="px-3.5 py-2 rounded-xl bg-amber-400 text-slate-950 font-black">📅 分年度展開</button>
-        <button id="btnWarViewStars" class="px-3.5 py-2 rounded-xl bg-slate-800 text-slate-200 font-bold border border-slate-700">👑 選手星等排行</button>
+        <button id="btnWarViewYear" class="px-3.5 py-2 rounded-xl bg-amber-400 text-slate-950 font-black">📅 依年度</button>
+        <button id="btnWarViewStars" class="px-3.5 py-2 rounded-xl bg-slate-800 text-slate-200 font-bold border border-slate-700">👑 依星等</button>
       </div>
     </div>
 
-    <!-- 八百壯士 4 張統計 KPI 卡 -->
     <div id="warKpiGrid" class="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs"></div>
 
-    <!-- 八百壯士歷年趨勢柱狀統計 + 年度快篩與搜尋 -->
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 text-xs">
       <div id="warYearChart" class="space-y-2"></div>
       <div class="pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2">
         <div id="warYearPills" class="flex flex-wrap gap-1.5"></div>
-        <input id="warSearch" type="text" placeholder="🔎 搜尋八百壯士姓名或賽事名稱" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-white w-64" />
+        <input id="warSearch" type="text" placeholder="🔎 姓名或賽事" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-1.5 text-white w-56" />
       </div>
     </div>
 
-    <!-- 可收合展開之年度/星等榮譽區塊 -->
     <div id="warriorsGrid" class="space-y-4 text-xs"></div>
   </section>
 
-  <!-- 分頁 4：動態完賽證書中心（聯動承辦人開關） -->
+  <!-- 分頁 4：完賽證書 -->
   <section id="ptab-cert" class="ppanel hidden grid grid-cols-1 lg:grid-cols-12 gap-5">
     <div class="lg:col-span-4 bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
-      <h2 class="font-bold text-sm text-amber-400">🔍 選擇選手產製完賽證書</h2>
-      <input id="certSearch" type="text" placeholder="輸入號碼布或姓名" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white" />
+      <h2 class="font-bold text-sm text-amber-400">🔍 選擇選手</h2>
+      <input id="certSearch" type="text" placeholder="號碼布或姓名" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white" />
       <div id="certRunnerList" class="divide-y divide-slate-800 max-h-[520px] overflow-y-auto text-xs"></div>
     </div>
 
     <div class="lg:col-span-8 bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-4">
       <div class="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 class="font-black text-base sm:text-lg text-white">🏆 完賽證書中心</h2>
+          <h2 class="font-black text-base sm:text-lg text-white">🏆 完賽證書</h2>
           <p id="certConfigHint" class="text-xs text-slate-400 mt-0.5"></p>
         </div>
         <div class="flex gap-2">
-          <button id="btnDlPng" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-sm">⬇️ 下載 PNG</button>
-          <button id="btnDlPdf" class="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm">📄 匯出 PDF</button>
+          <button id="btnDlPng" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-sm">⬇️ PNG</button>
+          <button id="btnDlPdf" class="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm">📄 PDF</button>
         </div>
       </div>
 
-      <!-- 明確區分：官方證書 vs 選手客製化證書 -->
       <div class="grid grid-cols-2 gap-2.5 text-xs">
         <button id="btnPubModeOfficial" class="p-3 rounded-xl border-2 border-amber-400 bg-amber-400 text-slate-950 text-left font-bold transition">
           <div class="font-black text-sm">🏛️ 官方證書</div>
-          <div class="text-xs opacity-85 mt-0.5">純淨正式版（不含個人照片）</div>
+          <div class="text-xs opacity-85 mt-0.5">純淨公版</div>
         </button>
         <button id="btnPubModeCustom" class="p-3 rounded-xl border-2 border-slate-700 bg-slate-950 text-slate-300 text-left font-bold transition hover:border-amber-400">
           <div class="font-black text-sm">📸 客製化證書</div>
-          <div class="text-xs opacity-80 mt-0.5">可上傳個人照片與 40 字感言</div>
+          <div class="text-xs opacity-80 mt-0.5">加照片與感言</div>
         </button>
       </div>
 
@@ -250,41 +236,39 @@
         <canvas id="pubCertCanvas" class="max-w-full max-h-[540px] w-auto h-auto rounded-lg shadow-2xl cursor-grab active:cursor-grabbing"></canvas>
       </div>
 
-      <!-- 官方與客製化共用：直/橫式 × 6樣式 × 6底圖 × 6字型 -->
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs bg-slate-950/70 p-3 rounded-xl border border-slate-800">
         <div>
-          <label class="block text-[11px] text-slate-400 mb-1">方向（橫式 / 直式）</label>
+          <label class="block text-[11px] text-slate-400 mb-1">方向</label>
           <select id="pubOrientPick" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white">
             <option value="landscape">A4 橫式</option>
             <option value="portrait">A4 直式</option>
           </select>
         </div>
         <div>
-          <label class="block text-[11px] text-slate-400 mb-1">樣式（6 種）</label>
+          <label class="block text-[11px] text-slate-400 mb-1">樣式</label>
           <select id="pubLayoutPick" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white"></select>
         </div>
         <div>
-          <label class="block text-[11px] text-slate-400 mb-1">底圖（6 種）</label>
+          <label class="block text-[11px] text-slate-400 mb-1">底圖</label>
           <select id="pubPalettePick" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white"></select>
         </div>
         <div>
-          <label class="block text-[11px] text-slate-400 mb-1">字型變化（6 種）</label>
+          <label class="block text-[11px] text-slate-400 mb-1">字型</label>
           <select id="pubFontPick" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-white"></select>
         </div>
       </div>
 
-      <!-- 僅「選手客製化證書」模式顯示：個人照片上傳＋3 相框＋拖曳縮放＋40 字感言 -->
       <div id="pubPhotoQuoteControls" class="hidden grid grid-cols-1 md:grid-cols-2 gap-4 text-xs bg-slate-950/70 p-3.5 rounded-xl border border-amber-500/40">
         <div class="space-y-2">
-          <div class="font-bold text-amber-300">📸 上傳個人衝線照片（畫布可拖曳＋3 款相框）</div>
+          <div class="font-bold text-amber-300">📸 個人照片（可拖曳縮放）</div>
           <div class="flex items-center gap-2">
             <input id="pubPhotoFile" type="file" accept="image/*" class="text-[11px] flex-1" />
             <button id="btnPubClearPhoto" class="px-2 py-1 rounded bg-slate-800">移除</button>
           </div>
           <div class="flex gap-1.5">
-            <button data-frame="rounded" class="frame-btn px-2.5 py-1 rounded bg-amber-400 text-slate-950 font-bold">1. 圓角相框</button>
-            <button data-frame="circle" class="frame-btn px-2.5 py-1 rounded bg-slate-800 text-slate-300">2. 圓形勳章</button>
-            <button data-frame="polaroid" class="frame-btn px-2.5 py-1 rounded bg-slate-800 text-slate-300">3. 拍立得</button>
+            <button data-frame="rounded" class="frame-btn px-2.5 py-1 rounded bg-amber-400 text-slate-950 font-bold">圓角</button>
+            <button data-frame="circle" class="frame-btn px-2.5 py-1 rounded bg-slate-800 text-slate-300">圓形</button>
+            <button data-frame="polaroid" class="frame-btn px-2.5 py-1 rounded bg-slate-800 text-slate-300">拍立得</button>
           </div>
           <div class="flex items-center gap-2">
             <span class="text-slate-400">縮放</span>
@@ -294,19 +278,18 @@
         </div>
         <div class="space-y-2">
           <div class="flex justify-between font-bold text-amber-300">
-            <span>💬 完賽感言（最多 40 字）</span>
+            <span>💬 完賽感言</span>
             <span id="pubQuoteCnt" class="mono text-slate-400">0 / 40</span>
           </div>
           <input id="pubQuoteInput" type="text" maxlength="40" value="突破極限，感謝每一站熱情的志工！" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white" />
-          <p class="text-[11px] text-slate-400">💡 切換為「🏛️ 官方證書」將自動隱藏個人照片與感言，輸出正式無照公版。</p>
         </div>
       </div>
     </div>
   </section>
 </main>
 
-<script src="js/tur-logo.js?v=5.22"></script>
-<script src="js/tur-core.js?v=5.22"></script>
+<script src="js/tur-logo.js?v=5.23"></script>
+<script src="js/tur-core.js?v=5.23"></script>
 <script>
 (() => {
   'use strict';
@@ -508,39 +491,39 @@
     const S = A.summary;
 
     const statusBadge = ev.status === 'finished'
-      ? '<span class="px-2.5 py-1 rounded-full bg-slate-700 text-slate-200 font-black text-[11px]">📦 已結案賽事</span>'
+      ? '<span class="px-2.5 py-1 rounded-full bg-slate-700 text-slate-200 font-black text-[11px]">📦 已結案</span>'
       : (ev.raceStart
-        ? '<span class="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-black text-[11px]">🟢 賽事鳴槍進行中</span>'
-        : '<span class="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-black text-[11px]">📝 開放報名階段（尚未開賽）</span>');
+        ? '<span class="px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-black text-[11px]">🟢 進行中</span>'
+        : '<span class="px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 font-black text-[11px]">📝 報名中</span>');
 
     $('#pubEventSummaryBanner').innerHTML = `
       <div class="space-y-1">
         <div class="flex flex-wrap items-center gap-2">
           ${statusBadge}
-          <span class="px-2 py-0.5 rounded bg-slate-800 text-sky-300 text-[11px] font-bold">${ev.raceType === 'lap_timed' ? `🔁 繞圈限時賽 (${ev.lapDistanceKm || 1}km/圈)` : '🏃 距離挑戰賽'}</span>
-          ${S.warriors800 > 0 ? `<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[11px] font-bold">★ 八百壯士 100K+ 達標 ${S.warriors800} 人</span>` : ''}
+          <span class="px-2 py-0.5 rounded bg-slate-800 text-sky-300 text-[11px] font-bold">${ev.raceType === 'lap_timed' ? `🔁 繞圈賽 (${ev.lapDistanceKm || 1}km/圈)` : '🏃 距離賽'}</span>
+          ${S.warriors800 > 0 ? `<span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[11px] font-bold">★ 八百壯士 ${S.warriors800} 人</span>` : ''}
         </div>
         <h2 class="text-lg sm:text-xl font-black text-white">${C.escapeHtml(ev.nameZh)}</h2>
-        <div class="text-[11px] text-slate-400">📍 ${C.escapeHtml(ev.location || '-')} ｜ 主辦：${C.escapeHtml(ev.organizerZh || 'TUR')} ｜ 開賽起跑時間：<span class="mono text-amber-300">${ev.raceStart || '尚未鳴槍'}</span></div>
+        <div class="text-[11px] text-slate-400">📍 ${C.escapeHtml(ev.location || '-')} ｜ 起跑：<span class="mono text-amber-300">${ev.raceStart || '尚未鳴槍'}</span></div>
       </div>
       <div class="flex gap-3 text-right mono">
         <div class="px-3 py-2 rounded-xl bg-slate-950/70 border border-slate-800">
-          <div class="text-[10px] text-slate-400">全場累計有效里程</div>
+          <div class="text-[10px] text-slate-400">總里程</div>
           <div class="text-lg font-black text-amber-400">${S.totalKmAll.toLocaleString()} <span class="text-xs">km</span></div>
         </div>
         <div class="px-3 py-2 rounded-xl bg-slate-950/70 border border-slate-800">
-          <div class="text-[10px] text-slate-400">完賽率（已報到）</div>
+          <div class="text-[10px] text-slate-400">完賽率</div>
           <div class="text-lg font-black text-emerald-400">${S.finishRate}<span class="text-xs">%</span></div>
         </div>
       </div>`;
 
     const kpis = [
-      { key: 'all', label: '📋 總報名人數', val: S.total, sub: `有效 ${S.activeTotal}｜取消 ${S.cancelled}`, cls: 'border-slate-700 text-white' },
-      { key: 'paid_all', label: '💳 已繳費 / 配號', val: S.paid, sub: `繳費率 ${S.payRate}%｜待繳 ${S.unpaid}`, cls: 'border-amber-500/40 text-amber-300' },
-      { key: 'checked_in_all', label: '✅ 現場已報到', val: S.checkedIn, sub: `報到率 ${S.checkinRate}%（不含時間點）`, cls: 'border-indigo-500/40 text-indigo-300' },
-      { key: 'on_track', label: '🏃 賽道進行中', val: S.onTrack, sub: '已通過節點／繞圈中', cls: 'border-sky-500/40 text-sky-300' },
-      { key: 'finished', label: '🏁 已完賽人數', val: S.finished, sub: `完賽率 ${S.finishRate}%｜百K ${S.warriors800}人`, cls: 'border-emerald-500/40 text-emerald-400' },
-      { key: 'issue', label: '🛑 DNF / 未報到 / 待繳', val: S.dnf + S.unpaid + (S.paid - S.checkedIn), sub: `DNF ${S.dnf}｜未報到 ${Math.max(0, S.paid - S.checkedIn)}｜待繳 ${S.unpaid}`, cls: 'border-rose-500/40 text-rose-300' }
+      { key: 'all', label: '📋 總報名', val: S.total, sub: `有效 ${S.activeTotal}｜取消 ${S.cancelled}`, cls: 'border-slate-700 text-white' },
+      { key: 'paid_all', label: '💳 已繳費', val: S.paid, sub: `繳費率 ${S.payRate}%｜待繳 ${S.unpaid}`, cls: 'border-amber-500/40 text-amber-300' },
+      { key: 'checked_in_all', label: '✅ 已報到', val: S.checkedIn, sub: `報到率 ${S.checkinRate}%`, cls: 'border-indigo-500/40 text-indigo-300' },
+      { key: 'on_track', label: '🏃 進行中', val: S.onTrack, sub: '賽道計時中', cls: 'border-sky-500/40 text-sky-300' },
+      { key: 'finished', label: '🏁 已完賽', val: S.finished, sub: `完賽率 ${S.finishRate}%｜百K ${S.warriors800}人`, cls: 'border-emerald-500/40 text-emerald-400' },
+      { key: 'issue', label: '🛑 待處理', val: S.dnf + S.unpaid + (S.paid - S.checkedIn), sub: `DNF ${S.dnf}｜未報到 ${Math.max(0, S.paid - S.checkedIn)}｜待繳 ${S.unpaid}`, cls: 'border-rose-500/40 text-rose-300' }
     ];
 
     $('#pubKpiGrid').innerHTML = kpis.map((k) => {
@@ -601,8 +584,8 @@
 
     $('#pubCheckpointFunnel').innerHTML = `
       <div class="flex items-center justify-between border-b border-slate-800 pb-2">
-        <h3 class="font-black text-sm text-amber-300">📍 賽事全階段與各管制節點通過分析</h3>
-        <span class="text-[11px] text-slate-400">以有效報名 ${S.activeTotal} 人為基準</span>
+        <h3 class="font-black text-sm text-amber-300">📍 各節點通過人數</h3>
+        <span class="text-[11px] text-slate-400">有效 ${S.activeTotal} 人</span>
       </div>
       <div class="space-y-2.5">
         ${funnelRows.map((fr) => `
@@ -625,8 +608,8 @@
 
     $('#pubCategoryBreakdown').innerHTML = `
       <div class="flex items-center justify-between border-b border-slate-800 pb-2">
-        <h3 class="font-black text-sm text-amber-300">📊 分組進度明細 ＆ 選手輪廓統計</h3>
-        <span class="text-[11px] text-slate-400">${A.byCategory.length} 個組別</span>
+        <h3 class="font-black text-sm text-amber-300">📊 分組與選手統計</h3>
+        <span class="text-[11px] text-slate-400">${A.byCategory.length} 組</span>
       </div>
       <div class="overflow-x-auto">
         <table class="w-full text-[11px] text-left">
@@ -832,12 +815,12 @@
     const w800Cnt = list.filter((x) => x.isWarrior800).length;
     const maxKm = list.reduce((m, x) => Math.max(m, Number(x.distanceKm || 0)), 0);
     $('#hisKpiGrid').innerHTML = `
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3.5"><div class="text-slate-400 font-bold">📋 查詢命中完賽場次</div><div class="text-2xl font-black mono text-white mt-1">${list.length} <span class="text-xs font-normal text-slate-400">筆（${uniqRunners} 位選手）</span></div></div>
-      <div class="bg-slate-900 border border-amber-500/30 rounded-2xl p-3.5"><div class="text-slate-400 font-bold">🛣️ 累計完賽總里程</div><div class="text-2xl font-black mono text-amber-400 mt-1">${totalKm.toLocaleString()} <span class="text-xs">km</span></div></div>
-      <div class="bg-slate-900 border border-emerald-500/30 rounded-2xl p-3.5"><div class="text-slate-400 font-bold">★ 八百壯士 100K+ 達標</div><div class="text-2xl font-black mono text-emerald-400 mt-1">${w800Cnt} <span class="text-xs">人次</span></div></div>
-      <div class="bg-slate-900 border border-sky-500/30 rounded-2xl p-3.5"><div class="text-slate-400 font-bold">🏆 單場最長里程紀錄</div><div class="text-2xl font-black mono text-sky-300 mt-1">${maxKm} <span class="text-xs">km</span></div></div>`;
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3.5"><div class="text-slate-400 font-bold">📋 完賽紀錄</div><div class="text-2xl font-black mono text-white mt-1">${list.length} <span class="text-xs font-normal text-slate-400">筆（${uniqRunners} 人）</span></div></div>
+      <div class="bg-slate-900 border border-amber-500/30 rounded-2xl p-3.5"><div class="text-slate-400 font-bold">🛣️ 累計里程</div><div class="text-2xl font-black mono text-amber-400 mt-1">${totalKm.toLocaleString()} <span class="text-xs">km</span></div></div>
+      <div class="bg-slate-900 border border-emerald-500/30 rounded-2xl p-3.5"><div class="text-slate-400 font-bold">★ 八百壯士</div><div class="text-2xl font-black mono text-emerald-400 mt-1">${w800Cnt} <span class="text-xs">人次</span></div></div>
+      <div class="bg-slate-900 border border-sky-500/30 rounded-2xl p-3.5"><div class="text-slate-400 font-bold">🏆 單場最長</div><div class="text-2xl font-black mono text-sky-300 mt-1">${maxKm} <span class="text-xs">km</span></div></div>`;
 
-    // 2. 左欄：各年度統計分析（以全庫或目前搜尋條件按年度彙整）
+    // 2. 左欄：各年度統計分析
     const byYear = new Map();
     all.forEach((h) => {
       if (!byYear.has(h.year)) byYear.set(h.year, { year: h.year, count: 0, km: 0, w800: 0 });
@@ -848,8 +831,8 @@
     const maxYCnt = Math.max(1, ...yearArr.map((y) => y.count));
     $('#hisYearStats').innerHTML = `
       <div class="flex items-center justify-between border-b border-slate-800 pb-2">
-        <h3 class="font-black text-sm text-amber-300">📅 各年度完賽與里程統計（點擊年度快篩）</h3>
-        <span class="text-[10px] text-slate-400">${yearArr.length} 個年度</span>
+        <h3 class="font-black text-sm text-amber-300">📅 年度統計</h3>
+        <span class="text-[10px] text-slate-400">${yearArr.length} 年</span>
       </div>
       <div class="space-y-2">
         ${yearArr.map((y) => {
@@ -999,10 +982,10 @@
     const maxKm = filtered.reduce((m, w) => Math.max(m, Number(w.distanceKm || 0)), 0);
 
     $('#warKpiGrid').innerHTML = `
-      <div class="bg-slate-900 border border-amber-500/30 rounded-2xl p-3.5"><div class="text-slate-400 font-bold">🏅 達標總人次</div><div class="text-2xl font-black mono text-amber-400 mt-1">${filtered.length} <span class="text-xs">人次</span></div></div>
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3.5"><div class="text-slate-400 font-bold">👑 不重複壯士人數</div><div class="text-2xl font-black mono text-white mt-1">${runnerMap.size} <span class="text-xs font-normal text-amber-300">人（多星老將 ${multiStarCount} 位）</span></div></div>
-      <div class="bg-slate-900 border border-emerald-500/30 rounded-2xl p-3.5"><div class="text-slate-400 font-bold">🛣️ 百K 累計總征程</div><div class="text-2xl font-black mono text-emerald-400 mt-1">${totalKm.toLocaleString()} <span class="text-xs">km</span></div></div>
-      <div class="bg-slate-900 border border-sky-500/30 rounded-2xl p-3.5"><div class="text-slate-400 font-bold">🚀 單場最長百K紀錄</div><div class="text-2xl font-black mono text-sky-300 mt-1">${maxKm} <span class="text-xs">km</span></div></div>`;
+      <div class="bg-slate-900 border border-amber-500/30 rounded-2xl p-3.5"><div class="text-slate-400 font-bold">🏅 達標人次</div><div class="text-2xl font-black mono text-amber-400 mt-1">${filtered.length} <span class="text-xs">人次</span></div></div>
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-3.5"><div class="text-slate-400 font-bold">👑 壯士人數</div><div class="text-2xl font-black mono text-white mt-1">${runnerMap.size} <span class="text-xs font-normal text-amber-300">人（多星 ${multiStarCount}）</span></div></div>
+      <div class="bg-slate-900 border border-emerald-500/30 rounded-2xl p-3.5"><div class="text-slate-400 font-bold">🛣️ 累計里程</div><div class="text-2xl font-black mono text-emerald-400 mt-1">${totalKm.toLocaleString()} <span class="text-xs">km</span></div></div>
+      <div class="bg-slate-900 border border-sky-500/30 rounded-2xl p-3.5"><div class="text-slate-400 font-bold">🚀 單場最長</div><div class="text-2xl font-black mono text-sky-300 mt-1">${maxKm} <span class="text-xs">km</span></div></div>`;
 
     // 2. 分年度趨勢柱狀分析條
     const yStats = years.map((y) => {
@@ -1011,7 +994,7 @@
     });
     const maxY = Math.max(1, ...yStats.map((y) => y.count));
     $('#warYearChart').innerHTML = `
-      <div class="font-black text-sm text-amber-300">📊 八百壯士各年度達標趨勢與里程統計</div>
+      <div class="font-black text-sm text-amber-300">📊 年度趨勢</div>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
         ${yStats.map((y) => `
           <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-1">
@@ -1188,8 +1171,8 @@
     $('#btnPubModeCustom').className = `p-3 rounded-xl border-2 text-left font-bold transition ${isCustom ? 'border-amber-400 bg-amber-400 text-slate-950' : 'border-slate-700 bg-slate-950 text-slate-300 hover:border-amber-400'}`;
     $('#pubPhotoQuoteControls').classList.toggle('hidden', !(canPrint && isCustom && cfg.allowPublicPhotoQuote));
     $('#certConfigHint').textContent = canPrint
-      ? `${Pub.selectedIsExternalCert ? '📚 歷年/跨場個人證書模式｜' : ''}目前模式：${isCustom ? '📸 選手客製化證書（含個人照片）' : '🏛️ 官方證書（不含個人照片）'} · ${cfg.orientation === 'portrait' ? 'A4 直式' : 'A4 橫式'} · ${Pub.customBgImg ? '大會自訂設計底圖套印' : '官方 6×6 內建底圖'}`
-      : `🔒 管制鎖定：${eligibility.reason}（須完賽＋已結案＋有正式成績方開放下載列印）`;
+      ? `${isCustom ? '📸 客製化證書' : '🏛️ 官方證書'} · ${cfg.orientation === 'portrait' ? 'A4 直式' : 'A4 橫式'}`
+      : `🔒 ${eligibility.reason}`;
 
     if (!canPrint) {
       const cEl = $('#pubCertCanvas');
@@ -1312,7 +1295,7 @@
   });
 
   if ('serviceWorker' in navigator && /^https?:/i.test(location.protocol)) {
-    navigator.serviceWorker.register('./sw.js?v=5.22').catch(() => {});
+    navigator.serviceWorker.register('./sw.js?v=5.23').catch(() => {});
   }
   C.onLogoReady(() => { if (Pub.activeTab === 'cert') drawCert(); });
   loadAll();

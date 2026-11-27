@@ -335,29 +335,29 @@
         </div>
         <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
           <div class="p-3 rounded-xl bg-slate-50 border">
-            <div class="text-slate-500 font-bold">📋 有效報名人數</div>
+            <div class="text-slate-500 font-bold">📋 有效報名</div>
             <div class="text-2xl font-black mono text-slate-900 mt-0.5">${S.activeTotal}</div>
             <div class="text-[10px] text-slate-500">總報名 ${S.total}｜取消 ${S.cancelled}</div>
           </div>
           <div class="p-3 rounded-xl bg-amber-50 border border-amber-200">
-            <div class="text-amber-800 font-bold">💳 已繳費人數</div>
+            <div class="text-amber-800 font-bold">💳 已繳費</div>
             <div class="text-2xl font-black mono text-amber-900 mt-0.5">${S.paid} <span class="text-xs">(${S.payRate}%)</span></div>
-            <div class="text-[10px] text-amber-800">繳費率（佔有效報名）</div>
+            <div class="text-[10px] text-amber-800">繳費率</div>
           </div>
           <div class="p-3 rounded-xl bg-indigo-50 border border-indigo-200">
-            <div class="text-indigo-800 font-bold">✅ 實際報到人數</div>
+            <div class="text-indigo-800 font-bold">✅ 已報到</div>
             <div class="text-2xl font-black mono text-indigo-900 mt-0.5">${S.checkedIn} <span class="text-xs">(${S.checkinRate}%)</span></div>
             <div class="text-[10px] text-indigo-800">佔已繳 ${S.checkinRate}%｜佔報名 ${chkOfReg}%</div>
           </div>
           <div class="p-3 rounded-xl bg-emerald-50 border border-emerald-200">
-            <div class="text-emerald-800 font-bold">🏁 完賽人數</div>
+            <div class="text-emerald-800 font-bold">🏁 已完賽</div>
             <div class="text-2xl font-black mono text-emerald-800 mt-0.5">${S.finished} <span class="text-xs">(${S.finishRate}%)</span></div>
             <div class="text-[10px] text-emerald-800">佔報到 ${S.finishRate}%｜佔報名 ${finOfReg}%</div>
           </div>
           <div class="p-3 rounded-xl bg-rose-50 border border-rose-200">
-            <div class="text-rose-800 font-bold">🛑 未完賽 / 退賽</div>
+            <div class="text-rose-800 font-bold">🛑 退賽 DNF</div>
             <div class="text-2xl font-black mono text-rose-800 mt-0.5">${S.dnf} <span class="text-xs">(${dnfOfChk}%)</span></div>
-            <div class="text-[10px] text-rose-700">DNF 佔報到｜★百K ${S.warriors800} 人</div>
+            <div class="text-[10px] text-rose-700">★百K ${S.warriors800} 人</div>
           </div>
         </div>
         <div class="overflow-x-auto">
@@ -460,10 +460,7 @@
     };
     bar.innerHTML = `
       <div class="bg-white px-3.5 py-2.5 rounded-xl border shadow-sm space-y-2 text-xs">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <div class="font-black text-slate-800">🛡️ 賽事進度把關（階段 ${g.currentStage} / 5）</div>
-          <span class="text-xs text-slate-500">點任一階段可直達該分頁</span>
-        </div>
+        <div class="font-black text-slate-800">🛡️ 賽事進度（階段 ${g.currentStage} / 5）</div>
         <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
           ${g.stages.map((s) => {
             const st = stStyles[s.status] || stStyles.locked;
@@ -522,36 +519,36 @@
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <!-- 活動基本設定 -->
         <div class="bg-white p-4 rounded-xl border shadow-sm space-y-3 text-xs">
-          <h3 class="font-black text-sm border-b pb-2">⚙️ 活動基本參數與橫幅（明確區分距離賽 / 計時繞圈賽）</h3>
+          <h3 class="font-black text-sm border-b pb-2">⚙️ 基本設定</h3>
           <div class="grid grid-cols-2 gap-2.5">
             <div class="col-span-2">
-              <label class="font-bold">中文活動名稱</label>
+              <label class="font-bold">活動名稱</label>
               <input id="z1NameZh" value="${C.escapeHtml(ev.nameZh)}" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5" />
             </div>
             <div class="col-span-2">
-              <label class="font-bold">英文活動名稱（DUV 送審用，可自訂微調）</label>
+              <label class="font-bold">英文名稱（DUV 用）</label>
               <input id="z1NameEn" value="${C.escapeHtml(ev.nameEn)}" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5" />
             </div>
             <div class="col-span-2 space-y-1">
-              <label class="font-bold block">活動賽制類型（設立報名表時明確區分）</label>
+              <label class="font-bold block">賽制類型</label>
               <input type="hidden" id="z1RaceType" value="${ev.raceType}" />
               <div class="grid grid-cols-2 gap-2">
                 <button type="button" data-z1-racetype="distance" class="p-2.5 rounded-xl border-2 text-left transition ${!isLap ? 'border-sky-600 bg-sky-50 text-sky-950' : 'border-slate-200 bg-white text-slate-600'}">
-                  <div class="font-black">🏃 一般距離賽 (distance)</div>
-                  <div class="text-[10px] opacity-80 mt-0.5">固定里程完賽・CP 檢查點→終點・比總時間</div>
+                  <div class="font-black">🏃 距離賽</div>
+                  <div class="text-[10px] opacity-80 mt-0.5">固定里程・比完賽時間</div>
                 </button>
                 <button type="button" data-z1-racetype="lap_timed" class="p-2.5 rounded-xl border-2 text-left transition ${isLap ? 'border-indigo-600 bg-indigo-50 text-indigo-950' : 'border-slate-200 bg-white text-slate-600'}">
-                  <div class="font-black">🔁 計時繞圈賽 (lap_timed)</div>
-                  <div class="text-[10px] opacity-80 mt-0.5">固定限時繞圈・LAP 拱門累圈・比總里程</div>
+                  <div class="font-black">🔁 繞圈賽</div>
+                  <div class="text-[10px] opacity-80 mt-0.5">固定限時・比累計里程</div>
                 </button>
               </div>
             </div>
             <div class="col-span-2 space-y-1.5 pt-1 border-t">
               <div class="flex flex-wrap items-center justify-between gap-1">
-                <label class="font-bold">💰 本活動金流作業管制模式（建立報名表選定，管制至報名結束）</label>
+                <label class="font-bold">💰 繳費方式</label>
                 ${payLocked
-                  ? `<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-950 font-black text-[10px]">🔒 已有 ${activeRegCount} 人報名／管制鎖定至報名結束</span>`
-                  : '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">尚無人報名，可自由選擇</span>'}
+                  ? `<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-950 font-black text-[10px]">🔒 已鎖定（已有 ${activeRegCount} 人報名）</span>`
+                  : '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">可變更</span>'}
               </div>
               <input type="hidden" id="z1PayMode" value="${payMode}" />
               <div class="grid grid-cols-2 gap-2">
@@ -562,15 +559,15 @@
                   const actCls = pm.id === 'ONLINE_PAYUNi' ? 'border-emerald-600 bg-emerald-50 text-emerald-950' : 'border-amber-500 bg-amber-50 text-amber-950';
                   return `
                     <button type="button" data-z1-paymode="${pm.id}" ${disabledBtn ? 'disabled' : ''} class="p-2.5 rounded-xl border-2 text-left transition ${isPayuniDisabled && !sel ? 'border-slate-200 bg-slate-100 text-slate-400 opacity-60 cursor-not-allowed' : (sel ? actCls : 'border-slate-200 bg-white text-slate-500')} ${disabledBtn ? 'cursor-not-allowed' : 'hover:shadow-sm'}">
-                      <div class="font-black">${pm.short}${sel ? ' ✓' : ''}${isPayuniDisabled ? ' <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">🔒 尚未開通</span>' : ''}</div>
-                      <div class="text-[10px] opacity-85 mt-0.5">${isPayuniDisabled ? '目前尚未串接金流，暫停選用（一律預設轉帳）' : C.escapeHtml(pm.desc)}</div>
+                      <div class="font-black">${pm.short}${sel ? ' ✓' : ''}${isPayuniDisabled ? ' <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">未開通</span>' : ''}</div>
+                      <div class="text-[10px] opacity-85 mt-0.5">${isPayuniDisabled ? '尚未串接金流' : C.escapeHtml(pm.desc)}</div>
                     </button>`;
                 }).join('')}
               </div>
             </div>
             <div class="col-span-2 p-2.5 rounded-xl bg-amber-50 border border-amber-300">
-              <label class="font-black text-amber-950 block">🏁 活動起跑日期與時間 *（YYYY-MM-DD HH:mm:ss，建立報名表即設定好以利計時）</label>
-              <input id="z1RaceStart" value="${C.escapeHtml(ev.raceStart || '')}" placeholder="例如：2026-12-20 05:00:00" class="w-full px-2.5 py-1.5 border border-amber-400 rounded-lg mt-1 bg-white mono font-bold" />
+              <label class="font-black text-amber-950 block">🏁 起跑時間 *</label>
+              <input id="z1RaceStart" value="${C.escapeHtml(ev.raceStart || '')}" placeholder="YYYY-MM-DD HH:mm:ss" class="w-full px-2.5 py-1.5 border border-amber-400 rounded-lg mt-1 bg-white mono font-bold" />
             </div>
             ${(() => {
               const ebCfg = C.getEventEarlyBirdConfig(ev);
@@ -580,64 +577,59 @@
                   <div class="flex flex-wrap items-center justify-between gap-1">
                     <label class="inline-flex items-center gap-1.5 font-black text-emerald-950 cursor-pointer">
                       <input id="z1EarlyBirdEnabled" type="checkbox" ${ebCfg.enabled ? 'checked' : ''} class="accent-emerald-600" />
-                      <span>🐤 啟用本活動早鳥優惠價（修改截止日期即時變動生效）</span>
+                      <span>🐤 啟用早鳥價</span>
                     </label>
-                    <span class="px-2 py-0.5 rounded-full text-[10px] font-black ${!ebCfg.enabled ? 'bg-slate-200 text-slate-600' : (ebAct ? 'bg-emerald-600 text-white' : 'bg-amber-200 text-amber-950')}">${!ebCfg.enabled ? '未啟用' : (ebAct ? '🟢 早鳥優惠進行中' : '⏰ 早鳥已截止（改收一般價）')}</span>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-black ${!ebCfg.enabled ? 'bg-slate-200 text-slate-600' : (ebAct ? 'bg-emerald-600 text-white' : 'bg-amber-200 text-amber-950')}">${!ebCfg.enabled ? '未啟用' : (ebAct ? '🟢 進行中' : '⏰ 已截止')}</span>
                   </div>
-                  <div class="flex flex-wrap items-center gap-2">
-                    <input id="z1EarlyBirdEnd" value="${C.escapeHtml(ebCfg.endTime || '')}" placeholder="YYYY-MM-DD HH:mm:ss（例如 2026-12-15 23:59:59）" class="flex-1 min-w-[200px] px-2.5 py-1.5 border border-emerald-400 rounded-lg bg-white mono font-bold" />
-                    <span class="text-[10px] text-emerald-900">僅填 YYYY-MM-DD 會自動補 <code>23:59:59</code>；各組別早鳥價請於右側分組點「✏️ 調價」設定。</span>
-                  </div>
+                  <input id="z1EarlyBirdEnd" value="${C.escapeHtml(ebCfg.endTime || '')}" placeholder="截止時間 YYYY-MM-DD HH:mm:ss" class="w-full px-2.5 py-1.5 border border-emerald-400 rounded-lg bg-white mono font-bold" />
                 </div>`;
             })()}
             <div>
-              <label class="font-bold">活動狀態</label>
+              <label class="font-bold">狀態</label>
               <select id="z1Status" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5">
                 ${['open', 'draft', 'closed', 'auto'].map((st) => `<option value="${st}" ${ev.status === st ? 'selected' : ''}>${st}</option>`).join('')}
               </select>
             </div>
             <div id="z1LapDistWrap" class="${isLap ? '' : 'opacity-45'}">
-              <label class="font-bold">${isLap ? '🔁 繞圈單圈里程 (km) *' : '繞圈單圈里程（距離賽免填）'}</label>
+              <label class="font-bold">${isLap ? '單圈里程 (km) *' : '單圈里程（免填）'}</label>
               <input id="z1LapDist" type="number" step="0.05" value="${ev.lapDistanceKm || 0}" ${isLap ? '' : 'disabled'} class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5 mono ${isLap ? 'bg-indigo-50/50 border-indigo-300' : 'bg-slate-100'}" />
             </div>
             <div>
-              <label class="font-bold">總名額上限 (0=不限)</label>
+              <label class="font-bold">總名額 (0=不限)</label>
               <input id="z1MaxQuota" type="number" value="${ev.maxQuota || 0}" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5 mono" />
             </div>
             <div>
-              <label class="font-bold">主辦單位 (中文)</label>
+              <label class="font-bold">主辦單位</label>
               <input id="z1OrgZh" value="${C.escapeHtml(ev.organizerZh || '')}" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5" />
             </div>
             <div>
-              <label class="font-bold">🎖️ 賽事總監姓名（證書最下列顯示）</label>
-              <input id="z1Director" value="${C.escapeHtml(C.parseJsonSafe(ev.certConfigJson, C.defaultCertConfig()).raceDirectorName || '')}" placeholder="例如：林政宏" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5" />
+              <label class="font-bold">🎖️ 賽事總監</label>
+              <input id="z1Director" value="${C.escapeHtml(C.parseJsonSafe(ev.certConfigJson, C.defaultCertConfig()).raceDirectorName || '')}" placeholder="例：林政宏" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5" />
             </div>
           </div>
 
-          <!-- 📜 活動簡章內容編輯區（預設空白，有填寫才顯示於前台報名頁） -->
           <div class="space-y-1.5 pt-2 border-t">
-            <label class="font-bold block">📜 活動簡章與參賽須知（選填，預設空白）</label>
-            <textarea id="z1Brochure" rows="4" placeholder="選填，留空則前台不顯示簡章區塊..." class="w-full px-2.5 py-2 border rounded-lg text-xs leading-relaxed">${C.escapeHtml(C.sanitizeBrochureText(ev.brochureText))}</textarea>
+            <label class="font-bold block">📜 活動簡章（選填）</label>
+            <textarea id="z1Brochure" rows="3" placeholder="留空則前台不顯示" class="w-full px-2.5 py-2 border rounded-lg text-xs leading-relaxed">${C.escapeHtml(C.sanitizeBrochureText(ev.brochureText))}</textarea>
           </div>
 
-          <!-- 活動橫幅（顯示預覽，16 款樣式預設收合減少表單長度） -->
           <div class="space-y-2 pt-2 border-t">
-            <label class="font-bold block">🎨 活動橫幅預覽</label>
+            <label class="font-bold block">🎨 活動橫幅</label>
             <div class="h-20 rounded-xl flex items-end p-3 text-white font-black text-sm shadow-inner" id="z1BannerPreview" style="${C.getBannerStyle(ev.bannerUrl)}">${C.escapeHtml(ev.nameZh)}</div>
             <details class="rounded-xl bg-slate-50 border p-2.5">
               <summary class="cursor-pointer font-bold text-slate-700 flex items-center justify-between">
-                <span class="flex items-center gap-1.5"><span class="acc-arrow inline-block text-slate-400">▶</span><span>更換橫幅樣式（16 款內建 / 自訂上傳）</span></span>
-                <span class="text-[11px] text-sky-700">點擊展開</span>
+                <span class="flex items-center gap-1.5"><span class="acc-arrow inline-block text-slate-400">▶</span><span>更換橫幅</span></span>
+                <span class="text-[11px] text-sky-700">展開</span>
               </summary>
               <div class="mt-2.5 space-y-2">
-                <div class="text-[11px] font-bold text-amber-800">⚡ 動感路跑 / 越野精選（6 款）</div>
+                <div class="text-[11px] font-bold text-amber-800">⚡ 動感插畫</div>
                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                   ${C.CURATED_BANNERS.filter((b) => b.isDynamic).map((b) => `
                     <button type="button" data-pick-banner="${b.id}" class="h-12 rounded-lg border text-white font-bold text-[11px] flex items-end p-1.5 shadow-sm transition ${ev.bannerUrl === b.id ? 'ring-2 ring-amber-400 scale-[1.01]' : 'opacity-90 hover:opacity-100'}" style="${C.getBannerStyle(b.id)}">
                       <span class="bg-black/45 px-1.5 py-0.5 rounded">${b.name}</span>
                     </button>`).join('')}
                 </div>
-                <div class="text-[11px] font-bold text-slate-600">🎨 經典漸層（10 款）</div>
+                <div class="text-[11px] font-bold text-slate-600">🎨 經典漸層</div>
                 <div class="grid grid-cols-5 gap-1">
                   ${C.CURATED_BANNERS.filter((b) => !b.isDynamic).map((b) => `<button type="button" data-pick-banner="${b.id}" class="h-6 rounded border ${ev.bannerUrl === b.id ? 'ring-2 ring-amber-400' : ''}" style="background:${b.css};" title="${b.name}"></button>`).join('')}
                 </div>
@@ -645,69 +637,65 @@
               </div>
             </details>
           </div>
-          <button id="btnZ1SaveEvent" class="w-full py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black">💾 儲存活動設定與簡章</button>
+          <button id="btnZ1SaveEvent" class="w-full py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black">💾 儲存設定</button>
         </div>
 
-        <!-- 分組設定 + 動態加購項目 -->
+        <!-- 分組設定 + 加購項目 -->
         <div class="space-y-4 text-xs">
           <div class="bg-white p-4 rounded-xl border shadow-sm space-y-2.5">
             <div class="flex items-center justify-between border-b pb-2">
-              <div>
-                <h3 class="font-black text-sm">🏷️ 分組里程 / 限時 / 配號前綴 / 八百壯士歸類</h3>
-                <p class="text-[11px] text-slate-500 mt-0.5">新增分組欄位預設空白；有需要納入「🏅 八百壯士」再打勾即可，新增後隨時可按「✏️ 修改」調整。</p>
-              </div>
+              <h3 class="font-black text-sm">🏷️ 分組設定</h3>
               <button type="button" id="btnZ1AddCat" class="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold shrink-0">+ 新增分組</button>
             </div>
 
-            <!-- 新增 / 修改分組表單（新增時全欄位空白不帶前組資料；八百壯士改純勾選預設不打勾；支援回頭完整修改） -->
             <div id="z1CatEditorBox" class="hidden p-3 rounded-xl bg-sky-50/80 border-2 border-sky-300 space-y-2.5">
               <div class="flex items-center justify-between border-b border-sky-200 pb-1.5">
-                <div id="z1CatEditorTitle" class="font-black text-sky-950">➕ 新增分組（所有欄位預設空白）</div>
+                <div id="z1CatEditorTitle" class="font-black text-sky-950">➕ 新增分組</div>
                 <button type="button" id="btnZ1CancelCatEdit" class="text-xs text-slate-500 hover:text-slate-800 font-bold">✕ 關閉</button>
               </div>
               <input type="hidden" id="z1CatEditId" value="" />
               <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <div class="col-span-2">
-                  <label class="font-bold text-[11px]">分組名稱 <span class="text-rose-600">*</span></label>
-                  <input id="z1CatName" type="text" value="" placeholder="例如：50K 超馬組" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5" />
+                  <label class="font-bold text-[11px]">組別名稱 <span class="text-rose-600">*</span></label>
+                  <input id="z1CatName" type="text" value="" placeholder="例：50K 超馬組" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5" />
                 </div>
                 <div>
                   <label class="font-bold text-[11px]">距離 (km) <span class="text-rose-600">*</span></label>
-                  <input id="z1CatDist" type="number" step="0.1" min="0" value="" placeholder="例如：50" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5 mono" />
+                  <input id="z1CatDist" type="number" step="0.1" min="0" value="" placeholder="50" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5 mono" />
                 </div>
                 <div>
-                  <label class="font-bold text-[11px]">限時 (小時) <span class="text-rose-600">*</span></label>
-                  <input id="z1CatHrs" type="number" step="0.5" min="0.5" value="" placeholder="例如：8" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5 mono" />
+                  <label class="font-bold text-[11px]">限時 (時) <span class="text-rose-600">*</span></label>
+                  <input id="z1CatHrs" type="number" step="0.5" min="0.5" value="" placeholder="8" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5 mono" />
                 </div>
                 <div>
-                  <label class="font-bold text-[11px]">一般報名費 (NT$) <span class="text-rose-600">*</span></label>
-                  <input id="z1CatFee" type="number" min="0" value="" placeholder="例如：1800" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5 mono" />
+                  <label class="font-bold text-[11px]">報名費 <span class="text-rose-600">*</span></label>
+                  <input id="z1CatFee" type="number" min="0" value="" placeholder="1800" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5 mono" />
                 </div>
                 <div>
-                  <label class="font-bold text-[11px]">早鳥優惠價 (NT$)</label>
-                  <input id="z1CatEarlyFee" type="number" min="0" value="" placeholder="選填，須低於一般價" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5 mono" />
+                  <label class="font-bold text-[11px]">早鳥價</label>
+                  <input id="z1CatEarlyFee" type="number" min="0" value="" placeholder="選填" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5 mono" />
                 </div>
                 <div>
-                  <label class="font-bold text-[11px]">號碼布前綴 <span class="text-rose-600">*</span></label>
-                  <input id="z1CatPrefix" type="text" maxlength="4" value="" placeholder="例如：A" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5 mono uppercase" />
+                  <label class="font-bold text-[11px]">配號前綴 <span class="text-rose-600">*</span></label>
+                  <input id="z1CatPrefix" type="text" maxlength="4" value="" placeholder="A" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5 mono uppercase" />
                 </div>
                 <div>
-                  <label class="font-bold text-[11px]">起始編號</label>
-                  <input id="z1CatStartNum" type="text" maxlength="5" value="" placeholder="預設 001" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5 mono" />
+                  <label class="font-bold text-[11px]">起始號</label>
+                  <input id="z1CatStartNum" type="text" maxlength="5" value="" placeholder="001" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5 mono" />
                 </div>
                 <div>
-                  <label class="font-bold text-[11px]">組別限額人數</label>
-                  <input id="z1CatQuota" type="number" min="1" value="" placeholder="預設 300" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5 mono" />
+                  <label class="font-bold text-[11px]">限額</label>
+                  <input id="z1CatQuota" type="number" min="1" value="" placeholder="300" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5 mono" />
                 </div>
                 <div class="col-span-2 sm:col-span-3 flex items-end pb-1">
                   <label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-amber-300 cursor-pointer font-bold text-amber-950 hover:bg-amber-50">
                     <input id="z1CatW800" type="checkbox" class="accent-amber-600" />
-                    <span>🏅 勾選歸類為「八百壯士 (100K+)」組別（預設空白，有需要再打勾）</span>
+                    <span>🏅 八百壯士組</span>
                   </label>
                 </div>
               </div>
               <div class="flex justify-end gap-2 pt-1">
-                <button type="button" id="btnZ1SaveCat" class="px-4 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-black shadow">💾 儲存此分組</button>
+                <button type="button" id="btnZ1SaveCat" class="px-4 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-black shadow">💾 儲存</button>
               </div>
             </div>
 
@@ -743,13 +731,10 @@
 
           <div class="bg-white p-4 rounded-xl border shadow-sm space-y-2.5">
             <div class="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
-              <div>
-                <h3 class="font-black text-sm">🛍️ 動態加購服務管理（TUR 預設 3 項・可自由核取及增修刪）</h3>
-                <p class="text-[11px] text-slate-500 mt-0.5">勾選即顯示於報名表供選手加購；取消勾選則暫停顯示不需刪除，亦可自由改價或新增其他品項。</p>
-              </div>
+              <h3 class="font-black text-sm">🛍️ 加購服務</h3>
               <div class="flex gap-1.5 shrink-0">
-                <button type="button" id="btnZ1ResetTurAddons" class="px-2 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 font-bold text-[11px]">↺ 補齊 TUR 預設 3 項</button>
-                <button type="button" id="btnZ1AddAddon" class="px-2.5 py-1 rounded-lg bg-amber-500 text-slate-950 font-bold">+ 新增加購項</button>
+                <button type="button" id="btnZ1ResetTurAddons" class="px-2 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 font-bold text-[11px]">↺ 預設 3 項</button>
+                <button type="button" id="btnZ1AddAddon" class="px-2.5 py-1 rounded-lg bg-amber-500 text-slate-950 font-bold">+ 新增</button>
               </div>
             </div>
             <div class="space-y-1.5">
@@ -759,26 +744,22 @@
                 <div class="p-2 rounded-lg border flex flex-wrap items-center justify-between gap-2 ${isOn ? 'bg-slate-50 border-slate-200' : 'bg-slate-100/70 border-slate-200 opacity-65'}">
                   <label class="inline-flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" data-toggle-addon="${idx}" ${isOn ? 'checked' : ''} class="accent-amber-600" />
-                    <span class="${isOn ? '' : 'line-through text-slate-500'}"><b>${C.escapeHtml(a.name)}</b> — +NT$${Number(a.price || 0).toLocaleString()}</span>
-                    ${isOn ? '<span class="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">啟用中</span>' : '<span class="px-1.5 py-0.5 rounded bg-slate-200 text-slate-600 text-[10px]">已停用</span>'}
+                    <span class="${isOn ? '' : 'line-through text-slate-500'}"><b>${C.escapeHtml(a.name)}</b> +NT$${Number(a.price || 0).toLocaleString()}</span>
                   </label>
                   <div class="flex items-center gap-1.5">
-                    <button type="button" data-edit-addon="${idx}" class="px-2 py-0.5 rounded bg-white border border-slate-300 hover:bg-amber-50 text-slate-700 font-bold text-[11px]">✏️ 改名/調價</button>
-                    <button type="button" data-del-addon="${idx}" class="text-rose-600 font-bold px-1.5">移除</button>
+                    <button type="button" data-edit-addon="${idx}" class="px-2 py-0.5 rounded bg-white border border-slate-300 hover:bg-amber-50 text-slate-700 font-bold text-[11px]">✏️ 修改</button>
+                    <button type="button" data-del-addon="${idx}" class="text-rose-600 font-bold px-1.5">刪</button>
                   </div>
                 </div>`;
-              }).join('') || '<div class="text-slate-400 text-center py-3">尚無加購項目，可點「↺ 補齊 TUR 預設 3 項」或「+ 新增加購項」</div>'}
+              }).join('') || '<div class="text-slate-400 text-center py-3">尚無加購項目</div>'}
             </div>
           </div>
 
-          <!-- ↕️ 報名表欄位填列順序調整（上方先調整順序；下方再依需求自由擴充自訂欄位） -->
+          <!-- 報名表欄位順序 -->
           <div class="bg-white p-4 rounded-xl border-2 border-indigo-200 shadow-sm space-y-3">
             <div class="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
-              <div>
-                <h3 class="font-black text-sm text-indigo-950">↕️ 報名表欄位填列順序調整</h3>
-                <p class="text-[11px] text-slate-500 mt-0.5">點選 ↑ / ↓ 自由上下調整所有欄位順序，前台報名表即刻套用並重新編號。</p>
-              </div>
-              <button type="button" id="btnZ1ResetFieldOrder" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] shrink-0">↺ 恢復預設順序</button>
+              <h3 class="font-black text-sm text-indigo-950">↕️ 欄位順序</h3>
+              <button type="button" id="btnZ1ResetFieldOrder" class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] shrink-0">↺ 重設順序</button>
             </div>
 
             <div class="space-y-1.5">
@@ -817,51 +798,44 @@
               })()}
             </div>
 
-            <!-- 📝 活動專屬自訂填列欄位（置於排序清單最下方，由承辦人依需求自由增加） -->
+            <!-- 自訂欄位 -->
             <div class="pt-3 border-t space-y-2.5">
-              <div>
-                <h4 class="font-black text-xs sm:text-sm text-indigo-950">📝 活動專屬自訂填列欄位（承辦人自由擴充）</h4>
-                <p class="text-[11px] text-slate-500 mt-0.5">依活動需要於下方點選常用範本或自建欄位，新增後會自動加入上方順序清單供調整位置。</p>
-              </div>
-
-              <!-- 一鍵快速加入常用範本（僅留住址與紀念衣尺寸） -->
-              <div class="space-y-1">
-                <div class="text-[11px] font-bold text-indigo-700">⚡ 一鍵帶入常用欄位範本：</div>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <h4 class="font-black text-xs sm:text-sm text-indigo-950">📝 新增自訂欄位</h4>
                 <div class="flex flex-wrap gap-1.5">
                   ${(C.CUSTOM_FIELD_PRESETS || []).map((pr, idx) => `
-                    <button type="button" data-preset-cf="${idx}" class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-bold text-[11px] border border-indigo-200">+ ${C.escapeHtml(pr.label)} <span class="opacity-65">(${pr.type})</span></button>
+                    <button type="button" data-preset-cf="${idx}" class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-bold text-[11px] border border-indigo-200">+ ${C.escapeHtml(pr.label)}</button>
                   `).join('')}
                 </div>
               </div>
 
-              <!-- 新增自訂欄位表單 -->
               <div class="p-3 rounded-xl bg-slate-50 border space-y-2">
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div>
                     <label class="font-bold text-[11px]">欄位名稱 *</label>
-                    <input id="z1CfLabel" type="text" placeholder="例如：紀念衣尺寸、接駁車梯次" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5" />
+                    <input id="z1CfLabel" type="text" placeholder="例：紀念衣尺寸" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5" />
                   </div>
                   <div>
-                    <label class="font-bold text-[11px]">欄位類型（8 種）</label>
+                    <label class="font-bold text-[11px]">類型</label>
                     <select id="z1CfType" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5">
                       ${(C.CUSTOM_FIELD_TYPES || []).map((t) => `<option value="${t.id}">${C.escapeHtml(t.label)}</option>`).join('')}
                     </select>
                   </div>
                 </div>
                 <div id="z1CfOptionsRow" class="hidden">
-                  <label class="font-bold text-[11px]">選項清單（以半形逗號 <code>,</code> 分隔）*</label>
-                  <input id="z1CfOptions" type="text" placeholder="例如：S, M, L, XL, 2XL" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5" />
+                  <label class="font-bold text-[11px]">選項（逗號分隔）*</label>
+                  <input id="z1CfOptions" type="text" placeholder="S, M, L, XL" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5" />
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
                   <div class="sm:col-span-2">
-                    <label class="font-bold text-[11px]">輸入提示文字（選填）</label>
+                    <label class="font-bold text-[11px]">提示文字</label>
                     <input id="z1CfPlaceholder" type="text" placeholder="選填" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5" />
                   </div>
                   <label class="flex items-center gap-1.5 py-1.5 font-bold cursor-pointer">
-                    <input id="z1CfReq" type="checkbox" /> 設為必填欄位
+                    <input id="z1CfReq" type="checkbox" /> 必填
                   </label>
                 </div>
-                <button type="button" id="btnZ1AddCustomField" class="w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-black">+ 加入此自訂欄位至本活動報名表</button>
+                <button type="button" id="btnZ1AddCustomField" class="w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-black">+ 加入欄位</button>
               </div>
             </div>
           </div>
@@ -1259,75 +1233,58 @@
     const isPayuniEv = payMode === 'ONLINE_PAYUNi';
     const box = $('#z1-recon');
     box.innerHTML = `
-      <!-- 金流模式管制橫幅（依建立活動時之選定模式統一管制至報名結束） -->
-      <div class="p-3 rounded-xl border-2 text-xs flex flex-wrap items-center justify-between gap-2 ${isPayuniEv ? 'bg-emerald-50 border-emerald-300 text-emerald-950' : 'bg-amber-50 border-amber-300 text-amber-950'}">
-        <div>
-          <span class="px-2 py-0.5 rounded-full font-black ${isPayuniEv ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-slate-950'}">${isPayuniEv ? '💳 結合金流廠商 (PAYUNi)' : '🏦 實體轉帳核對末五碼'}</span>
-          <span class="ml-2 font-black">本活動金流管制作業模式</span>
-          <span class="ml-1 opacity-85">${isPayuniEv ? '— 報名頁僅開放線上金流自動銷帳與秒級配號；此表可檢視每筆金流單號與付款別。' : '— 報名頁僅開放大會轉帳與填寫末五碼；請於下方紅底待對帳清單核對後入帳配號。'}</span>
-        </div>
-        <span class="font-bold mono text-[11px]">${isPayuniEv ? '自動銷帳模式' : `待對帳 ${unpaid.length} 筆`}</span>
-      </div>
-
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-        <div class="bg-white p-3 rounded-xl border"><div class="text-slate-500">本場報名總數</div><div class="text-2xl font-black mono">${parts.length}</div></div>
-        <div class="bg-rose-50 p-3 rounded-xl border border-rose-200"><div class="text-rose-700 font-bold">待對帳未繳 (紅底置頂)</div><div class="text-2xl font-black mono text-rose-700">${unpaid.length}</div></div>
-        <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-200"><div class="text-emerald-700 font-bold">已繳費 (PAID)</div><div class="text-2xl font-black mono text-emerald-700">${paid.length}</div></div>
-        <div class="bg-sky-50 p-3 rounded-xl border border-sky-200"><div class="text-sky-700 font-bold">已配發號碼布</div><div class="text-2xl font-black mono text-sky-700">${parts.filter((p) => p.bibNumber).length}</div></div>
+        <div class="bg-white p-3 rounded-xl border"><div class="text-slate-500">總報名</div><div class="text-2xl font-black mono">${parts.length}</div></div>
+        <div class="bg-rose-50 p-3 rounded-xl border border-rose-200"><div class="text-rose-700 font-bold">待對帳</div><div class="text-2xl font-black mono text-rose-700">${unpaid.length}</div></div>
+        <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-200"><div class="text-emerald-700 font-bold">已繳費</div><div class="text-2xl font-black mono text-emerald-700">${paid.length}</div></div>
+        <div class="bg-sky-50 p-3 rounded-xl border border-sky-200"><div class="text-sky-700 font-bold">已配號</div><div class="text-2xl font-black mono text-sky-700">${parts.filter((p) => p.bibNumber).length}</div></div>
       </div>
 
       <div class="bg-white p-3 rounded-xl border shadow-sm space-y-2.5 text-xs">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <div class="flex flex-wrap gap-1.5">
-            <button id="btnZ1BatchPaid" class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold">✅ 勾選批次入帳</button>
-            ${groupsUnpaid.map((gc) => `<button data-group-paid="${gc}" class="px-3 py-1.5 rounded-lg bg-amber-500 text-slate-950 font-black">👥 整團入帳 ${gc}</button>`).join('')}
-            <button id="btnZ1AutoBib" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white font-bold">🏷️ 依組別自動配號 (Bib)</button>
+            <button id="btnZ1BatchPaid" class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold">✅ 批次入帳</button>
+            ${groupsUnpaid.map((gc) => `<button data-group-paid="${gc}" class="px-3 py-1.5 rounded-lg bg-amber-500 text-slate-950 font-black">👥 入帳 ${gc}</button>`).join('')}
+            <button id="btnZ1AutoBib" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white font-bold">🏷️ 自動配號</button>
           </div>
           <div class="flex flex-wrap gap-1.5">
-            <button id="btnZ1ExportPaidXlsx" class="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-black">📋 匯出已完成報名繳費名單 (.xlsx)</button>
-            <button id="btnZ1ExportPaidCsv" class="px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold border border-emerald-300">📄 繳費名單 CSV</button>
-            <button id="btnZ1ExportXlsx" class="px-3 py-1.5 rounded-lg bg-sky-600 text-white font-bold">📊 全場統計 Excel</button>
-            <button id="btnZ1ExportChipCsv" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-bold">📡 匯出晶片 CSV</button>
-            <button id="btnZ1ToggleExtCsv" class="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-900 font-black border border-indigo-300">📥 匯入外部已繳費名單（供晶片紀錄管制）</button>
+            <button id="btnZ1ExportPaidXlsx" class="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-black">📋 繳費名單 .xlsx</button>
+            <button id="btnZ1ExportPaidCsv" class="px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold border border-emerald-300">📄 CSV</button>
+            <button id="btnZ1ExportXlsx" class="px-3 py-1.5 rounded-lg bg-sky-600 text-white font-bold">📊 全場 Excel</button>
+            <button id="btnZ1ExportChipCsv" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white font-bold">📡 晶片 CSV</button>
+            <button id="btnZ1ToggleExtCsv" class="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-900 font-black border border-indigo-300">📥 匯入名單</button>
           </div>
         </div>
-        <div class="p-2 rounded-lg bg-emerald-50/70 border border-emerald-200 text-[11px] text-emerald-950 flex flex-wrap items-center justify-between gap-2">
-          <span>💡 <b>免晶片活動運用說明</b>：不須執行後續晶片作業者，可直接匯出「已完成報名繳費名單 (PAID，共 <b>${paid.length}</b> 人)」供承辦人現場點名／發物資；活動結束後可至「<b>專區 4 → 歷屆成績匯入</b>」將完賽成績納入資料庫並手動標示八百壯士。</span>
-        </div>
         <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t">
-          <input id="z1ReconSearch" type="text" value="${C.escapeHtml(App.State.z1ReconSearch || '')}" placeholder="🔎 搜尋已報名選手（姓名 / 身分證 / 號碼布 / 手機 / 團報碼）" class="w-full sm:w-80 px-3 py-1.5 border rounded-lg text-xs" />
-          <span class="text-[11px] text-slate-500">管理員與本活動承辦人均可直接點右側「✏️ 修改」或「🗑️ 刪除」選手資料</span>
+          <input id="z1ReconSearch" type="text" value="${C.escapeHtml(App.State.z1ReconSearch || '')}" placeholder="🔎 姓名 / 身分證 / 號碼布 / 手機" class="w-full sm:w-80 px-3 py-1.5 border rounded-lg text-xs" />
+          <span class="px-2 py-0.5 rounded-full font-bold ${isPayuniEv ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'}">${isPayuniEv ? '💳 線上金流' : '🏦 銀行轉帳'}</span>
         </div>
       </div>
 
-      <!-- 外部賽事名單匯入精靈：支援 Excel (.xlsx) / CSV / 貼上文字，含 11 欄指定順序規範表與賽事進行中補加 -->
+      <!-- 外部名單匯入 -->
       <div id="z1ExtImportBox" class="hidden bg-indigo-50/90 p-4 rounded-2xl border-2 border-indigo-300 space-y-3 text-xs">
         <div class="flex flex-wrap items-center justify-between gap-2 border-b border-indigo-200 pb-2.5">
-          <div>
-            <div class="font-black text-sm text-indigo-950">📥 匯入外部「已完成報名繳費」名單（供後續執行晶片紀錄管制作業）</div>
-            <p class="text-[11px] text-indigo-800 mt-0.5">凡未在本系統報名及繳費之選手，請依下方指定 11 欄位順序整理 Excel / CSV 匯入；匯入後一律設為 <b>PAID（已完成報名繳費）</b>、自動接續配號，立即可進晶片寫卡、報到與賽道感應！</p>
-          </div>
+          <div class="font-black text-sm text-indigo-950">📥 匯入外部已繳費名單</div>
           <div class="flex flex-wrap gap-1.5">
-            <button type="button" id="btnZ1DlExtXlsx" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold">📥 下載 Excel 範本 (.xlsx)</button>
-            <button type="button" id="btnZ1DlExtCsv" class="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-indigo-300 text-indigo-900 font-bold">📄 下載 CSV 範本</button>
+            <button type="button" id="btnZ1DlExtXlsx" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold">📥 Excel 範本</button>
+            <button type="button" id="btnZ1DlExtCsv" class="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-indigo-300 text-indigo-900 font-bold">📄 CSV 範本</button>
           </div>
         </div>
 
-        <!-- 指定匯入欄位順序與明細表（欄位 1 ~ 11） -->
-        <div class="bg-white rounded-xl border border-indigo-200 overflow-hidden">
-          <div class="px-3 py-2 bg-indigo-950 text-white font-bold flex flex-wrap items-center justify-between gap-2">
-            <span>📋 外部已完成報名繳費名單 — 指定匯入欄位順序與明細（第 1～4 欄必填｜第 5～11 欄選填）</span>
-            <span class="text-[11px] text-amber-300">支援含表頭自動辨識，或無表頭直接依 1→11 順序貼上</span>
-          </div>
+        <details class="bg-white rounded-xl border border-indigo-200 overflow-hidden">
+          <summary class="px-3 py-2 bg-indigo-950 text-white font-bold cursor-pointer flex items-center justify-between">
+            <span class="flex items-center gap-1.5"><span class="acc-arrow inline-block text-amber-300">▶</span><span>📋 欄位順序說明（1～4 必填）</span></span>
+            <span class="text-[11px] text-amber-300">展開查看</span>
+          </summary>
           <div class="overflow-x-auto">
             <table class="w-full text-[11px] text-left">
               <thead class="bg-slate-100 border-b">
                 <tr>
-                  <th class="p-1.5 text-center w-12">順序</th>
-                  <th class="p-1.5">欄位名稱</th>
+                  <th class="p-1.5 text-center w-12">序</th>
+                  <th class="p-1.5">欄位</th>
                   <th class="p-1.5 w-16">必填</th>
-                  <th class="p-1.5">範例值</th>
-                  <th class="p-1.5">明細說明</th>
+                  <th class="p-1.5">範例</th>
+                  <th class="p-1.5">說明</th>
                 </tr>
               </thead>
               <tbody class="divide-y">
@@ -1342,39 +1299,37 @@
               </tbody>
             </table>
           </div>
-        </div>
+        </details>
 
-        <!-- 步驟設定：來源檔案 / 匯入階段模式（支援賽事進行中補加） -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-white p-3 rounded-xl border border-indigo-200">
           <div>
-            <label class="font-bold block mb-1">1. 上傳 Excel (.xlsx) 或 CSV 檔</label>
+            <label class="font-bold block mb-1">1. 上傳 Excel / CSV</label>
             <input id="z1ExtCsvFile" type="file" accept=".xlsx,.xls,.csv,.txt" class="w-full text-[11px]" />
           </div>
           <div>
-            <label class="font-bold block mb-1">2. 匯入初始階段模式（支援開賽後補加）</label>
+            <label class="font-bold block mb-1">2. 匯入狀態</label>
             <select id="z1ExtJoinMode" class="w-full px-2.5 py-1.5 border rounded-lg bg-slate-50 font-bold">
-              <option value="pre_pending" ${!ev.raceStart ? 'selected' : ''}>賽前名單匯入（PAID・未報到・待起跑）</option>
-              <option value="pre_checked">現場已報到匯入（PAID・已報到・待起跑）</option>
-              <option value="mid_race" ${ev.raceStart ? 'selected' : ''}>🏃 賽事進行中即時補加（PAID・已報到・進行中可立即刷站）</option>
+              <option value="pre_pending" ${!ev.raceStart ? 'selected' : ''}>賽前匯入（未報到）</option>
+              <option value="pre_checked">已報到匯入</option>
+              <option value="mid_race" ${ev.raceStart ? 'selected' : ''}>🏃 賽中補加（進行中）</option>
             </select>
           </div>
           <div class="space-y-1.5 pt-1">
-            <label class="flex items-center gap-1.5 font-bold cursor-pointer"><input id="z1ExtAutoBib" type="checkbox" checked /> 號碼布留空或撞號時自動依組別接續配號</label>
-            <label class="flex items-center gap-1.5 font-bold cursor-pointer"><input id="z1ExtMergeDup" type="checkbox" checked /> 身分證重複時「合併更新」（保留既有成績）</label>
+            <label class="flex items-center gap-1.5 font-bold cursor-pointer"><input id="z1ExtAutoBib" type="checkbox" checked /> 自動補配號碼布</label>
+            <label class="flex items-center gap-1.5 font-bold cursor-pointer"><input id="z1ExtMergeDup" type="checkbox" checked /> 重複身分證合併更新</label>
           </div>
         </div>
 
         <div>
-          <label class="font-bold text-indigo-950 block mb-1">或直接從 Excel / 試算表複製貼上名單（支援逗號或 Tab 分隔，第一列可含表頭）：</label>
-          <textarea id="z1ExtCsvText" rows="4" placeholder="姓名,身分證,性別,組別,號碼布,國籍,生日,手機,Email,晶片UID,跑團&#10;林大為,A123456789,M,50K 超馬組,,TWN,1988-06-15,0912345678,lin@example.com,,外場跑團&#10;陳小美,F223456786,F,100K 八百壯士組,,TWN,1992-03-20,0922334455,mei@example.com,,外場跑團" class="w-full p-2.5 border rounded-xl mono text-xs bg-white"></textarea>
+          <label class="font-bold text-indigo-950 block mb-1">或直接貼上名單：</label>
+          <textarea id="z1ExtCsvText" rows="3" placeholder="姓名,身分證,性別,組別,號碼布,國籍,生日,手機,Email,晶片UID,跑團" class="w-full p-2.5 border rounded-xl mono text-xs bg-white"></textarea>
         </div>
 
         <div class="flex flex-wrap items-center gap-2">
-          <button type="button" id="btnZ1PreviewExtImport" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black">🔍 步驟 1：預檢名單與防呆核對</button>
-          <button type="button" id="btnZ1RunExtImport" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow">✅ 步驟 2：確認匯入至本場活動並同步雲端</button>
+          <button type="button" id="btnZ1PreviewExtImport" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black">🔍 1. 預檢名單</button>
+          <button type="button" id="btnZ1RunExtImport" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow">✅ 2. 確認匯入</button>
         </div>
 
-        <!-- 預檢結果表格區 -->
         <div id="z1ExtPreviewBox" class="hidden bg-white rounded-xl border border-indigo-200 p-3 space-y-2"></div>
       </div>
 
@@ -1387,11 +1342,8 @@
         if (!evGroups.length) return '';
         return `
           <div class="bg-amber-50/90 p-4 rounded-2xl border-2 border-amber-400 space-y-2.5 text-xs">
-            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200 pb-2">
-              <div>
-                <div class="font-black text-sm text-amber-950">👥 團體報名「統一匯款」對帳區（本場共 ${evGroups.length} 團）</div>
-                <p class="text-[11px] text-amber-900 mt-0.5">團體報名一律由第 1 位「👑 團長」統一匯款、統一收信與管理；核對整團總金額無誤後，請直接按「💰 整團一次入帳」，系統將僅寄發 1 封整團入帳確認信給團長。</p>
-              </div>
+            <div class="border-b border-amber-200 pb-2">
+              <div class="font-black text-sm text-amber-950">👥 團報對帳（${evGroups.length} 團）</div>
             </div>
             <div class="space-y-2">
               ${evGroups.map((g) => `
@@ -1432,11 +1384,8 @@
         return `
           <div class="bg-emerald-50/90 p-4 rounded-2xl border-2 border-emerald-400 space-y-2.5 text-xs">
             <div class="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200 pb-2">
-              <div>
-                <div class="font-black text-sm text-emerald-950">📦 多場活動聯合報名「合併繳費訂單」對帳區（本場涉及 ${evBundles.length} 筆合併單）</div>
-                <p class="text-[11px] text-emerald-900 mt-0.5">選手一次勾選多場活動並合併匯款；核對總金額無誤後，點「💰 合併整單入帳」即可一次跨場同步 PAID 並各自自動配號。</p>
-              </div>
-              <button type="button" id="btnZ1ExportBundleXlsx" class="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-bold">📊 匯出合併對帳表 (.xlsx)</button>
+              <div class="font-black text-sm text-emerald-950">📦 聯合報名合併單（${evBundles.length} 筆）</div>
+              <button type="button" id="btnZ1ExportBundleXlsx" class="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-bold">📊 匯出對帳表</button>
             </div>
             <div class="space-y-2">
               ${evBundles.map((b) => {
@@ -2018,26 +1967,26 @@
 
     box.innerHTML = `
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-        <div class="bg-white p-3 rounded-xl border"><div class="text-slate-500">本場起跑時間（已預設）</div><div class="text-sm font-black mono text-indigo-800 mt-1">${ev.raceStart || '尚未設定（請至分頁1）'}</div></div>
-        <div class="bg-white p-3 rounded-xl border"><div class="text-slate-500">已繳費待作業人數</div><div class="text-2xl font-black mono">${paid.length}</div></div>
-        <div class="bg-sky-50 p-3 rounded-xl border border-sky-200"><div class="text-sky-800 font-bold">📡 已寫入/綁定晶片</div><div class="text-2xl font-black mono text-sky-900">${chippedCnt} <span class="text-xs">(${chipPct}%)</span></div></div>
-        <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-200"><div class="text-emerald-800 font-bold">✅ 現場已報到人員</div><div class="text-2xl font-black mono text-emerald-800">${checkedCnt} <span class="text-xs">(${chkPct}%)</span></div></div>
+        <div class="bg-white p-3 rounded-xl border"><div class="text-slate-500">起跑時間</div><div class="text-sm font-black mono text-indigo-800 mt-1">${ev.raceStart || '尚未設定'}</div></div>
+        <div class="bg-white p-3 rounded-xl border"><div class="text-slate-500">已繳費</div><div class="text-2xl font-black mono">${paid.length}</div></div>
+        <div class="bg-sky-50 p-3 rounded-xl border border-sky-200"><div class="text-sky-800 font-bold">📡 已寫卡</div><div class="text-2xl font-black mono text-sky-900">${chippedCnt} <span class="text-xs">(${chipPct}%)</span></div></div>
+        <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-200"><div class="text-emerald-800 font-bold">✅ 已報到</div><div class="text-2xl font-black mono text-emerald-800">${checkedCnt} <span class="text-xs">(${chkPct}%)</span></div></div>
       </div>
 
       <div class="bg-white p-3.5 rounded-xl border shadow-sm space-y-2.5 text-xs">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <div class="flex flex-wrap items-center gap-2">
-            <input id="z1ChipSearch" value="${C.escapeHtml(App.State.z1ChipSearch || '')}" placeholder="🔎 搜尋號碼布 / 姓名 / 身分證 / UID" class="px-3 py-1.5 border rounded-lg w-60" />
+            <input id="z1ChipSearch" value="${C.escapeHtml(App.State.z1ChipSearch || '')}" placeholder="🔎 號碼布 / 姓名 / UID" class="px-3 py-1.5 border rounded-lg w-56" />
             <select id="z1ChipFilter" class="px-2.5 py-1.5 border rounded-lg bg-slate-50 font-bold">
-              <option value="all" ${flt === 'all' ? 'selected' : ''}>全部已繳費 (${paid.length})</option>
-              <option value="no_chip" ${flt === 'no_chip' ? 'selected' : ''}>⏳ 尚未寫卡 (${paid.length - chippedCnt})</option>
-              <option value="has_chip" ${flt === 'has_chip' ? 'selected' : ''}>✅ 已綁晶片 (${chippedCnt})</option>
-              <option value="unchecked" ${flt === 'unchecked' ? 'selected' : ''}>📋 尚未報到 (${paid.length - checkedCnt})</option>
+              <option value="all" ${flt === 'all' ? 'selected' : ''}>全部 (${paid.length})</option>
+              <option value="no_chip" ${flt === 'no_chip' ? 'selected' : ''}>⏳ 未寫卡 (${paid.length - chippedCnt})</option>
+              <option value="has_chip" ${flt === 'has_chip' ? 'selected' : ''}>✅ 已寫卡 (${chippedCnt})</option>
+              <option value="unchecked" ${flt === 'unchecked' ? 'selected' : ''}>📋 未報到 (${paid.length - checkedCnt})</option>
               <option value="checked" ${flt === 'checked' ? 'selected' : ''}>🟢 已報到 (${checkedCnt})</option>
             </select>
           </div>
           <label class="flex items-center gap-1.5 font-bold text-emerald-900 cursor-pointer">
-            <input id="z1ChipAutoChk" type="checkbox" ${autoChk ? 'checked' : ''} /> 寫入晶片時同步完成「現場報到」
+            <input id="z1ChipAutoChk" type="checkbox" ${autoChk ? 'checked' : ''} /> 寫卡同步報到
           </label>
         </div>
         <div id="z1ChipInspectBox" class="hidden p-3 rounded-xl bg-sky-50 border-2 border-sky-300 text-xs"></div>
@@ -2047,8 +1996,8 @@
         <table class="w-full text-xs text-left">
           <thead class="bg-slate-100 border-b">
             <tr>
-              <th class="p-2">號碼布</th><th class="p-2">選手 / 組別</th><th class="p-2">晶片 UID / NDEF 狀態</th>
-              <th class="p-2">報到人員管制</th><th class="p-2">晶片寫入・讀取查看操作</th>
+              <th class="p-2">號碼布</th><th class="p-2">選手 / 組別</th><th class="p-2">晶片 UID</th>
+              <th class="p-2">報到</th><th class="p-2">操作</th>
             </tr>
           </thead>
           <tbody class="divide-y">
@@ -2142,34 +2091,32 @@
     });
     const box = $('#z1-gun');
     box.innerHTML = `
-      <!-- 階段 3 鳴槍開跑前置防呆把關檢核板 -->
       <div class="p-3.5 rounded-xl border-2 ${gate.gunWarnings.length ? 'bg-amber-50 border-amber-300' : 'bg-emerald-50 border-emerald-300'} text-xs space-y-2">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <div class="font-black ${gate.gunWarnings.length ? 'text-amber-950' : 'text-emerald-950'}">
-            ${gate.gunWarnings.length ? `⚠️ 階段 3 開跑前置把關提醒（尚有 ${gate.gunWarnings.length} 項建議先處理）` : '✅ 階段 3 賽前整備檢核全數通過，可安心鳴槍開跑！'}
+            ${gate.gunWarnings.length ? `⚠️ 開跑前提醒（${gate.gunWarnings.length} 項）` : '✅ 賽前檢核通過'}
           </div>
-          ${gate.metrics.paidNoBibCount > 0 ? '<button id="btnZ1GunFixBib" class="px-3 py-1 rounded-lg bg-slate-900 text-white font-bold">🏷️ 立即一鍵補配號碼布</button>' : ''}
+          ${gate.metrics.paidNoBibCount > 0 ? '<button id="btnZ1GunFixBib" class="px-3 py-1 rounded-lg bg-slate-900 text-white font-bold">🏷️ 補配號碼布</button>' : ''}
         </div>
         ${gate.gunWarnings.length ? `<ul class="list-disc list-inside text-amber-900 space-y-0.5">${gate.gunWarnings.map((w) => `<li>${C.escapeHtml(w)}</li>`).join('')}</ul>` : ''}
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 text-xs">
         <div class="bg-slate-900 text-white p-5 rounded-2xl space-y-3 shadow">
-          <div class="text-amber-400 font-bold">🏁 活動起跑時間（建立報名表時已預設，此處僅供現場延後起跑微調）</div>
+          <div class="text-amber-400 font-bold">🏁 起跑時間</div>
           <div class="text-3xl font-black mono text-amber-300" id="z1GunDisplay">${ev.raceStart || '尚未設定'}</div>
           <div class="flex flex-wrap gap-2">
-            <button id="btnZ1GunNow" class="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 font-black text-sm shadow">🔫 立即鳴槍開跑</button>
+            <button id="btnZ1GunNow" class="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 font-black text-sm shadow">🔫 立即鳴槍</button>
           </div>
           <div class="pt-2 border-t border-slate-700 flex gap-2">
             <input id="z1CustomGunTime" value="${ev.raceStart || C.formatDateTime()}" placeholder="YYYY-MM-DD HH:mm:ss" class="flex-1 px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 mono text-white" />
-            <button id="btnZ1ApplyGunTime" class="px-3 py-2 rounded-lg bg-amber-400 text-slate-950 font-black">套用指定時間</button>
+            <button id="btnZ1ApplyGunTime" class="px-3 py-2 rounded-lg bg-amber-400 text-slate-950 font-black">套用時間</button>
           </div>
-          <p class="text-[11px] text-slate-400">🛡️ 防呆管制：未鳴槍前，賽道計時站點 (CP/FINISH/LAP) 將自動鎖定不接受感應，避免開跑前誤刷。</p>
         </div>
 
         <div class="bg-white p-4 rounded-xl border shadow-sm space-y-2.5">
           <div class="flex items-center justify-between border-b pb-2">
-            <h3 class="font-black text-sm">📍 賽道感應站點配置</h3>
+            <h3 class="font-black text-sm">📍 感應站點</h3>
             <button id="btnZ1AddStation" class="px-2.5 py-1 rounded-lg bg-sky-600 text-white font-bold">+ 新增站點</button>
           </div>
           <div class="space-y-1.5">
@@ -2261,32 +2208,26 @@
 
     const box = $('#z1-score');
     box.innerHTML = `
-      <!-- 階段 5 結案鎖定前 5 項層層把關檢核清單 -->
       <div id="z1ClosureGateBox" class="rounded-xl p-4 border-2 ${hasBlockers ? 'bg-rose-50 border-rose-300' : (gate.closureWarnings.length ? 'bg-amber-50 border-amber-300' : 'bg-emerald-50 border-emerald-300')} space-y-2.5 text-xs">
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <div class="font-black text-sm ${hasBlockers ? 'text-rose-950' : (gate.closureWarnings.length ? 'text-amber-950' : 'text-emerald-950')}">
-              🔒 階段 5 結案鎖定層層把關稽核（${hasBlockers ? `尚有 ${gate.closureBlockers.length} 項阻塞未通過` : (gate.closureWarnings.length ? `通過必要門檻，尚有 ${gate.closureWarnings.length} 項提醒` : '✅ 5 項結案檢核全數通過')})
-            </div>
-            <div class="text-slate-600 mt-0.5">結案後本活動所有感應、報名與費用資料將全面鎖定，並移轉至「專區 2：已結案專區」核發報表、DUV 與正式完賽證書。</div>
+          <div class="font-black text-sm ${hasBlockers ? 'text-rose-950' : (gate.closureWarnings.length ? 'text-amber-950' : 'text-emerald-950')}">
+            🔒 結案檢核（${hasBlockers ? `阻塞 ${gate.closureBlockers.length} 項` : (gate.closureWarnings.length ? `提醒 ${gate.closureWarnings.length} 項` : '✅ 全數通過')}）
           </div>
           <div class="flex flex-wrap gap-2">
-            ${gate.metrics.pendingSyncCount > 0 ? '<button id="btnZ1ClosureSync" class="px-3 py-2 rounded-xl bg-sky-600 text-white font-bold">☁️ 立即上傳待同步佇列</button>' : ''}
-            ${gate.metrics.onTrackCount > 0 ? `<button id="btnZ1MarkOnTrackDnf" class="px-3 py-2 rounded-xl bg-amber-500 text-slate-950 font-black">🛑 將在途 ${gate.metrics.onTrackCount} 人批次轉列 DNF</button>` : ''}
-            <button id="btnZ1LockFinish" ${hasBlockers ? 'disabled' : ''} class="px-4 py-2 rounded-xl font-black shadow ${hasBlockers ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-rose-600 hover:bg-rose-500 text-white'}">🔒 確認結案鎖定 (移至專區 2)</button>
+            ${gate.metrics.pendingSyncCount > 0 ? '<button id="btnZ1ClosureSync" class="px-3 py-2 rounded-xl bg-sky-600 text-white font-bold">☁️ 上傳佇列</button>' : ''}
+            ${gate.metrics.onTrackCount > 0 ? `<button id="btnZ1MarkOnTrackDnf" class="px-3 py-2 rounded-xl bg-amber-500 text-slate-950 font-black">🛑 在途 ${gate.metrics.onTrackCount} 人轉 DNF</button>` : ''}
+            <button id="btnZ1LockFinish" ${hasBlockers ? 'disabled' : ''} class="px-4 py-2 rounded-xl font-black shadow ${hasBlockers ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-rose-600 hover:bg-rose-500 text-white'}">🔒 結案鎖定</button>
           </div>
         </div>
-        ${gate.closureBlockers.length ? `<div class="p-2.5 rounded-lg bg-rose-100/80 text-rose-900 space-y-0.5"><div class="font-black">⛔ 結案阻塞項目（必須排除方可解鎖結案按鈕）：</div>${gate.closureBlockers.map((b) => `<div>• ${C.escapeHtml(b)}</div>`).join('')}</div>` : ''}
-        ${gate.closureWarnings.length ? `<div class="p-2.5 rounded-lg bg-amber-100/80 text-amber-950 space-y-0.5"><div class="font-black">⚠️ 結案前建議確認項目：</div>${gate.closureWarnings.map((w) => `<div>• ${C.escapeHtml(w)}</div>`).join('')}</div>` : ''}
+        ${gate.closureBlockers.length ? `<div class="p-2.5 rounded-lg bg-rose-100/80 text-rose-900 space-y-0.5"><div class="font-black">⛔ 阻塞項目：</div>${gate.closureBlockers.map((b) => `<div>• ${C.escapeHtml(b)}</div>`).join('')}</div>` : ''}
+        ${gate.closureWarnings.length ? `<div class="p-2.5 rounded-lg bg-amber-100/80 text-amber-950 space-y-0.5"><div class="font-black">⚠️ 提醒：</div>${gate.closureWarnings.map((w) => `<div>• ${C.escapeHtml(w)}</div>`).join('')}</div>` : ''}
       </div>
 
-      <!-- 本活動報名 / 報到 / 完賽人數與各比例資料 -->
-      ${buildEventRatioStatsHtml(App, ev, '📊 本活動即時統計總覽（報名人數・報到人數・完賽人數與各比例）')}
+      ${buildEventRatioStatsHtml(App, ev, '📊 活動統計')}
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 text-xs">
-        <!-- 選手成績與罰時微調 -->
         <div class="bg-white p-4 rounded-xl border shadow-sm space-y-2">
-          <h3 class="font-black text-sm">⚖️ 即時排名 / 狀態 / 罰時微調（整數秒）</h3>
+          <h3 class="font-black text-sm">⚖️ 成績與罰時</h3>
           <div class="max-h-96 overflow-y-auto">
             <table class="w-full text-left">
               <thead class="bg-slate-100 sticky top-0">
@@ -2311,9 +2252,8 @@
           </div>
         </div>
 
-        <!-- 逐圈/各站補登與刪除 -->
         <div class="bg-white p-4 rounded-xl border shadow-sm space-y-2.5">
-          <h3 class="font-black text-sm">🛠️ 補登漏卡 / 逐圈明細作廢還原</h3>
+          <h3 class="font-black text-sm">🛠️ 補登與明細</h3>
           <form id="z1AddLogForm" class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 bg-slate-50 p-2 rounded-lg border">
             <input id="z1LogBib" placeholder="號碼布" required class="px-2 py-1 border rounded uppercase mono" />
             <select id="z1LogSt" class="px-2 py-1 border rounded">${sts.map((s) => `<option value="${s.stationCode}">${s.stationCode}</option>`).join('')}</select>
@@ -2433,16 +2373,16 @@
 
     box.innerHTML = `
       <div class="bg-white p-4 rounded-xl border shadow-sm space-y-3 text-xs">
-        <h3 class="font-black text-sm">👷 核發本活動現場作業員帳號（嚴格隔離，僅限本人名下活動）</h3>
+        <h3 class="font-black text-sm">👷 作業員帳號</h3>
         <form id="z1NewOpForm" autocomplete="off" class="grid grid-cols-2 sm:grid-cols-5 gap-2 bg-slate-50 p-3 rounded-xl border">
-          <input id="opNewUser" required placeholder="作業員帳號 (如 cp2_01)" class="px-2.5 py-1.5 border rounded-lg" />
-          <input id="opNewPass" required type="password" autocomplete="new-password" placeholder="站點密碼" class="px-2.5 py-1.5 border rounded-lg" />
-          <input id="opNewName" required placeholder="顯示名稱" class="px-2.5 py-1.5 border rounded-lg" />
+          <input id="opNewUser" required placeholder="帳號 (例 cp2)" class="px-2.5 py-1.5 border rounded-lg" />
+          <input id="opNewPass" required type="password" autocomplete="new-password" placeholder="密碼" class="px-2.5 py-1.5 border rounded-lg" />
+          <input id="opNewName" required placeholder="名稱" class="px-2.5 py-1.5 border rounded-lg" />
           <select id="opNewStation" class="px-2.5 py-1.5 border rounded-lg">
-            <option value="WRITER">WRITER (晶片寫入發卡組)</option>
+            <option value="WRITER">WRITER (發卡組)</option>
             ${sts.map((s) => `<option value="${s.stationCode}">${s.stationCode} (${C.escapeHtml(s.name)})</option>`).join('')}
           </select>
-          <button type="submit" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white font-bold">+ 核發帳號</button>
+          <button type="submit" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white font-bold">+ 新增</button>
         </form>
         <table class="w-full text-left">
           <thead class="bg-slate-100"><tr><th class="p-2">帳號</th><th class="p-2">名稱</th><th class="p-2">鎖定活動</th><th class="p-2">鎖定站點</th><th class="p-2">狀態</th></tr></thead>
@@ -2521,30 +2461,27 @@
     box.innerHTML = `
       <div class="bg-white p-4 rounded-xl border shadow-sm flex flex-wrap items-center justify-between gap-2 text-xs">
         <div class="flex flex-wrap items-center gap-2">
-          <span class="px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 font-black">🔒 結案成績鎖定中</span>
+          <span class="px-2.5 py-1 rounded-full bg-rose-100 text-rose-800 font-black">🔒 已結案</span>
           <select id="z2EventSelect" class="px-3 py-1.5 border rounded-lg font-bold text-sm">
             ${finished.map((e) => `<option value="${e.eventId}" ${e.eventId === ev.eventId ? 'selected' : ''}>${C.isTestSuiteId(e.eventId) ? '🧪 ' : ''}${C.escapeHtml(e.nameZh)}</option>`).join('')}
           </select>
         </div>
-        <button id="btnZ2Reopen" class="px-3 py-1.5 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold">🔓 重新開啟解鎖（退回專區 1）</button>
+        <button id="btnZ2Reopen" class="px-3 py-1.5 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold">🔓 解鎖退回</button>
       </div>
 
-      <!-- 完賽後詳細統計總覽：報名人數、報到人數、完賽人數及各比例資料 -->
-      ${buildEventRatioStatsHtml(App, ev, '🏁 完賽結案統計總覽（報名人數・報到人數・完賽人數及各比例資料）')}
+      ${buildEventRatioStatsHtml(App, ev, '🏁 結案統計')}
 
       <!-- 報表與 DUV 送審 -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
         <div class="bg-white p-4 rounded-xl border shadow-sm space-y-2">
-          <h3 class="font-black text-sm">📊 4 工作表正式 Excel (.xlsx)</h3>
-          <p class="text-slate-500">含活動統計比例總覽、總成績、各站/逐圈明細、選手名冊。</p>
+          <h3 class="font-black text-sm">📊 正式 Excel</h3>
           <div class="flex flex-wrap gap-1.5">
-            <button id="btnZ2XlsxFull" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white font-bold">⬇️ 完整存檔版</button>
-            <button id="btnZ2XlsxMask" class="px-3 py-1.5 rounded-lg bg-sky-600 text-white font-bold">⬇️ 身分證隱碼公開版</button>
+            <button id="btnZ2XlsxFull" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white font-bold">⬇️ 完整版</button>
+            <button id="btnZ2XlsxMask" class="px-3 py-1.5 rounded-lg bg-sky-600 text-white font-bold">⬇️ 隱碼公開版</button>
           </div>
         </div>
         <div class="bg-white p-4 rounded-xl border border-emerald-200 shadow-sm space-y-2">
-          <h3 class="font-black text-sm text-emerald-900">🌍 DUV 國際超馬協會送審檔</h3>
-          <p class="text-slate-500">3 列表頭＋11 欄明細，自動拆複姓/英文名與性別。</p>
+          <h3 class="font-black text-sm text-emerald-900">🌍 DUV 送審檔</h3>
           <div class="flex flex-wrap gap-1.5">
             <button id="btnZ2DuvPrev" class="px-3 py-1.5 rounded-lg bg-emerald-100 text-emerald-900 font-bold">👁️ 預覽</button>
             <button id="btnZ2DuvTxt" class="px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold">⬇️ .txt</button>
@@ -2552,40 +2489,38 @@
           </div>
         </div>
         <div class="bg-gradient-to-br from-rose-50 to-amber-50 p-4 rounded-xl border border-rose-200 shadow-sm space-y-2">
-          <h3 class="font-black text-sm text-rose-900">🏅 八百壯士 100K+ 智慧分流</h3>
-          <p class="text-rose-800">本場符合 100K+ 完賽資格共 <b class="text-base mono">${warriorsCount}</b> 位。</p>
-          <button id="btnZ2ExportW800" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold">⬇️ 獨立匯出 _800壯士超馬.xlsx</button>
+          <h3 class="font-black text-sm text-rose-900">🏅 八百壯士（${warriorsCount} 位）</h3>
+          <button id="btnZ2ExportW800" class="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold">⬇️ 匯出 Excel</button>
         </div>
       </div>
 
       <div id="z2DuvBox" class="hidden bg-slate-950 text-emerald-300 p-4 rounded-xl space-y-2">
-        <div class="flex justify-between text-xs text-white font-bold"><span>DUV 格式即時預覽</span><button id="btnZ2DuvClose">✕</button></div>
+        <div class="flex justify-between text-xs text-white font-bold"><span>DUV 預覽</span><button id="btnZ2DuvClose">✕</button></div>
         <pre id="z2DuvPre" class="mono text-[11px] overflow-x-auto max-h-56"></pre>
       </div>
 
-      <!-- 雙模式完賽證書工作室（官方證書 無個人照 vs 選手客製化證書 含個人照） -->
+      <!-- 完賽證書工作室 -->
       <div class="bg-white p-4 rounded-2xl border shadow-sm space-y-4">
         <div class="flex flex-wrap items-center justify-between gap-2 border-b pb-2.5">
           <div>
-            <h3 class="font-black text-base">🏆 活動完賽證書工作室（區分官方證書 ＆ 選手客製化證書）</h3>
-            <p class="text-xs text-slate-500">6 樣式 × 6 底圖 × 橫/直式 × 6 字型；嚴格把關僅針對「<b>已結案＋完賽＋有正式成績</b>」選手核發（合格 <b class="text-emerald-700">${certRows.length}</b> 人${excludedCertCount ? `，自動排除 DNF/DNS/無成績 ${excludedCertCount} 人` : ''}）。</p>
+            <h3 class="font-black text-base">🏆 完賽證書</h3>
+            <p class="text-xs text-slate-500">合格 <b class="text-emerald-700">${certRows.length}</b> 人${excludedCertCount ? `（排除未完賽 ${excludedCertCount} 人）` : ''}</p>
           </div>
           <div class="flex flex-wrap gap-2 text-xs">
-            <button id="btnZ2SaveCertCfg" class="px-3.5 py-2 rounded-xl bg-slate-900 text-white font-black">💾 儲存證書設定至活動</button>
-            <button id="btnZ2BatchZip" ${certRows.length ? '' : 'disabled'} class="px-3.5 py-2 rounded-xl font-black ${certRows.length ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}">📦 離線批次匯出完賽 .zip (${certRows.length})</button>
-            <button id="btnZ2BatchPdf" ${certRows.length ? '' : 'disabled'} class="px-3.5 py-2 rounded-xl font-black ${certRows.length ? 'bg-amber-500 text-slate-950' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}">📄 匯出完賽多頁 .pdf (${certRows.length})</button>
+            <button id="btnZ2SaveCertCfg" class="px-3.5 py-2 rounded-xl bg-slate-900 text-white font-black">💾 儲存設定</button>
+            <button id="btnZ2BatchZip" ${certRows.length ? '' : 'disabled'} class="px-3.5 py-2 rounded-xl font-black ${certRows.length ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}">📦 匯出 .zip (${certRows.length})</button>
+            <button id="btnZ2BatchPdf" ${certRows.length ? '' : 'disabled'} class="px-3.5 py-2 rounded-xl font-black ${certRows.length ? 'bg-amber-500 text-slate-950' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}">📄 匯出 .pdf (${certRows.length})</button>
           </div>
         </div>
 
-        <!-- 明確區分：官方證書 vs 選手客製化證書 -->
         <div class="grid grid-cols-2 gap-2.5 text-xs">
           <button type="button" id="btnZ2CertOfficial" class="p-3 rounded-xl border-2 text-left transition ${cfg.certMode !== 'custom_runner' ? 'border-slate-900 bg-slate-900 text-white shadow' : 'border-slate-200 bg-slate-50 text-slate-700'}">
-            <div class="font-black text-sm">🏛️ 官方證書（不含個人照片）</div>
-            <div class="text-[11px] opacity-80 mt-0.5">6 樣式 × 6 底圖 × 直/橫式 × 6 字型；可上傳協會自訂設計底圖並微調文字套印。</div>
+            <div class="font-black text-sm">🏛️ 官方證書</div>
+            <div class="text-[11px] opacity-80 mt-0.5">純淨公版（無個人照）</div>
           </button>
           <button type="button" id="btnZ2CertCustom" class="p-3 rounded-xl border-2 text-left transition ${cfg.certMode === 'custom_runner' ? 'border-amber-500 bg-amber-500 text-slate-950 shadow' : 'border-slate-200 bg-slate-50 text-slate-700'}">
-            <div class="font-black text-sm">📸 選手客製化證書（含個人照片）</div>
-            <div class="text-[11px] opacity-85 mt-0.5">比照官方全部樣式/底圖/字型，額外增加選手個人照片框（3 相框＋拖曳縮放）與感言。</div>
+            <div class="font-black text-sm">📸 客製化證書</div>
+            <div class="text-[11px] opacity-85 mt-0.5">含個人照片與感言</div>
           </button>
         </div>
 
@@ -2593,14 +2528,14 @@
           <div class="lg:col-span-5 space-y-3">
             <div class="grid grid-cols-2 gap-2">
               <div>
-                <label class="font-bold block mb-1">1. A4 紙張方向</label>
+                <label class="font-bold block mb-1">方向</label>
                 <select id="certOrientSel" class="w-full px-2.5 py-1.5 border rounded-lg">
-                  <option value="landscape" ${cfg.orientation === 'landscape' ? 'selected' : ''}>A4 橫式 (1600×1131)</option>
-                  <option value="portrait" ${cfg.orientation === 'portrait' ? 'selected' : ''}>A4 直式 (1131×1600)</option>
+                  <option value="landscape" ${cfg.orientation === 'landscape' ? 'selected' : ''}>A4 橫式</option>
+                  <option value="portrait" ${cfg.orientation === 'portrait' ? 'selected' : ''}>A4 直式</option>
                 </select>
               </div>
               <div>
-                <label class="font-bold block mb-1">2. 字型變化（6 種）</label>
+                <label class="font-bold block mb-1">字型</label>
                 <select id="certFontSel" class="w-full px-2.5 py-1.5 border rounded-lg">
                   ${C.CERT_FONTS.map((f) => `<option value="${f.id}" ${cfg.fontId === f.id ? 'selected' : ''}>${f.name}</option>`).join('')}
                 </select>
@@ -2609,24 +2544,23 @@
 
             <div class="grid grid-cols-2 gap-2">
               <div>
-                <label class="font-bold block mb-1">3. 證書樣式（6 種）</label>
+                <label class="font-bold block mb-1">樣式</label>
                 <select id="certLayoutSel" class="w-full px-2.5 py-1.5 border rounded-lg">
                   ${C.CERT_LAYOUTS.map((l) => `<option value="${l.id}" ${cfg.layoutId === l.id ? 'selected' : ''}>${l.name}</option>`).join('')}
                 </select>
               </div>
               <div>
-                <label class="font-bold block mb-1">4. 官方底圖（6 種）</label>
+                <label class="font-bold block mb-1">底圖</label>
                 <select id="certPaletteSel" class="w-full px-2.5 py-1.5 border rounded-lg">
                   ${C.CERT_PALETTES.map((p) => `<option value="${p.id}" ${cfg.paletteId === p.id ? 'selected' : ''}>${p.name}</option>`).join('')}
                 </select>
               </div>
             </div>
 
-            <!-- 自訂底圖套印（預設載入 10 項原資訊，每欄獨立調整位置 / 大小 / 顏色 / 對齊 / 顯示，畫布直接拖曳） -->
             <details id="certCustomBgDetails" ${cfg.customBgDataUrl ? 'open' : ''} class="rounded-xl bg-indigo-50/70 border-2 border-indigo-300">
               <summary class="px-3 py-2.5 cursor-pointer font-black text-indigo-950 flex items-center justify-between">
-                <span class="flex items-center gap-1.5"><span class="acc-arrow inline-block text-indigo-500">▶</span><span>🖼️ 上傳自訂設計底圖（10 欄獨立排版）</span></span>
-                <span class="text-[11px] font-bold ${cfg.customBgDataUrl ? 'text-emerald-700' : 'text-indigo-700'}">${cfg.customBgDataUrl ? '已啟用自訂底圖 ✓' : '選用'}</span>
+                <span class="flex items-center gap-1.5"><span class="acc-arrow inline-block text-indigo-500">▶</span><span>🖼️ 自訂底圖排版</span></span>
+                <span class="text-[11px] font-bold ${cfg.customBgDataUrl ? 'text-emerald-700' : 'text-indigo-700'}">${cfg.customBgDataUrl ? '已啟用 ✓' : '選用'}</span>
               </summary>
               <div class="px-3 pb-3 pt-2 space-y-2.5 border-t border-indigo-200/70">
                 <div class="flex items-center justify-between gap-2">
@@ -2634,16 +2568,14 @@
                   <button type="button" id="btnCertClearBg" class="px-2.5 py-1 rounded-lg bg-white border border-indigo-300 text-indigo-800 font-bold text-[11px] shrink-0">恢復內建</button>
                 </div>
                 <div class="flex gap-1.5">
-                  <input id="certCustomBgUrl" type="url" value="${/^https?:\/\//i.test(cfg.customBgDataUrl || '') ? C.escapeHtml(cfg.customBgDataUrl) : ''}" placeholder="或貼上外部設計底圖網址 (https://...)" class="flex-1 px-2 py-1 border rounded-lg bg-white text-[11px]" />
-                  <button type="button" id="btnCertApplyBgUrl" class="px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-bold text-[11px] shrink-0">套用網址</button>
+                  <input id="certCustomBgUrl" type="url" value="${/^https?:\/\//i.test(cfg.customBgDataUrl || '') ? C.escapeHtml(cfg.customBgDataUrl) : ''}" placeholder="或貼上圖片網址 (https://...)" class="flex-1 px-2 py-1 border rounded-lg bg-white text-[11px]" />
+                  <button type="button" id="btnCertApplyBgUrl" class="px-2.5 py-1 rounded-lg bg-indigo-600 text-white font-bold text-[11px] shrink-0">套用</button>
                 </div>
-                <div class="text-[10px] text-indigo-800">💡 上傳後自動壓縮最佳化（安全同步雲端），並預設載入 10 項原資訊；可直接於右側畫布<b>點選任一欄位拖曳位置</b>！</div>
 
-                <!-- 10 欄位各自獨立調整控制面板 -->
                 <div id="certCustomElemEditor" class="${cfg.customBgDataUrl ? '' : 'hidden'} p-2.5 rounded-xl bg-white border border-indigo-200 space-y-2.5">
                   <div class="flex items-center justify-between">
-                    <span class="font-black text-indigo-950">🎯 步驟 1：點選要微調的欄位（或直接點右側畫布）</span>
-                    <button type="button" id="btnCeResetAll" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px]">↩️ 恢復預設</button>
+                    <span class="font-black text-indigo-950">🎯 選欄位或直接拖曳畫布</span>
+                    <button type="button" id="btnCeResetAll" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px]">↩️ 重設</button>
                   </div>
                   <div id="ceLayerPills" class="grid grid-cols-2 gap-1"></div>
 
@@ -3006,26 +2938,25 @@
     box.innerHTML = `
       <div class="bg-white p-4 rounded-2xl border shadow-sm space-y-4 text-xs">
         <div class="border-b pb-2">
-          <h2 class="font-black text-base">👥 專區 3：全平台帳號核發與權責管控（最高管理員專用）</h2>
-          <p class="text-slate-500">無公開註冊；所有活動承辦人（organizer）與站點作業員（operator）皆由上級核發管理。</p>
+          <h2 class="font-black text-base">👥 帳號管理</h2>
         </div>
         <form id="z3NewUserForm" autocomplete="off" class="grid grid-cols-2 sm:grid-cols-6 gap-2 bg-slate-50 p-3 rounded-xl border">
           <input id="z3User" required placeholder="帳號" class="px-2.5 py-1.5 border rounded-lg" />
           <input id="z3Pass" required type="password" autocomplete="new-password" placeholder="密碼" class="px-2.5 py-1.5 border rounded-lg" />
-          <input id="z3Name" required placeholder="顯示姓名" class="px-2.5 py-1.5 border rounded-lg" />
+          <input id="z3Name" required placeholder="姓名" class="px-2.5 py-1.5 border rounded-lg" />
           <select id="z3Role" class="px-2.5 py-1.5 border rounded-lg">
-            <option value="organizer">活動承辦人 (organizer)</option>
-            <option value="operator">現場作業員 (operator)</option>
-            <option value="super_admin">最高管理員 (super_admin)</option>
+            <option value="organizer">承辦人</option>
+            <option value="operator">作業員</option>
+            <option value="super_admin">管理員</option>
           </select>
           <select id="z3Station" class="px-2.5 py-1.5 border rounded-lg">
-            <option value="ALL">ALL (管理員/承辦人)</option>
-            <option value="WRITER">WRITER (晶片寫入)</option>
-            <option value="CHECKIN">CHECKIN (報到檢錄)</option>
+            <option value="ALL">ALL</option>
+            <option value="WRITER">WRITER</option>
+            <option value="CHECKIN">CHECKIN</option>
             <option value="CP1">CP1</option><option value="CP2">CP2</option>
             <option value="FINISH">FINISH</option><option value="LAP">LAP</option>
           </select>
-          <button type="submit" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white font-black">+ 核發帳號</button>
+          <button type="submit" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white font-black">+ 新增</button>
         </form>
         <div class="overflow-x-auto">
           <table class="w-full text-left">
@@ -3097,30 +3028,26 @@
     box.innerHTML = `
       <div class="bg-white p-4 rounded-2xl border shadow-sm space-y-3 text-xs">
         <div class="flex flex-wrap items-center justify-between gap-2 border-b pb-2.5">
-          <div>
-            <h2 class="font-black text-base">📚 專區 4：歷屆完賽成績匯入與「八百壯士」手動標示</h2>
-            <p class="text-slate-500 mt-0.5">匯入之歷屆明細一律列為「<b>✅ 已完賽</b>」；預覽時可依組別或個別跑者手動勾選標示八百壯士，確認無誤再存檔納入統計與英雄榜。</p>
-          </div>
+          <h2 class="font-black text-base">📚 歷屆成績匯入</h2>
           <div class="flex flex-wrap gap-1.5">
-            <button type="button" id="btnHisDlXlsx" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold">📥 下載 Excel 範本 (.xlsx)</button>
-            <button type="button" id="btnHisDlCsv" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 border font-bold text-slate-800">📄 下載 CSV 範本</button>
+            <button type="button" id="btnHisDlXlsx" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold">📥 Excel 範本</button>
+            <button type="button" id="btnHisDlCsv" class="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 border font-bold text-slate-800">📄 CSV 範本</button>
           </div>
         </div>
 
-        <!-- 同頁顯示：歷屆成績匯入範例欄位順序表（第 1～7 欄） -->
-        <div class="rounded-xl border border-amber-300 overflow-hidden">
-          <div class="px-3 py-2 bg-slate-900 text-white font-bold flex flex-wrap items-center justify-between gap-2">
-            <span>📋 歷屆成績匯入 — 標準範例欄位順序（第 1～7 欄，均列為 ✅ 已完賽）</span>
-            <span class="text-[11px] text-amber-300">支援 Excel (.xlsx) / CSV / TSV 直接上傳或複製貼上</span>
-          </div>
+        <details class="rounded-xl border border-amber-300 overflow-hidden">
+          <summary class="px-3 py-2 bg-slate-900 text-white font-bold cursor-pointer flex items-center justify-between">
+            <span class="flex items-center gap-1.5"><span class="acc-arrow inline-block text-amber-300">▶</span><span>📋 欄位格式說明（7 欄）</span></span>
+            <span class="text-[11px] text-amber-300">展開查看</span>
+          </summary>
           <div class="overflow-x-auto">
             <table class="w-full text-[11px] text-left bg-white">
               <thead class="bg-amber-50 border-b">
                 <tr>
-                  <th class="p-1.5 text-center w-12">順序</th>
-                  <th class="p-1.5">欄位名稱</th>
+                  <th class="p-1.5 text-center w-12">序</th>
+                  <th class="p-1.5">欄位</th>
                   <th class="p-1.5 w-16">必填</th>
-                  <th class="p-1.5">範例值</th>
+                  <th class="p-1.5">範例</th>
                   <th class="p-1.5">說明</th>
                 </tr>
               </thead>
@@ -3136,11 +3063,11 @@
               </tbody>
             </table>
           </div>
-        </div>
+        </details>
 
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <div>
-            <label class="font-bold text-[11px] text-slate-600">賽事日期</label>
+            <label class="font-bold text-[11px] text-slate-600">日期</label>
             <input id="hisEventDate" value="2025-11-15" placeholder="YYYY-MM-DD" class="w-full px-2.5 py-1.5 border rounded-lg mono mt-0.5" />
           </div>
           <div class="sm:col-span-2">
@@ -3150,19 +3077,18 @@
         </div>
         <div class="flex flex-wrap items-center gap-2">
           <input id="hisFileInput" type="file" accept=".xlsx,.xls,.csv,.txt" class="text-[11px]" />
-          <button type="button" id="btnHisSample" class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold border border-indigo-200">✨ 載入 7 欄標準範例（含複姓與多組別）</button>
+          <button type="button" id="btnHisSample" class="px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold border border-indigo-200">✨ 載入範例</button>
         </div>
-        <textarea id="hisRawInput" rows="4" placeholder="請依上方 1～7 欄順序貼上（逗號或 Tab 分隔）：組別名稱,參賽號碼布,姓,名,身分證,完賽成績,完賽距離km" class="w-full p-2.5 border rounded-lg mono bg-slate-50"></textarea>
-        <button type="button" id="btnHisAnalyze" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black">🔍 步驟 1：解析並預覽跑者明細（手動標示八百壯士）</button>
+        <textarea id="hisRawInput" rows="3" placeholder="組別,號碼布,姓,名,身分證,成績,距離km" class="w-full p-2.5 border rounded-lg mono bg-slate-50"></textarea>
+        <button type="button" id="btnHisAnalyze" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black">🔍 1. 解析預覽</button>
 
-        <!-- 金框預覽審查區（可按組別批次標示或逐筆勾選八百壯士，確認後才寫入） -->
         <div id="hisGoldenBox" class="${pendingHistoryPreview.length ? '' : 'hidden'} p-4 rounded-2xl border-4 border-amber-400 bg-amber-50/70 space-y-3">
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div class="font-black text-amber-950 text-sm">🛡️ 步驟 2：金框預覽與手動標示八百壯士（共 ${pendingHistoryPreview.length} 筆，均列為 ✅ 已完賽，尚未寫入）</div>
-              <div class="text-[11px] text-amber-900 mt-0.5">目前手動標示八百壯士：<b class="text-rose-700 mono">${prevW800Cnt} / ${pendingHistoryPreview.length}</b> 人（系統不再自動猜測，請點選組別按鈕或下方核取方塊）</div>
+              <div class="font-black text-amber-950 text-sm">🛡️ 2. 預覽與標示八百壯士（${pendingHistoryPreview.length} 筆）</div>
+              <div class="text-[11px] text-amber-900 mt-0.5">已標示：<b class="text-rose-700 mono">${prevW800Cnt} / ${pendingHistoryPreview.length}</b> 人</div>
             </div>
-            <button type="button" id="btnHisConfirmCommit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow">✅ 步驟 3：確認標示無誤並存檔匯入</button>
+            <button type="button" id="btnHisConfirmCommit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow">✅ 3. 確認匯入</button>
           </div>
 
           <!-- 依組別快速批次標示工具列 -->
@@ -3410,34 +3336,30 @@
     const activeTbl = storeMap[directSheetName] || storeMap.GlobalConfig;
 
     box.innerHTML = `
-      <!-- 共用區：本機 IndexedDB 總覽與雲端 GAS 雙向同步 -->
+      <!-- 資料庫與同步 -->
       <div class="bg-white p-4 rounded-2xl border shadow-sm space-y-3 text-xs">
-        <h2 class="font-black text-base">🗄️ 專區 5：本機離線資料庫與 Google 試算表雙向同步</h2>
+        <h2 class="font-black text-base">🗄️ 同步與資料庫</h2>
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mono">
-          <div class="p-2.5 rounded-xl bg-slate-50 border">Events: <b>${App.State.events.length}</b></div>
-          <div class="p-2.5 rounded-xl bg-slate-50 border">Participants: <b>${App.State.participants.length}</b></div>
-          <div class="p-2.5 rounded-xl bg-slate-50 border">TimingLogs: <b>${App.State.timingLogs.length}</b></div>
-          <div class="p-2.5 rounded-xl bg-amber-50 border border-amber-200">待上傳佇列: <b>${App.State.syncQueue.length}</b></div>
+          <div class="p-2.5 rounded-xl bg-slate-50 border">活動：<b>${App.State.events.length}</b></div>
+          <div class="p-2.5 rounded-xl bg-slate-50 border">選手：<b>${App.State.participants.length}</b></div>
+          <div class="p-2.5 rounded-xl bg-slate-50 border">計時：<b>${App.State.timingLogs.length}</b></div>
+          <div class="p-2.5 rounded-xl bg-amber-50 border border-amber-200">待上傳：<b>${App.State.syncQueue.length}</b></div>
         </div>
         <div class="flex flex-wrap gap-2 items-end pt-1">
           <div class="flex-1 min-w-[260px]">
-            <label class="font-bold block mb-1">Google Apps Script Web App URL (/exec)</label>
+            <label class="font-bold block mb-1">GAS 網址 (/exec)</label>
             <input id="z5GasUrl" value="${C.escapeHtml(App.State.gasUrl)}" placeholder="https://script.google.com/macros/s/.../exec" class="w-full px-3 py-2 border rounded-lg mono" />
           </div>
-          <button id="btnZ5TestGas" class="px-3.5 py-2 rounded-lg bg-sky-600 text-white font-bold">測試並儲存連線</button>
-          <button id="btnZ5Pull" class="px-3.5 py-2 rounded-lg bg-slate-900 text-white font-bold">🔄 立即雙向拉取</button>
-          <button id="btnZ5Push" class="px-3.5 py-2 rounded-lg bg-emerald-600 text-white font-bold">☁️ 批次上傳 (${App.State.syncQueue.length})</button>
+          <button id="btnZ5TestGas" class="px-3.5 py-2 rounded-lg bg-sky-600 text-white font-bold">測試連線</button>
+          <button id="btnZ5Pull" class="px-3.5 py-2 rounded-lg bg-slate-900 text-white font-bold">🔄 拉取</button>
+          <button id="btnZ5Push" class="px-3.5 py-2 rounded-lg bg-emerald-600 text-white font-bold">☁️ 上傳 (${App.State.syncQueue.length})</button>
         </div>
       </div>
 
       ${isSuper ? `
-        <!-- 最高管理員專用：直通 Google 試算表後端控制台 (Direct Cloud CRUD) -->
         <div class="bg-white p-4 rounded-2xl border-2 border-indigo-400 shadow-sm space-y-3 text-xs">
           <div class="flex flex-wrap items-center justify-between gap-2 border-b pb-2.5">
-            <div>
-              <div class="text-[11px] font-black text-indigo-600">🛡️ SUPER ADMIN DIRECT BACKEND SYNC</div>
-              <h3 class="font-black text-base">最高管理直通 Google 後端資料庫控制台（免進試算表直接修改）</h3>
-            </div>
+            <h3 class="font-black text-base">🛡️ 試算表直通編輯</h3>
             <div class="flex flex-wrap gap-1.5">
               ${Object.keys(storeMap).map((sn) => `<button data-pick-sheet="${sn}" class="px-2.5 py-1.5 rounded-lg font-bold ${directSheetName === sn ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-700'}">${sn}</button>`).join('')}
             </div>
@@ -3460,11 +3382,10 @@
             </table>
           </div>
           <div class="flex justify-end">
-            <button id="btnZ5DirectBatchSave" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black shadow">💾 儲存並更新雲端 Google 試算表 (BatchUpdate)</button>
+            <button id="btnZ5DirectBatchSave" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black shadow">💾 儲存並同步</button>
           </div>
         </div>
 
-        <!-- 最高管理員專用：10 大全情境獨立測試資料管理（不影響任何正式資料，可隨時一鍵單獨清除） -->
         ${(() => {
           const ts = C.countTestSuiteStats(App.State);
           const realEvCnt = App.State.events.length - ts.events;
@@ -3472,43 +3393,33 @@
           return `
           <div class="bg-emerald-50/70 p-4 rounded-2xl border-2 border-emerald-400 shadow-sm space-y-3 text-xs">
             <div class="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200 pb-2">
-              <div>
-                <div class="text-[11px] font-black text-emerald-700">🧪 ISOLATED 10-SCENARIO TEST SUITE (PREFIX: TEST-* / test_*)</div>
-                <h3 class="font-black text-base text-emerald-950">10 大全情境測試資料管理（與正式資料完全隔離，支援單獨一鍵清除）</h3>
-                <p class="text-[11px] text-emerald-900 mt-0.5">涵蓋早鳥開/閉、額滿防呆、同承辦人統報、不同承辦人隔離、PAYUNi 金流、晶片寫卡報到、繞圈刷圈、外部名單匯入與結案自訂底圖證書等 10 場完整生命週期。</p>
-              </div>
+              <h3 class="font-black text-base text-emerald-950">🧪 測試資料（與正式資料隔離）</h3>
               <div class="text-right mono text-[11px]">
-                <div class="text-emerald-900 font-black">測試資料：${ts.events} 場 / ${ts.participants} 筆報名 / ${ts.timingLogs} 筆計時 / ${ts.users} 測試帳號</div>
-                <div class="text-slate-600">正式資料（受保護）：${realEvCnt} 場 / ${realPartCnt} 筆報名</div>
+                <span class="text-emerald-900 font-black">測試：${ts.events} 場 / ${ts.participants} 人</span> ｜ <span class="text-slate-600">正式：${realEvCnt} 場 / ${realPartCnt} 人</span>
               </div>
             </div>
             <div class="flex flex-wrap gap-2 items-center">
-              <button id="btnZ5LoadTestSuite10" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow">🧪 載入／重建 10 大情境測試資料（保留現有正式資料）</button>
-              <button id="btnZ5ClearTestSuite10" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow">🧹 一鍵單獨清除測試資料（僅刪 TEST-*，完全不影響正式資料）</button>
+              <button id="btnZ5LoadTestSuite10" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow">🧪 載入測試資料</button>
+              <button id="btnZ5ClearTestSuite10" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow">🧹 清除測試資料</button>
             </div>
           </div>`;
         })()}
 
-        <!-- 最高管理員專用：全機 .json 備份、合併/覆蓋還原、6場示範資料、CLEAR 清空 -->
         <div class="bg-white p-4 rounded-2xl border shadow-sm space-y-3 text-xs">
-          <h3 class="font-black text-sm">💾 全機 .json 封存備份、雙模式還原與安全重置（最高管理員專用）</h3>
+          <h3 class="font-black text-sm">💾 備份與還原</h3>
           <div class="flex flex-wrap gap-2 items-center">
-            <button id="btnZ5DownloadJson" class="px-3.5 py-2 rounded-lg bg-slate-900 text-white font-bold">⬇️ 下載完整備份 (.json)</button>
+            <button id="btnZ5DownloadJson" class="px-3.5 py-2 rounded-lg bg-slate-900 text-white font-bold">⬇️ 備份 JSON</button>
             <label class="px-3.5 py-2 rounded-lg bg-emerald-100 text-emerald-900 font-bold cursor-pointer">
-              ➕ 合併還原（去重累加）<input id="z5RestoreMerge" type="file" accept=".json" class="hidden" />
+              ➕ 合併還原<input id="z5RestoreMerge" type="file" accept=".json" class="hidden" />
             </label>
             <label class="px-3.5 py-2 rounded-lg bg-amber-100 text-amber-900 font-bold cursor-pointer">
-              ♻️ 覆蓋還原（整機回溯）<input id="z5RestoreOverwrite" type="file" accept=".json" class="hidden" />
+              ♻️ 覆蓋還原<input id="z5RestoreOverwrite" type="file" accept=".json" class="hidden" />
             </label>
-            <button id="btnZ5Seed5" class="px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold">⚡ 清空舊活動並重建 6 場全情境示範資料（同步雲端）</button>
-            <button id="btnZ5ClearAll" class="px-3.5 py-2 rounded-lg bg-rose-600 text-white font-bold">🗑️ 清空全平台資料</button>
+            <button id="btnZ5Seed5" class="px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold">⚡ 重建示範資料</button>
+            <button id="btnZ5ClearAll" class="px-3.5 py-2 rounded-lg bg-rose-600 text-white font-bold">🗑️ 清空資料</button>
           </div>
         </div>
-      ` : `
-        <div class="bg-slate-100 p-4 rounded-xl text-xs text-slate-600">
-          ℹ️ 您目前為「活動承辦人」角色，僅顯示本機總覽與雙向同步；直通後端表格編輯與全機重置功能已自動隱藏保護。
-        </div>
-      `}`;
+      ` : ``}`;
 
     $('#z5GasUrl').onchange = (e) => {
       const url = e.target.value.trim();

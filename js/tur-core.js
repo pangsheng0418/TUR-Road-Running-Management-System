@@ -351,17 +351,17 @@
   ];
 
   const DEFAULT_REG_FIELDS = [
-    { id: 'nationality', label: '國籍 (三碼國際碼)', required: true },
-    { id: 'name', label: '選手姓名', required: true },
-    { id: 'idCard', label: '身分證字號 / 護照', required: true },
+    { id: 'nationality', label: '國籍', required: true },
+    { id: 'name', label: '姓名', required: true },
+    { id: 'idCard', label: '身分證 / 護照', required: true },
     { id: 'gender', label: '性別', required: true },
-    { id: 'birthday', label: '出生年月日', required: true },
-    { id: 'phone', label: '手機號碼', required: true },
-    { id: 'email', label: '電子信箱 Email', required: true },
-    { id: 'diet', label: '飲食習慣', required: true },
-    { id: 'remark', label: '備註 / 特殊需求', required: false },
-    { id: 'emergName', label: '緊急聯絡人姓名', required: true },
-    { id: 'emergPhone', label: '緊急聯絡人電話', required: true }
+    { id: 'birthday', label: '出生日期', required: true },
+    { id: 'phone', label: '手機', required: true },
+    { id: 'email', label: 'Email', required: true },
+    { id: 'diet', label: '飲食', required: true },
+    { id: 'remark', label: '備註', required: false },
+    { id: 'emergName', label: '緊急聯絡人', required: true },
+    { id: 'emergPhone', label: '緊急聯絡電話', required: true }
   ];
 
   function getEffectiveRegFieldOrder(schema) {
@@ -399,15 +399,15 @@
   const PAYMENT_MODES = [
     {
       id: 'MANUAL_ATM',
-      short: '🏦 轉帳核對末五碼',
-      label: '🏦 實體銀行轉帳（核對帳號末五碼）',
-      desc: '選手填表後依大會帳號匯款並填寫末五碼，由承辦人於專區 1 核對入帳與自動配號。'
+      short: '🏦 銀行轉帳',
+      label: '🏦 銀行轉帳',
+      desc: '匯款核對末 5 碼，入帳後配號'
     },
     {
       id: 'ONLINE_PAYUNi',
-      short: '💳 結合金流廠商 (PAYUNi)',
-      label: '💳 結合金流廠商（PAYUNi 線上自動銷帳）',
-      desc: '串接統一金流信用卡 / 虛擬 ATM / 超商代碼，付款完成自動改 PAID 並秒級配發號碼布。'
+      short: '💳 線上金流',
+      label: '💳 線上金流 (PAYUNi)',
+      desc: '信用卡 / 虛擬 ATM / 超商自動銷帳'
     }
   ];
 
@@ -1256,11 +1256,11 @@
       closureBlockers,
       closureWarnings,
       stages: [
-        { step: 1, key: 'setup', tab: 'setup', title: '1. 報名與表單', status: s1Status, detail: `${evCats.length} 組｜報名 ${activeParts.length} 人` },
-        { step: 2, key: 'recon', tab: 'recon', title: '2. 繳費對帳配號', status: s2Status, detail: `已繳 ${paidParts.length}｜待繳 ${unpaidParts.length}｜未配 ${paidNoBib.length}` },
-        { step: 3, key: 'gun', tab: 'gun', title: '3. 賽前整備鳴槍', status: s3Status, detail: hasGunStart ? `已開跑 ${String(event.raceStart).slice(11)}` : `未開跑｜缺卡 ${paidNoChip.length}` },
-        { step: 4, key: 'inrace', tab: 'score', title: '4. 賽事進行管制', status: s4Status, detail: `報到 ${checkedInParts.length}｜在途 ${onTrackParts.length}｜完賽 ${finishedParts.length}` },
-        { step: 5, key: 'closure', tab: 'score', title: '5. 審核結案鎖定', status: s5Status, detail: event.status === 'finished' ? '已鎖定歸檔專區2' : (closureBlockers.length ? `阻塞 ${closureBlockers.length} 項` : (closureWarnings.length ? `待確認 ${closureWarnings.length} 項` : '可安全結案')) }
+        { step: 1, key: 'setup', tab: 'setup', title: '1. 活動設定', status: s1Status, detail: `${evCats.length} 組｜${activeParts.length} 人` },
+        { step: 2, key: 'recon', tab: 'recon', title: '2. 對帳配號', status: s2Status, detail: `已繳 ${paidParts.length}｜待繳 ${unpaidParts.length}` },
+        { step: 3, key: 'gun', tab: 'gun', title: '3. 整備鳴槍', status: s3Status, detail: hasGunStart ? `已開跑 ${String(event.raceStart).slice(11)}` : `未開跑｜缺卡 ${paidNoChip.length}` },
+        { step: 4, key: 'inrace', tab: 'score', title: '4. 賽事進行', status: s4Status, detail: `報到 ${checkedInParts.length}｜在途 ${onTrackParts.length}｜完賽 ${finishedParts.length}` },
+        { step: 5, key: 'closure', tab: 'score', title: '5. 結案鎖定', status: s5Status, detail: event.status === 'finished' ? '已歸檔' : (closureBlockers.length ? `阻塞 ${closureBlockers.length}` : (closureWarnings.length ? `提醒 ${closureWarnings.length}` : '可結案')) }
       ]
     };
   }
@@ -2132,28 +2132,28 @@
     if (isLap) {
       return {
         raceType: 'lap_timed',
-        badge: '🔁 計時繞圈限時賽 (lap_timed)',
-        shortRule: `單圈 ${Number(ev?.lapDistanceKm || 1.0)} km · 限時內累計有效圈數與總里程排序（逾限時圈次留存紀錄不計里程）`,
+        badge: '🔁 繞圈賽',
+        shortRule: `單圈 ${Number(ev?.lapDistanceKm || 1.0)} km · 限時累圈比總里程`,
         steps: [
-          { no: 1, title: '報名分組（限時制）', desc: `設定限時組別（如 6H / 12H / 24H），目前 ${evCats.length} 組；單圈里程 ${Number(ev?.lapDistanceKm || 1.0)} km。`, ok: evCats.length > 0 && Number(ev?.lapDistanceKm || 0) > 0 },
-          { no: 2, title: '對帳配號與發卡', desc: '確認繳費 (PAID) 後自動配發號碼布並完成 WRITER 寫卡/綁卡。', ok: true },
-          { no: 3, title: '報到檢錄 (CHECKIN)', desc: '起跑前由報到站感應確認出賽資格（不計入圈數）。', ok: evSts.some((s) => String(s.stationCode).toUpperCase() === 'CHECKIN') },
-          { no: 4, title: '主拱門繞圈感應 (LAP)', desc: '鳴槍後每圈通過 LAP 拱門刷卡累圈，超過組別限時自動標註超時無效圈；晶片失靈可改選選手手動補登。', ok: evSts.some((s) => String(s.stationCode).toUpperCase() === 'LAP') },
-          { no: 5, title: '總里程排名與結案', desc: '依有效總距離（公里）優先、同距比末圈時間排序，完成 5 項結案稽核後移轉專區 2 製證。', ok: Boolean(ev?.raceStart) }
+          { no: 1, title: '分組設定', desc: `目前 ${evCats.length} 組，單圈 ${Number(ev?.lapDistanceKm || 1.0)} km`, ok: evCats.length > 0 && Number(ev?.lapDistanceKm || 0) > 0 },
+          { no: 2, title: '對帳配號', desc: '入帳後配號與寫卡', ok: true },
+          { no: 3, title: '報到檢錄', desc: '起跑前感應報到', ok: evSts.some((s) => String(s.stationCode).toUpperCase() === 'CHECKIN') },
+          { no: 4, title: '繞圈感應', desc: 'LAP 拱門累圈，逾時自動過濾', ok: evSts.some((s) => String(s.stationCode).toUpperCase() === 'LAP') },
+          { no: 5, title: '結案製證', desc: '依總里程排序並結案', ok: Boolean(ev?.raceStart) }
         ]
       };
     }
     const routeText = evSts.map((s) => s.stationCode).join(' → ') || 'CHECKIN → CP1 → FINISH';
     return {
       raceType: 'distance',
-      badge: '🏃 一般距離挑戰賽 (distance)',
-      shortRule: `固定里程完賽制 · 賽道節點：${routeText} · 依完賽總時間（整數秒）排序`,
+      badge: '🏃 距離賽',
+      shortRule: `節點：${routeText} · 比完賽時間`,
       steps: [
-        { no: 1, title: '報名分組（固定里程）', desc: `設定各距離組別（如 50K / 100K 八百壯士）與關門時間，目前 ${evCats.length} 組。`, ok: evCats.length > 0 },
-        { no: 2, title: '對帳配號與發卡', desc: '確認繳費 (PAID) 後自動配發號碼布並完成 WRITER 寫卡/綁卡。', ok: true },
-        { no: 3, title: '起點報到檢錄 (CHECKIN)', desc: '起跑前檢錄確認選手到場，報到時間不對外公開。', ok: evSts.some((s) => String(s.stationCode).toUpperCase() === 'CHECKIN') },
-        { no: 4, title: '各檢查點與終點管制 (CP → FINISH)', desc: `鳴槍後依序於 ${routeText} 感應計算區段均速；若晶片失靈可立即選擇本活動選手手動補登。`, ok: evSts.some((s) => String(s.stationCode).toUpperCase() === 'FINISH') },
-        { no: 5, title: '完賽時間稽核與結案', desc: '核對各站通過與罰時（整數秒），確認在途選手後通過 5 項把關結案移至專區 2。', ok: Boolean(ev?.raceStart) }
+        { no: 1, title: '分組設定', desc: `目前 ${evCats.length} 組`, ok: evCats.length > 0 },
+        { no: 2, title: '對帳配號', desc: '入帳後配號與寫卡', ok: true },
+        { no: 3, title: '報到檢錄', desc: '起跑前感應報到', ok: evSts.some((s) => String(s.stationCode).toUpperCase() === 'CHECKIN') },
+        { no: 4, title: '各站計時', desc: `依序感應 ${routeText}`, ok: evSts.some((s) => String(s.stationCode).toUpperCase() === 'FINISH') },
+        { no: 5, title: '結案製證', desc: '核對成績與罰時後結案', ok: Boolean(ev?.raceStart) }
       ]
     };
   }
@@ -2165,35 +2165,35 @@
     const isLap = ev?.raceType === 'lap_timed';
     const map = {
       WRITER: {
-        roleLabel: '晶片寫入與發卡管制站',
-        action: '核對已繳費 (PAID) 選手與號碼布，寫入 NDEF「姓名|身分證」或綁定唯讀 UID，並支援舊晶片共用核准。',
-        guard: '未繳費或未配號選手系統自動紅閃攔截；已結案活動禁止寫卡。',
-        fallback: '若晶片損壞請更換備用晶片重新寫入並覆蓋綁定 UID。'
+        roleLabel: '發卡寫入站',
+        action: '寫入 NDEF「姓名|身分證」、綁定 UID 或核准舊卡',
+        guard: '攔截未繳費 / 未配號 / 已結案活動',
+        fallback: '晶片異常請換新卡重新寫入'
       },
       CHECKIN: {
-        roleLabel: '起點報到檢錄管制站（不計成績與圈數）',
-        action: '於開跑前感應選手晶片確認到場報到，更新公開頁「已報到」狀態（嚴格隱藏報到時間點）。',
-        guard: '自動攔截未繳費與重複報到；開跑前後皆可執行檢錄。',
-        fallback: '若晶片無法感應，直接於下方「手動補登」選取該選手並標註異常原因即可完成報到。'
+        roleLabel: '報到檢錄站',
+        action: '感應確認選手報到（不計入成績）',
+        guard: '攔截未繳費與重複報到',
+        fallback: '異常時用下方手動補登'
       },
       LAP: {
-        roleLabel: `繞圈計時主拱門（單圈 ${Number(ev?.lapDistanceKm || 1.0)} km）`,
-        action: '選手每跑完一圈通過主拱門即感應累圈，系統自動防 15 秒連點並於逾限時後標註超時無效圈。',
-        guard: '未鳴槍開跑前自動鎖定禁止感應；未繳費選手自動紅閃攔截。',
-        fallback: '若選手晶片失靈漏感應，立即於下方選擇本活動選手手動補登該圈並註記原因。'
+        roleLabel: `繞圈主拱門 (${Number(ev?.lapDistanceKm || 1.0)}km)`,
+        action: '每圈刷卡累圈，逾限時標註超時圈',
+        guard: '未鳴槍鎖定；防 15 秒連點',
+        fallback: '漏感應請用下方手動補圈'
       },
       FINISH: {
-        roleLabel: `終點衝線計時站${stObj?.distanceKm ? ` (${stObj.distanceKm} km)` : ''}`,
-        action: '感應選手衝線瞬間並以整數秒計算總成績、平均配速與八百壯士 100K+ 達標判定。',
-        guard: '未鳴槍前禁止感應；已完賽選手防呆鎖定不覆蓋首次衝線時間。',
-        fallback: '若衝線晶片無法感應，立即於下方選擇選手並手動補登衝線時間與原因。'
+        roleLabel: `終點站${stObj?.distanceKm ? ` (${stObj.distanceKm}km)` : ''}`,
+        action: '感應衝線計算完賽時間與配速',
+        guard: '未鳴槍鎖定；不覆蓋首次衝線',
+        fallback: '漏感應請用下方手動補登'
       }
     };
     const info = map[code] || {
-      roleLabel: `${stObj ? stObj.name : code} 賽道中繼檢查站${stObj?.distanceKm ? ` (${stObj.distanceKm} km)` : ''}`,
-      action: '記錄選手通過本管制點之精準時間，即時更新公開進度時間軸與各區段均速分析。',
-      guard: '未鳴槍開跑前自動鎖定；未繳費與 15 秒內重複刷卡自動攔截。',
-      fallback: '若晶片無法感應，請於下方「晶片無法感應手動補登」搜尋並選擇本場選手補登通過時間。'
+      roleLabel: `${stObj ? stObj.name : code}${stObj?.distanceKm ? ` (${stObj.distanceKm}km)` : ''}`,
+      action: '記錄通過時間與區段均速',
+      guard: '未鳴槍鎖定；防 15 秒連點',
+      fallback: '漏感應請用下方手動補登'
     };
     return {
       code,

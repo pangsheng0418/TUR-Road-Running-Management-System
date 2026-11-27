@@ -135,10 +135,10 @@
   function updateNetworkBadge() {
     const b = $('#netBadge');
     if (navigator.onLine) {
-      b.textContent = State.gasUrl ? '● 雲端即時同步' : '● 本機模式';
+      b.textContent = State.gasUrl ? '● 雲端同步' : '● 本機';
       b.className = 'whitespace-nowrap text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
     } else {
-      b.textContent = '● 離線作業中';
+      b.textContent = '● 離線';
       b.className = 'whitespace-nowrap text-[11px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40';
     }
   }
@@ -277,10 +277,10 @@
     $('#btnSyncPull').classList.toggle('hidden', !isStaff);
 
     const roleLabels = {
-      public: '🏃 民眾 / 跑者前台',
-      operator: `📡 現場作業員：${u.displayName} [${State.opLockedStation}]`,
-      organizer: `👤 活動承辦人：${u.displayName} (${u.username})`,
-      super_admin: `🛡️ 最高管理員：${u.displayName}`
+      public: '🏃 前台',
+      operator: `📡 作業員：${u.displayName} [${State.opLockedStation}]`,
+      organizer: `👤 承辦：${u.displayName}`,
+      super_admin: `🛡️ 管理員：${u.displayName}`
     };
     $('#roleStatusBadge').textContent = roleLabels[u.role] || roleLabels.public;
 
@@ -288,27 +288,27 @@
     let pills = [];
     if (u.role === 'public') {
       pills = [
-        ['public-home', '🏠 開放報名賽事'],
-        ['public-multi', '🛒 多場聯合報名'],
-        ['public-lookup', '🔍 雙因子報名查詢與修改 (/lookup)']
+        ['public-home', '🏠 賽事報名'],
+        ['public-multi', '🛒 聯合報名'],
+        ['public-lookup', '🔍 查詢與修改']
       ];
     } else if (u.role === 'operator') {
-      pills = [['operator-station', `🔒 執勤站點：${State.opLockedStation}`]];
+      pills = [['operator-station', `🔒 ${State.opLockedStation}`]];
     } else if (u.role === 'organizer') {
       pills = [
-        ['zone1', '專區 1：🏃 進行中活動（僅本人名下）'],
-        ['zone2', '專區 2：📦 已結案・報表・動態證書'],
-        ['zone5', '專區 5：🗄️ 同步狀態（精簡）'],
-        ['public-home', '🌐 預覽報名首頁']
+        ['zone1', '🏃 進行中'],
+        ['zone2', '📦 已結案'],
+        ['zone5', '🗄️ 同步狀態'],
+        ['public-home', '🌐 報名頁']
       ];
     } else if (u.role === 'super_admin') {
       pills = [
-        ['zone1', '專區 1：🏃 進行中活動'],
-        ['zone2', '專區 2：📦 已結案・證書'],
-        ['zone3', '專區 3：👥 帳號管理'],
-        ['zone4', '專區 4：📚 歷屆與八百壯士'],
-        ['zone5', '專區 5：🗄️ 直通控制台'],
-        ['public-home', '🌐 報名首頁']
+        ['zone1', '🏃 進行中'],
+        ['zone2', '📦 已結案'],
+        ['zone3', '👥 帳號'],
+        ['zone4', '📚 歷屆成績'],
+        ['zone5', '🗄️ 系統設定'],
+        ['public-home', '🌐 報名頁']
       ];
     }
 
@@ -383,17 +383,17 @@
             const cats = State.categories.filter((c) => c.eventId === ev.eventId);
             const evPayMode = C.getEventPaymentMode(ev);
             const payBadge = evPayMode === 'ONLINE_PAYUNi'
-              ? '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">💳 結合金流廠商 (PAYUNi)</span>'
-              : '<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-[10px]">🏦 轉帳核對末五碼</span>';
+              ? '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">💳 線上金流</span>'
+              : '<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold text-[10px]">🏦 銀行轉帳</span>';
             return `
               <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col hover:shadow-md transition">
                 <div class="h-32 p-4 flex flex-col justify-between text-white" style="${C.getBannerStyle(ev.bannerUrl)}">
                   <div class="flex justify-between items-start text-[11px]">
                     <div class="flex flex-wrap gap-1">
-                      <span class="px-2 py-0.5 rounded-full bg-black/45 font-bold">${ev.raceType === 'lap_timed' ? '🔁 繞圈計時賽' : '🏃 距離挑戰賽'}</span>
-                      ${C.isTestSuiteId(ev.eventId) ? '<span class="px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black">🧪 測試情境</span>' : ''}
+                      <span class="px-2 py-0.5 rounded-full bg-black/45 font-bold">${ev.raceType === 'lap_timed' ? '🔁 繞圈賽' : '🏃 距離賽'}</span>
+                      ${C.isTestSuiteId(ev.eventId) ? '<span class="px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black">🧪 測試</span>' : ''}
                     </div>
-                    <span class="px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-black">開放報名中</span>
+                    <span class="px-2 py-0.5 rounded-full bg-emerald-500 text-slate-950 font-black">報名中</span>
                   </div>
                   <div>
                     <div class="font-black text-base leading-snug drop-shadow">${C.escapeHtml(ev.nameZh)}</div>
@@ -402,9 +402,9 @@
                 </div>
                 <div class="p-4 flex-1 flex flex-col justify-between space-y-3 text-xs">
                   <div class="space-y-1.5">
-                    <div class="flex justify-between items-center text-slate-600"><span>繳費管制方式</span>${payBadge}</div>
-                    <div class="flex justify-between text-slate-600"><span>🏁 起跑時間</span><b class="mono text-indigo-800">${ev.raceStart ? ev.raceStart.slice(0, 16) : '待公告'}</b></div>
-                    <div class="flex justify-between text-slate-600"><span>已報名 / 限額</span><b class="mono text-slate-900">${quotaTxt}</b></div>
+                    <div class="flex justify-between items-center text-slate-600"><span>繳費方式</span>${payBadge}</div>
+                    <div class="flex justify-between text-slate-600"><span>🏁 起跑</span><b class="mono text-indigo-800">${ev.raceStart ? ev.raceStart.slice(0, 16) : '待公告'}</b></div>
+                    <div class="flex justify-between text-slate-600"><span>名額</span><b class="mono text-slate-900">${quotaTxt}</b></div>
                     <div class="flex flex-wrap gap-1 pt-1">
                       ${C.isEarlyBirdActive(ev) ? `<span class="w-full px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-900 font-black text-[11px]">🐤 早鳥優惠至 ${C.getEventEarlyBirdConfig(ev).endTime.slice(0, 16)}</span>` : ''}
                       ${cats.map((c) => {
@@ -444,15 +444,14 @@
       ? 'p-3.5 rounded-2xl border-2 border-slate-200 bg-white hover:border-slate-400 text-slate-800 text-left shadow-sm transition'
       : 'p-3.5 rounded-2xl border-2 border-slate-900 bg-slate-900 text-white text-left shadow transition';
     $('#btnModeSolo').innerHTML = `
-      <div class="font-black text-sm sm:text-base flex items-center gap-1.5"><span>🏃 個人報名</span>${!isGroup ? '<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-400 text-slate-950">目前模式</span>' : ''}</div>
-      <div class="text-[11px] ${!isGroup ? 'opacity-85' : 'text-slate-500'} mt-0.5">單人填表直接送出，不顯示團報欄位，避免填錯。</div>`;
+      <div class="font-black text-sm sm:text-base flex items-center gap-1.5"><span>🏃 個人報名</span>${!isGroup ? '<span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-400 text-slate-950">目前</span>' : ''}</div>`;
 
     $('#btnModeGroup').className = isGroup
       ? 'p-3.5 rounded-2xl border-2 border-amber-500 bg-amber-500 text-slate-950 text-left shadow transition'
       : 'p-3.5 rounded-2xl border-2 border-slate-200 bg-white hover:border-amber-400 text-slate-800 text-left shadow-sm transition';
     $('#btnModeGroup').innerHTML = `
-      <div class="font-black text-sm sm:text-base flex items-center gap-1.5"><span>👥 團體報名（2～50 人）</span>${isGroup ? '<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-900 text-amber-300">目前模式</span>' : ''}</div>
-      <div class="text-[11px] ${isGroup ? 'text-slate-900/80' : 'text-slate-500'} mt-0.5">第 1 位為團長、其餘為組員；統一匯款、只寄信給團長並由團長統一管理。</div>`;
+      <div class="font-black text-sm sm:text-base flex items-center gap-1.5"><span>👥 團體報名</span>${isGroup ? '<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-900 text-amber-300">目前</span>' : ''}</div>
+      <div class="text-[11px] ${isGroup ? 'text-slate-900/80' : 'text-slate-500'} mt-0.5">2～50 人・團長統一匯款與管理</div>`;
 
     $('#groupSettingsPanel').classList.toggle('hidden', !isGroup);
     $('#btnAddToGroup').classList.toggle('hidden', !isGroup);
@@ -493,28 +492,28 @@
     const leader = State.groupCart[0] || null;
     if (!leader) {
       if (banner) {
-        banner.className = 'p-2.5 rounded-lg bg-amber-200/80 border border-amber-400 text-xs font-black text-amber-950';
-        banner.textContent = '👑 目前填寫：【第 1 位・團長資料】— 請填寫團長 Email，後續所有報名確認信、入帳通知與整團修改權限均由團長統一管理。';
+        banner.className = 'p-2 rounded-lg bg-amber-200/80 border border-amber-400 text-xs font-black text-amber-950';
+        banner.textContent = '👑 第 1 位（團長）— 統一收信、匯款與管理';
       }
       if (emailEl) {
         emailEl.readOnly = false;
         emailEl.classList.remove('bg-amber-50', 'text-slate-600');
       }
-      if (emailHint) emailHint.textContent = '（團長統一收信窗口，必填）';
-      if (addBtn) addBtn.textContent = '👑 加入為團長（第 1 位）';
+      if (emailHint) emailHint.textContent = '（團長信箱）';
+      if (addBtn) addBtn.textContent = '👑 加入團長';
     } else {
       const nextIdx = State.groupCart.length + 1;
       if (banner) {
-        banner.className = 'p-2.5 rounded-lg bg-sky-100 border border-sky-300 text-xs font-black text-sky-950';
-        banner.textContent = `👥 目前填寫：【第 ${nextIdx} 位・組員資料】— 通知信與匯款由團長「${leader.name} (${leader.email})」統一管理，組員免重複填寫 Email。`;
+        banner.className = 'p-2 rounded-lg bg-sky-100 border border-sky-300 text-xs font-black text-sky-950';
+        banner.textContent = `👥 第 ${nextIdx} 位（組員）— 沿用團長信箱 (${leader.email})`;
       }
       if (emailEl) {
         emailEl.value = leader.email || '';
         emailEl.readOnly = true;
         emailEl.classList.add('bg-amber-50', 'text-slate-600');
       }
-      if (emailHint) emailHint.textContent = '（已自動套用團長信箱，由團長統一收信）';
-      if (addBtn) addBtn.textContent = `➕ 加入為組員（第 ${nextIdx} 位）`;
+      if (emailHint) emailHint.textContent = '（沿用團長）';
+      if (addBtn) addBtn.textContent = `➕ 加入組員 (#${nextIdx})`;
     }
   }
 
@@ -533,13 +532,10 @@
     const isLap = ev.raceType === 'lap_timed';
     const rtBox = $('#regRaceTypeBanner');
     if (rtBox) {
-      rtBox.className = `rounded-2xl border-2 p-3.5 text-xs shadow-sm ${isLap ? 'bg-indigo-50 border-indigo-300 text-indigo-950' : 'bg-sky-50 border-sky-300 text-sky-950'}`;
+      rtBox.className = `rounded-2xl border-2 p-3 text-xs shadow-sm ${isLap ? 'bg-indigo-50 border-indigo-300 text-indigo-950' : 'bg-sky-50 border-sky-300 text-sky-950'}`;
       rtBox.innerHTML = `
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <div class="flex items-center gap-2">
-            <span class="px-2.5 py-0.5 rounded-full font-black ${isLap ? 'bg-indigo-700 text-white' : 'bg-sky-700 text-white'}">${wf.badge}</span>
-            <span class="font-black">本場賽事賽制與計時方式</span>
-          </div>
+          <span class="px-2.5 py-0.5 rounded-full font-black ${isLap ? 'bg-indigo-700 text-white' : 'bg-sky-700 text-white'}">${wf.badge}</span>
           <span class="font-bold opacity-90">${C.escapeHtml(wf.shortRule)}</span>
         </div>`;
     }
@@ -549,7 +545,7 @@
     const ebActive = C.isEarlyBirdActive(ev);
     const ebCfg = C.getEventEarlyBirdConfig(ev);
     if (rtBox && ebActive) {
-      rtBox.innerHTML += `<div class="mt-2 pt-2 border-t border-current/15 flex flex-wrap items-center justify-between gap-2 text-emerald-800 font-black"><span>🐤 本活動早鳥優惠進行中！報名送出即鎖定早鳥價</span><span class="mono">早鳥截止：${C.escapeHtml(ebCfg.endTime)}</span></div>`;
+      rtBox.innerHTML += `<div class="mt-2 pt-2 border-t border-current/15 flex flex-wrap items-center justify-between gap-2 text-emerald-800 font-black"><span>🐤 早鳥優惠中</span><span class="mono">截止：${C.escapeHtml(ebCfg.endTime)}</span></div>`;
     }
     $('#regCatId').innerHTML = cats.map((c) => {
       const used = State.participants.filter((p) => p.eventId === ev.eventId && p.catId === c.catId && String(p.payStatus).toUpperCase() !== 'CANCELLED').length;
@@ -668,15 +664,9 @@
     if ($('#regLast5GroupNote')) $('#regLast5GroupNote').classList.toggle('hidden', !isGroup);
     if ($('#groupUnifiedLast5Wrap')) $('#groupUnifiedLast5Wrap').classList.toggle('hidden', !isManual);
     if ($('#regPayModeHeader')) {
-      $('#regPayModeHeader').textContent = isManual
-        ? '14. 本活動指定繳費方式：🏦 實體銀行轉帳（核對帳號末五碼）'
-        : '14. 本活動指定繳費方式：💳 結合金流廠商（PAYUNi 線上自動銷帳）';
+      $('#regPayModeHeader').textContent = isManual ? '繳費方式：🏦 銀行轉帳' : '繳費方式：💳 線上金流';
     }
-    if ($('#regPayModeBadge')) {
-      $('#regPayModeBadge').textContent = isManual ? '🔒 轉帳核對末五碼管制' : '🔒 金流廠商自動銷帳管制';
-      $('#regPayModeBadge').className = `text-[10px] px-2 py-0.5 rounded-full font-bold ${isManual ? 'bg-amber-200 text-amber-950' : 'bg-emerald-600 text-white'}`;
-    }
-    $('#btnSubmitSingle').textContent = isManual ? '📝 確認送出個人報名（轉帳核對末五碼）' : '🔒 前往統一金流 PAYUNi 線上付款（秒級配號）';
+    $('#btnSubmitSingle').textContent = isManual ? '✅ 送出報名' : '💳 送出並線上付款';
   }
 
   function validateRegForm() {
@@ -823,9 +813,9 @@
     $('#groupCountBadge').textContent = `${State.groupCart.length} / 50`;
     const box = $('#groupCartList');
     if (!State.groupCart.length) {
-      box.innerHTML = '<p class="text-slate-400 italic py-3 text-center">尚無成員（第 1 位加入即為 👑 團長，第 2 位起為組員，上限 50 人）</p>';
+      box.innerHTML = '<p class="text-slate-400 italic py-3 text-center">尚無成員（第 1 位為團長，上限 50 人）</p>';
       $('#groupGrandTotal').textContent = 'NT$ 0';
-      $('#btnSubmitGroup').textContent = '✅ 送出整批團報（至少 2 人）';
+      $('#btnSubmitGroup').textContent = '✅ 送出團報（至少 2 人）';
       $('#btnSubmitGroup').disabled = true;
       syncGroupRoleUI();
       return;
@@ -850,8 +840,8 @@
     $('#groupGrandTotal').textContent = `NT$ ${grandTotal.toLocaleString()}`;
     const enough = State.groupCart.length >= 2;
     $('#btnSubmitGroup').textContent = enough
-      ? `✅ 送出整批團報 (${State.groupCart.length} 人｜統一匯款)`
-      : '➕ 請再加入至少 1 位組員 (1/2)';
+      ? `✅ 送出團報 (${State.groupCart.length} 人)`
+      : '➕ 再加 1 位組員 (1/2)';
     $('#btnSubmitGroup').disabled = !enough;
     syncGroupRoleUI();
   }
@@ -917,45 +907,35 @@
     const evs = byMode[mode] || [];
     const isPayuni = mode === 'ONLINE_PAYUNi';
 
-    // 兩段式嚴格防呆：步驟 0A 先選承辦人（不同承辦人收款不同）→ 步驟 0B 再選同金流群組
     $('#multiPayModeBar').innerHTML = `
       <div class="space-y-3">
         <div class="space-y-2">
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <div class="font-black text-sm text-slate-900">👤 步驟 0A：先選擇承辦人 / 收款主辦單位（僅限同一承辦人活動合併繳費）</div>
-              <div class="text-xs text-slate-500 mt-0.5">因不同承辦人收款帳戶與對帳作業各自獨立，發起統一報名須先指定單一承辦人，再勾選其舉辦的場次。</div>
-            </div>
-            <span class="px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-900 font-bold text-xs">共 ${organizers.length} 位承辦人開放中</span>
+            <div class="font-black text-sm text-slate-900">👤 選擇承辦人（限同承辦人合併繳費）</div>
+            <span class="px-2.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-900 font-bold text-xs">${organizers.length} 位</span>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
             ${organizers.map((o) => {
               const act = o.ownerKey === State.multiOwner;
-              const oAtm = o.events.filter((e) => C.getEventPaymentMode(e) === 'MANUAL_ATM').length;
-              const oPu = o.events.filter((e) => C.getEventPaymentMode(e) === 'ONLINE_PAYUNi').length;
               return `
                 <button type="button" data-multi-owner="${C.escapeHtml(o.ownerKey)}" class="p-3 rounded-xl border-2 text-left transition ${act ? 'border-slate-900 bg-slate-900 text-white shadow' : 'border-slate-200 bg-slate-50 text-slate-800 hover:border-indigo-400'}">
                   <div class="flex items-center justify-between gap-1">
                     <span class="font-black text-sm truncate">👤 ${C.escapeHtml(o.displayName)}</span>
-                    <span class="px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 ${act ? 'bg-amber-400 text-slate-950' : 'bg-white border text-slate-700'}">${o.events.length} 場開放</span>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 ${act ? 'bg-amber-400 text-slate-950' : 'bg-white border text-slate-700'}">${o.events.length} 場</span>
                   </div>
-                  <div class="text-[11px] mt-1 ${act ? 'text-slate-300' : 'text-slate-500'}">主辦：${C.escapeHtml(o.organizerZh)} · <span class="mono">${C.escapeHtml(o.ownerKey)}</span></div>
-                  <div class="text-[10px] mt-1 ${act ? 'text-emerald-300' : 'text-slate-600'}">轉帳 ${oAtm} 場 ｜ PAYUNi ${oPu} 場</div>
+                  <div class="text-[11px] mt-1 ${act ? 'text-slate-300' : 'text-slate-500'}">${C.escapeHtml(o.organizerZh)}</div>
                 </button>`;
             }).join('')}
           </div>
         </div>
 
         <div class="pt-2.5 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <div class="font-black text-xs sm:text-sm text-slate-900">💰 步驟 0B：選擇「${C.escapeHtml(activeOrg.displayName)}」名下同金流群組</div>
-            <div class="text-[11px] text-slate-500 mt-0.5">同承辦人且同金流模式之活動方可合併為 1 筆結帳。</div>
-          </div>
+          <div class="font-black text-xs sm:text-sm text-slate-900">💰 繳費方式</div>
           <div class="flex flex-wrap gap-2 text-xs">
-            <button type="button" data-multi-mode="MANUAL_ATM" class="px-3.5 py-2 rounded-xl border-2 font-black transition ${!isPayuni ? 'border-amber-500 bg-amber-500 text-slate-950 shadow' : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-amber-300'}">🏦 轉帳核對末五碼（${byMode.MANUAL_ATM.length} 場）</button>
+            <button type="button" data-multi-mode="MANUAL_ATM" class="px-3.5 py-1.5 rounded-xl border-2 font-black transition ${!isPayuni ? 'border-amber-500 bg-amber-500 text-slate-950 shadow' : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-amber-300'}">🏦 銀行轉帳（${byMode.MANUAL_ATM.length} 場）</button>
             ${C.PAYUNi_FEATURE_ENABLED
-              ? `<button type="button" data-multi-mode="ONLINE_PAYUNi" class="px-3.5 py-2 rounded-xl border-2 font-black transition ${isPayuni ? 'border-emerald-600 bg-emerald-600 text-white shadow' : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-400'}">💳 PAYUNi 線上金流（${byMode.ONLINE_PAYUNi.length} 場）</button>`
-              : `<button type="button" disabled class="px-3.5 py-2 rounded-xl border-2 border-slate-200 bg-slate-100 text-slate-400 font-bold opacity-60 cursor-not-allowed">💳 線上金流（🔒 尚未開通）</button>`}
+              ? `<button type="button" data-multi-mode="ONLINE_PAYUNi" class="px-3.5 py-1.5 rounded-xl border-2 font-black transition ${isPayuni ? 'border-emerald-600 bg-emerald-600 text-white shadow' : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-400'}">💳 線上金流（${byMode.ONLINE_PAYUNi.length} 場）</button>`
+              : `<button type="button" disabled class="px-3.5 py-1.5 rounded-xl border-2 border-slate-200 bg-slate-100 text-slate-400 font-bold opacity-60 cursor-not-allowed">💳 線上金流（未開通）</button>`}
           </div>
         </div>
       </div>`;
@@ -993,11 +973,9 @@
     // 渲染可勾選之活動與組別清單
     const listBox = $('#multiEventsList');
     if (!evs.length) {
-      listBox.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm">承辦人「${C.escapeHtml(activeOrg.displayName)}」在此金流群組目前尚無開放報名活動，請切換上方承辦人或金流群組。</div>`;
+      listBox.innerHTML = `<div class="p-8 text-center text-slate-400 text-sm">目前無開放中活動</div>`;
     } else {
-      listBox.innerHTML = (evs.length === 1
-        ? `<div class="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-950">💡 承辦人「<b>${C.escapeHtml(activeOrg.displayName)}</b>」目前於「${isPayuni ? 'PAYUNi 線上金流' : '轉帳核對末五碼'}」共有 <b>1 場</b>開放中活動（不同承辦人收款不同已自動隔離；當該承辦人開立第 2 場以上同金流活動時，將自動並列於此處供一次勾選合併匯款）。</div>`
-        : `<div class="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-950">✅ 承辦人「<b>${C.escapeHtml(activeOrg.displayName)}</b>」目前共有 <b>${evs.length} 場</b>同金流活動開放中，勾選 2 場以上即可合併 1 筆匯款記帳！</div>`) + evs.map((ev) => {
+      listBox.innerHTML = evs.map((ev) => {
         const cats = State.categories.filter((c) => c.eventId === ev.eventId);
         const schema = C.parseJsonSafe(ev.formSchemaJson, C.defaultFormSchema());
         const addons = (Array.isArray(schema.addons) ? schema.addons : []).filter((a) => a && a.enabled !== false);
@@ -1609,32 +1587,36 @@
     const pct = paid.length ? Math.round((passedCount / paid.length) * 100) : 0;
     const needsGun = stCode !== 'WRITER' && stCode !== 'CHECKIN' && !ev.raceStart;
 
-    $('#opStationTitle').textContent = stCode === 'WRITER' ? '📡 晶片寫入與發卡專區（WRITER 鎖定）' : `⏱️ ${stCode} ${sop.stationName} — 管制點控制台`;
-    $('#opEventSubtitle').textContent = `${sop.raceTypeLabel} · ${ev.nameZh} · 執勤帳號：${State.currentUser.username}`;
+    $('#opStationTitle').textContent = stCode === 'WRITER' ? '📡 發卡與寫入 (WRITER)' : `⏱️ ${stCode} ${sop.stationName}`;
+    $('#opEventSubtitle').textContent = `${sop.raceTypeLabel} · ${ev.nameZh} · ${State.currentUser.username}`;
 
-    // 渲染管制點專屬 SOP 與晶片處置指引卡
+    // 管制點進度與 SOP（預設收合，保留主畫面空間給刷卡/寫卡）
     const sopBox = $('#opStationSopBanner');
     if (sopBox) {
-      sopBox.className = `rounded-2xl border-2 p-4 text-xs space-y-2.5 shadow-sm outdoor-card ${needsGun ? 'bg-amber-50 border-amber-400' : (ev.status === 'finished' ? 'bg-rose-50 border-rose-400' : 'bg-white border-indigo-200')}`;
+      sopBox.className = `rounded-2xl border-2 text-xs shadow-sm outdoor-card overflow-hidden ${needsGun ? 'bg-amber-50 border-amber-400' : (ev.status === 'finished' ? 'bg-rose-50 border-rose-400' : 'bg-white border-indigo-200')}`;
       sopBox.innerHTML = `
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <div class="flex flex-wrap items-center gap-2">
-            <span class="px-2.5 py-0.5 rounded-full bg-slate-900 text-amber-400 font-black mono">${sop.code}</span>
-            <span class="font-black text-sm text-slate-900">${C.escapeHtml(sop.roleLabel)}</span>
-            <span class="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-900 font-bold">${sop.raceTypeLabel}</span>
-            ${needsGun ? '<span class="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black">⏳ 尚未鳴槍（目前鎖定計時）</span>' : (ev.status === 'finished' ? '<span class="px-2 py-0.5 rounded-full bg-rose-600 text-white font-black">🔒 活動已結案鎖定</span>' : '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-black">🟢 管制站執勤中</span>')}
+        <details>
+          <summary class="px-4 py-2.5 cursor-pointer flex flex-wrap items-center justify-between gap-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="acc-arrow inline-block text-slate-400">▶</span>
+              <span class="px-2 py-0.5 rounded-full bg-slate-900 text-amber-400 font-black mono">${sop.code}</span>
+              <span class="font-black text-slate-900">${C.escapeHtml(sop.roleLabel)}</span>
+              ${needsGun ? '<span class="px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black">⏳ 未鳴槍</span>' : (ev.status === 'finished' ? '<span class="px-2 py-0.5 rounded-full bg-rose-600 text-white font-black">🔒 已結案</span>' : '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-black">🟢 執勤中</span>')}
+            </div>
+            <div class="mono font-bold text-slate-700">進度：<b>${passedCount}/${paid.length}</b> (${pct}%)</div>
+          </summary>
+          <div class="px-4 pb-3 pt-2 border-t space-y-2">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+              <div class="p-2 rounded-lg bg-slate-50 border"><b>📡 作業：</b>${C.escapeHtml(sop.action)}</div>
+              <div class="p-2 rounded-lg bg-amber-50/70 border border-amber-200"><b>🛡️ 防呆：</b>${C.escapeHtml(sop.guard)}</div>
+              <div class="p-2 rounded-lg bg-sky-50/70 border border-sky-200"><b>🛠️ 補登：</b>${C.escapeHtml(sop.fallback)}</div>
+            </div>
+            <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
+              <span class="font-bold text-slate-500">賽道：</span>
+              ${sop.routeNodes.map((n, i) => `${i > 0 ? '<span class="text-slate-400">→</span>' : ''}<span class="px-2 py-0.5 rounded-lg mono font-bold ${n === stCode ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-500' : 'bg-slate-100 text-slate-600'}">${n}</span>`).join('')}
+            </div>
           </div>
-          <div class="mono font-bold text-slate-700">本站進度：<b>${passedCount} / ${paid.length} 人</b> (${pct}%)</div>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
-          <div class="p-2.5 rounded-xl bg-slate-50 border"><b class="text-slate-800">📡 本站晶片管制作為：</b><div class="mt-0.5 text-slate-600 leading-relaxed">${C.escapeHtml(sop.action)}</div></div>
-          <div class="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200"><b class="text-amber-900">🛡️ 系統自動防呆攔截：</b><div class="mt-0.5 text-amber-900/90 leading-relaxed">${C.escapeHtml(sop.guard)}</div></div>
-          <div class="p-2.5 rounded-xl bg-sky-50/70 border border-sky-200"><b class="text-sky-900">🛠️ 晶片無法感應處置：</b><div class="mt-0.5 text-sky-900/90 leading-relaxed">${C.escapeHtml(sop.fallback)}</div></div>
-        </div>
-        <div class="flex flex-wrap items-center gap-1.5 text-[11px] pt-1">
-          <span class="font-bold text-slate-500">賽道管制鏈：</span>
-          ${sop.routeNodes.map((n, i) => `${i > 0 ? '<span class="text-slate-400">→</span>' : ''}<span class="px-2 py-0.5 rounded-lg mono font-bold ${n === stCode ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-500' : 'bg-slate-100 text-slate-600'}">${n}</span>`).join('')}
-        </div>`;
+        </details>`;
     }
 
     const isWriter = stCode === 'WRITER';
@@ -2329,68 +2311,64 @@
           </div>` : ''}
 
         ${isGroupLeaderLogin ? `
-          <div class="p-4 rounded-xl bg-amber-50 border-2 border-amber-400 space-y-3 text-xs">
+          <div class="p-3.5 rounded-xl bg-amber-50 border-2 border-amber-400 space-y-2.5 text-xs">
             <div class="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200 pb-2">
               <div>
-                <div class="font-black text-sm text-amber-950">👑 團長專屬管理視圖：${C.escapeHtml(p.groupName || '團體報名')}（團報碼 <span class="mono">${C.escapeHtml(p.groupCode)}</span>）</div>
-                <div class="text-[11px] text-amber-900 mt-0.5">本團共 <b>${groupMembers.length}</b> 人（1 團長 ＋ ${Math.max(0, groupMembers.length - 1)} 組員）｜整團統一匯款總額：<b class="mono text-sm text-rose-700">NT$ ${groupGrandTotal.toLocaleString()}</b>｜所有通知信僅寄送給團長</div>
+                <div class="font-black text-sm text-amber-950">👑 團長管理：${C.escapeHtml(p.groupName || '團報')} <span class="mono">(${C.escapeHtml(p.groupCode)})</span></div>
+                <div class="text-[11px] text-amber-900 mt-0.5">共 <b>${groupMembers.length}</b> 人 ｜ 總額 <b class="mono text-rose-700">NT$ ${groupGrandTotal.toLocaleString()}</b></div>
               </div>
-              <span class="px-2.5 py-1 rounded-full font-black ${groupUnpaid.length ? 'bg-rose-100 text-rose-800' : 'bg-emerald-600 text-white'}">${groupUnpaid.length ? `整團待對帳 (${groupUnpaid.length}/${groupMembers.length}人)` : '✅ 全團已入帳'}</span>
+              <span class="px-2.5 py-1 rounded-full font-black ${groupUnpaid.length ? 'bg-rose-100 text-rose-800' : 'bg-emerald-600 text-white'}">${groupUnpaid.length ? `待對帳 (${groupUnpaid.length}/${groupMembers.length})` : '✅ 全團已繳'}</span>
             </div>
             ${groupUnpaid.length >= 1 && !isPayuniEv && !isEventClosed && !isClosedLock ? `
               <div class="flex flex-wrap items-center gap-2">
-                <span class="font-bold text-amber-950">🏦 整團統一匯款末五碼：</span>
-                <input id="lkGroupLast5" type="text" maxlength="5" value="${C.escapeHtml(groupLeader?.remittanceLast5 || '')}" placeholder="輸入 5 碼匯款末五碼" class="px-3 py-1.5 border border-amber-400 rounded-lg mono bg-white w-48" />
-                <button type="button" id="btnSaveGroupLast5" class="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow">💾 一次套用至全團 ${groupUnpaid.length} 人</button>
+                <span class="font-bold text-amber-950">🏦 整團末 5 碼：</span>
+                <input id="lkGroupLast5" type="text" maxlength="5" value="${C.escapeHtml(groupLeader?.remittanceLast5 || '')}" placeholder="5 碼數字" class="px-3 py-1.5 border border-amber-400 rounded-lg mono bg-white w-40" />
+                <button type="button" id="btnSaveGroupLast5" class="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow">💾 套用全團</button>
               </div>` : ''}
-            <div class="space-y-1.5">
-              <div class="font-bold text-amber-950">👥 點選切換要修改的團員資料（組員無法自行登入修改，統一由團長維護）：</div>
-              <div class="flex flex-wrap gap-1.5">
-                ${groupMembers.map((m, idx) => {
-                  const isLdr = groupLeader && m.participantId === groupLeader.participantId;
-                  const active = m.participantId === p.participantId;
-                  return `<button type="button" data-lk-switch="${m.participantId}" class="px-2.5 py-1.5 rounded-lg border transition ${active ? 'bg-slate-900 border-slate-900 text-white font-black' : 'bg-white border-amber-300 text-slate-800 hover:border-amber-500 font-bold'}">
-                    ${isLdr ? '👑 團長' : `👥 組員#${idx}`} ${C.escapeHtml(m.name)} <span class="mono opacity-80">(${m.bibNumber || m.payStatus})</span>
-                  </button>`;
-                }).join('')}
-              </div>
+            <div class="flex flex-wrap gap-1.5">
+              ${groupMembers.map((m, idx) => {
+                const isLdr = groupLeader && m.participantId === groupLeader.participantId;
+                const active = m.participantId === p.participantId;
+                return `<button type="button" data-lk-switch="${m.participantId}" class="px-2.5 py-1.5 rounded-lg border transition ${active ? 'bg-slate-900 border-slate-900 text-white font-black' : 'bg-white border-amber-300 text-slate-800 hover:border-amber-500 font-bold'}">
+                  ${isLdr ? '👑' : `#${idx}`} ${C.escapeHtml(m.name)} <span class="mono opacity-80">(${m.bibNumber || m.payStatus})</span>
+                </button>`;
+              }).join('')}
             </div>
           </div>` : ''}
 
         ${isGroupMemberReadOnly ? `
-          <div class="p-4 rounded-xl bg-rose-50 border-2 border-rose-400 text-xs text-rose-950 space-y-1">
-            <div class="font-black text-sm">🔒 團體報名組員唯讀檢視模式（無法自行修改資料）</div>
-            <div>您屬於團體報名「<b>${C.escapeHtml(p.groupName || '')}</b>（<span class="mono">${C.escapeHtml(p.groupCode)}</span>）」之【組員】。</div>
-            <div>本團採<b>團長統一匯款、統一收信、統一管理</b>，如需修改組別、聯絡資訊或填報匯款末五碼，請聯繫團長「<b>${C.escapeHtml(groupLeader?.name || '團長')}</b>」登入修改。</div>
+          <div class="p-3.5 rounded-xl bg-rose-50 border-2 border-rose-400 text-xs text-rose-950 space-y-1">
+            <div class="font-black text-sm">🔒 組員唯讀（不可修改）</div>
+            <div>如需異動資料或補填末 5 碼，請洽團長「<b>${C.escapeHtml(groupLeader?.name || '團長')}</b>」登入修改。</div>
           </div>` : ''}
 
         ${bundleSiblings.length >= 2 ? `
           <div class="p-3.5 rounded-xl bg-emerald-50 border-2 border-emerald-400 space-y-2 text-xs">
             <div class="flex flex-wrap items-center justify-between gap-2">
-              <div class="font-black text-emerald-950">📦 多場聯合報名合併單：<span class="mono">${bundleCode}</span>（共 ${bundleSiblings.length} 場・合併總額 NT$ ${bundleGrandTotal.toLocaleString()}）</div>
-              <span class="px-2 py-0.5 rounded-full font-bold ${bundleUnpaid.length ? 'bg-amber-200 text-amber-950' : 'bg-emerald-600 text-white'}">${bundleUnpaid.length ? `尚有 ${bundleUnpaid.length} 場待對帳` : '✅ 全數已入帳'}</span>
+              <div class="font-black text-emerald-950">📦 合併單 <span class="mono">${bundleCode}</span>（${bundleSiblings.length} 場・NT$ ${bundleGrandTotal.toLocaleString()}）</div>
+              <span class="px-2 py-0.5 rounded-full font-bold ${bundleUnpaid.length ? 'bg-amber-200 text-amber-950' : 'bg-emerald-600 text-white'}">${bundleUnpaid.length ? `待對帳 ${bundleUnpaid.length} 場` : '✅ 已全數入帳'}</span>
             </div>
             ${bundleUnpaid.length >= 1 && !isPayuniEv ? `
               <div class="flex flex-wrap items-center gap-2 pt-1">
-                <input id="lkBundleLast5" type="text" maxlength="5" value="${C.escapeHtml(p.remittanceLast5 || '')}" placeholder="輸入 5 碼匯款帳號末五碼" class="px-3 py-1.5 border border-emerald-400 rounded-lg mono bg-white w-52" />
-                <button type="button" id="btnSaveBundleLast5" class="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black">💾 一次套用末五碼至本合併單全部 ${bundleUnpaid.length} 場</button>
+                <input id="lkBundleLast5" type="text" maxlength="5" value="${C.escapeHtml(p.remittanceLast5 || '')}" placeholder="5 碼末五碼" class="px-3 py-1.5 border border-emerald-400 rounded-lg mono bg-white w-40" />
+                <button type="button" id="btnSaveBundleLast5" class="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black">💾 套用全單</button>
               </div>` : ''}
           </div>` : ''}
 
         ${!isGroupMemberReadOnly ? `
-          <div class="p-3.5 rounded-xl text-xs font-bold ${isClosedLock ? 'bg-slate-200 border border-slate-400 text-slate-800' : (isPaid ? 'bg-amber-50 border-2 border-amber-400 text-amber-950' : 'bg-sky-50 border-2 border-sky-300 text-sky-950')}">
+          <div class="p-3 rounded-xl text-xs font-bold ${isClosedLock ? 'bg-slate-200 border border-slate-400 text-slate-800' : (isPaid ? 'bg-amber-50 border-2 border-amber-400 text-amber-950' : 'bg-sky-50 border-2 border-sky-300 text-sky-950')}">
             ${isClosedLock
-              ? `🔒 此筆報名已${isCancelled ? '取消' : (ev?.status === 'finished' ? '隨活動結案鎖定' : '完賽寫入正式成績')}，僅供查閱不可再修改。`
+              ? `🔒 已${isCancelled ? '取消' : (ev?.status === 'finished' ? '結案鎖定' : '完賽')}，僅供查閱。`
               : (isPaid
-                ? `🔒 已繳費入帳 (PAID) 費用防呆鎖定：目前編輯對象【${C.escapeHtml(p.name)}】之組別、加購服務、應繳金額與末五碼已鎖定；其餘聯絡資料仍可修改。`
-                : `✏️ 尚未繳費 (UNPAID)：目前編輯對象【${C.escapeHtml(p.name)}】可調整組別、加購服務與所有聯絡欄位${hasGroup ? '（匯款末五碼請於上方「整團統一匯款」處一次更新）' : ''}。`)}
+                ? `🔒 已繳費：費用項目已鎖定，聯絡資料仍可修改。`
+                : `✏️ 未繳費：可修改組別、加購與聯絡資料。`)}
           </div>` : ''}
 
-        <!-- 區塊 1：費用相關項目（已繳費或組員唯讀嚴格鎖定） -->
+        <!-- 區塊 1：費用項目 -->
         <div class="p-3.5 rounded-xl border ${feeLocked ? 'bg-slate-100/90 border-slate-300' : 'bg-amber-50/40 border-amber-200'} space-y-2.5 text-xs">
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <span class="font-black text-slate-900">💰 費用相關項目（${C.escapeHtml(ev?.nameZh || p.eventId)}｜${C.escapeHtml(p.name)}） ${feeLocked ? '<span class="ml-1 px-2 py-0.5 rounded-full bg-amber-200 text-amber-950 text-[10px]">🔒 已鎖定不可修改</span>' : '<span class="ml-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px]">✏️ 未繳費可調整重算</span>'}</span>
-            <span class="mono font-black text-base text-amber-700" id="lkTotalDisplay">${hasGroup ? `本員小計：NT$ ${Number(p.totalAmount || 0).toLocaleString()}（整團 NT$ ${groupGrandTotal.toLocaleString()}）` : `本場應繳：NT$ ${Number(p.totalAmount || 0).toLocaleString()}`}</span>
+            <span class="font-black text-slate-900">💰 費用項目（${C.escapeHtml(ev?.nameZh || p.eventId)}） ${feeLocked ? '<span class="ml-1 px-2 py-0.5 rounded-full bg-amber-200 text-amber-950 text-[10px]">🔒 已鎖定</span>' : '<span class="ml-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px]">✏️ 可修改</span>'}</span>
+            <span class="mono font-black text-base text-amber-700" id="lkTotalDisplay">${hasGroup ? `小計 NT$ ${Number(p.totalAmount || 0).toLocaleString()}（全團 NT$ ${groupGrandTotal.toLocaleString()}）` : `NT$ ${Number(p.totalAmount || 0).toLocaleString()}`}</span>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             <div><label class="font-bold">序號 / 號碼布 / 狀態</label><input disabled value="${p.participantId}｜${p.bibNumber || '待配號'}｜${paySt}" class="w-full px-2.5 py-2 border rounded-lg bg-slate-200/70 mono mt-0.5" /></div>
@@ -2429,26 +2407,26 @@
             </div>` : ''}
         </div>
 
-        <!-- 區塊 2：基本聯絡與非費用欄位（賽前皆可自由修改；組員登入唯讀） -->
+        <!-- 區塊 2：聯絡資料 -->
         <div class="p-3.5 rounded-xl border bg-white space-y-2.5 text-xs">
-          <div class="font-black text-slate-900">✏️ 聯絡、緊急聯絡人與非費用設定（${C.escapeHtml(p.name)}）</div>
+          <div class="font-black text-slate-900">✏️ 聯絡資料（${C.escapeHtml(p.name)}）</div>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-            <div><label class="font-bold">手機號碼 (09 開頭 10 碼)</label><input id="lkPhone" ${editLocked ? 'disabled' : ''} value="${C.escapeHtml(p.phone || '')}" maxlength="10" class="w-full px-2.5 py-2 border rounded-lg mono mt-0.5 ${editLocked ? 'bg-slate-100' : ''}" /></div>
-            <div><label class="font-bold">電子信箱 Email ${isEditingOtherMember ? '🔒（團長統一收信）' : ''}</label><input id="lkEmail" ${editLocked || isEditingOtherMember ? 'disabled' : ''} type="email" value="${C.escapeHtml(p.email || '')}" class="w-full px-2.5 py-2 border rounded-lg mt-0.5 ${editLocked || isEditingOtherMember ? 'bg-slate-100' : ''}" /></div>
-            <div><label class="font-bold">通訊住址（選填）</label><input id="lkCity" ${editLocked ? 'disabled' : ''} value="${C.escapeHtml(p.city || '')}" autocomplete="off" class="w-full px-2.5 py-2 border rounded-lg mt-0.5 ${editLocked ? 'bg-slate-100' : ''}" /></div>
-            <div><label class="font-bold">緊急聯絡人姓名</label><input id="lkEmergName" ${editLocked ? 'disabled' : ''} value="${C.escapeHtml(p.emergencyName || '')}" class="w-full px-2.5 py-2 border rounded-lg mt-0.5 ${editLocked ? 'bg-slate-100' : ''}" /></div>
-            <div><label class="font-bold">緊急聯絡人電話</label><input id="lkEmergPhone" ${editLocked ? 'disabled' : ''} value="${C.escapeHtml(p.emergencyPhone || '')}" maxlength="10" class="w-full px-2.5 py-2 border rounded-lg mono mt-0.5 ${editLocked ? 'bg-slate-100' : ''}" /></div>
-            <div><label class="font-bold">飲食習慣</label>
+            <div><label class="font-bold">手機</label><input id="lkPhone" ${editLocked ? 'disabled' : ''} value="${C.escapeHtml(p.phone || '')}" maxlength="10" class="w-full px-2.5 py-2 border rounded-lg mono mt-0.5 ${editLocked ? 'bg-slate-100' : ''}" /></div>
+            <div><label class="font-bold">Email ${isEditingOtherMember ? '🔒' : ''}</label><input id="lkEmail" ${editLocked || isEditingOtherMember ? 'disabled' : ''} type="email" value="${C.escapeHtml(p.email || '')}" class="w-full px-2.5 py-2 border rounded-lg mt-0.5 ${editLocked || isEditingOtherMember ? 'bg-slate-100' : ''}" /></div>
+            <div><label class="font-bold">住址</label><input id="lkCity" ${editLocked ? 'disabled' : ''} value="${C.escapeHtml(p.city || '')}" autocomplete="off" class="w-full px-2.5 py-2 border rounded-lg mt-0.5 ${editLocked ? 'bg-slate-100' : ''}" /></div>
+            <div><label class="font-bold">緊急聯絡人</label><input id="lkEmergName" ${editLocked ? 'disabled' : ''} value="${C.escapeHtml(p.emergencyName || '')}" class="w-full px-2.5 py-2 border rounded-lg mt-0.5 ${editLocked ? 'bg-slate-100' : ''}" /></div>
+            <div><label class="font-bold">緊急聯絡電話</label><input id="lkEmergPhone" ${editLocked ? 'disabled' : ''} value="${C.escapeHtml(p.emergencyPhone || '')}" maxlength="10" class="w-full px-2.5 py-2 border rounded-lg mono mt-0.5 ${editLocked ? 'bg-slate-100' : ''}" /></div>
+            <div><label class="font-bold">飲食</label>
               <select id="lkDiet" ${editLocked ? 'disabled' : ''} class="w-full px-2.5 py-2 border rounded-lg mt-0.5 ${editLocked ? 'bg-slate-100' : ''}">
                 <option value="葷" ${p.diet === '葷' ? 'selected' : ''}>葷食</option>
                 <option value="素" ${p.diet === '素' ? 'selected' : ''}>素食</option>
               </select>
             </div>
-            <div class="sm:col-span-3"><label class="font-bold">備註 / 特殊需求</label><input id="lkRemark" ${editLocked ? 'disabled' : ''} value="${C.escapeHtml(p.remark || '')}" class="w-full px-2.5 py-2 border rounded-lg mt-0.5 ${editLocked ? 'bg-slate-100' : ''}" /></div>
+            <div class="sm:col-span-3"><label class="font-bold">備註</label><input id="lkRemark" ${editLocked ? 'disabled' : ''} value="${C.escapeHtml(p.remark || '')}" class="w-full px-2.5 py-2 border rounded-lg mt-0.5 ${editLocked ? 'bg-slate-100' : ''}" /></div>
           </div>
           ${cfDefs.length ? `
             <div class="pt-2 border-t space-y-2">
-              <div class="font-bold text-indigo-900">📝 活動自訂擴充欄位</div>
+              <div class="font-bold text-indigo-900">📝 其他欄位</div>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 ${cfDefs.map((f) => {
                   const v = curCf[f.key];
@@ -2462,7 +2440,7 @@
             </div>` : ''}
         </div>
 
-        ${editLocked ? '' : `<button id="btnSaveLookup" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow">💾 儲存「${C.escapeHtml(p.name)}」修改並寄送通知信${hasGroup ? '（僅寄給團長）' : ''}</button>`}`;
+        ${editLocked ? '' : `<button id="btnSaveLookup" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow">💾 儲存修改</button>`}`;
 
       $$('[data-lk-switch]').forEach((b) => {
         b.onclick = () => renderLookupEditor(allMatches, b.dataset.lkSwitch, verifiedId);
@@ -2894,7 +2872,7 @@
 
     // 註冊 PWA Service Worker（僅在 http/https 下啟用，不干擾本機 file:// 開啟）
     if ('serviceWorker' in navigator && /^https?:/i.test(location.protocol)) {
-      navigator.serviceWorker.register('./sw.js?v=5.22').catch(() => {});
+      navigator.serviceWorker.register('./sw.js?v=5.23').catch(() => {});
     }
 
     // 連網且已綁定 GAS 時，背景自動同步雲端最新 Google 試算表資料（不影響開頁秒開速度）
