@@ -57,30 +57,30 @@
 <!-- 頂部治理導覽列 -->
 <header class="sticky top-0 z-40 bg-slate-950 text-white shadow-lg">
   <div class="max-w-7xl mx-auto px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2">
-    <div class="flex items-center gap-3">
+    <button type="button" id="btnLogoHome" class="flex items-center gap-3 text-left hover:opacity-90 transition cursor-pointer" title="返回四大區塊首頁">
       <div class="bg-white rounded-xl px-2.5 py-1 shadow flex items-center justify-center shrink-0">
         <img src="assets/tur-logo.jpg" alt="TUR Taiwan Ultra Runners" class="h-7 sm:h-8 w-auto object-contain" />
       </div>
       <div>
         <div class="font-bold text-base leading-tight flex items-center gap-2">
           <span>跑管家</span>
-          <span id="netBadge" class="whitespace-nowrap text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">🌐 雲端連線</span>
+          <span id="netBadge" class="hidden whitespace-nowrap text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">🌐 雲端連線</span>
         </div>
         <div class="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
           <span id="roleStatusBadge" class="px-1.5 py-0.5 rounded bg-slate-800 text-sky-300 font-semibold">🏃 民眾 / 跑者</span>
           <span id="topGunClock" class="mono text-amber-400 font-bold hidden"></span>
         </div>
       </div>
-    </div>
+    </button>
 
     <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs">
-      <!-- 步驟 1：單機離線 ⇄ 雲端連線 模式切換器 -->
-      <div id="syncModeSwitcher" class="flex items-center bg-slate-900 border border-slate-700 rounded-lg p-0.5" title="切換單機離線或雲端連線模式">
+      <!-- 步驟 1：單機離線 ⇄ 雲端連線（僅於晶片計時／後台管理或工作人員登入後顯示） -->
+      <div id="syncModeSwitcher" class="hidden flex items-center bg-slate-900 border border-slate-700 rounded-lg p-0.5" title="切換單機離線或雲端連線模式">
         <button type="button" id="btnSyncModeOffline" data-sync-mode="offline" class="px-2 py-1 rounded text-[11px] font-bold text-slate-300 hover:bg-slate-800 whitespace-nowrap transition">📴 單機離線</button>
         <button type="button" id="btnSyncModeCloud" data-sync-mode="cloud" class="px-2 py-1 rounded text-[11px] font-black bg-emerald-500 text-slate-950 whitespace-nowrap transition">🌐 雲端連線</button>
       </div>
-      <!-- 步驟 2 & 3：右上角常駐待上傳筆數與立即雙向同步 -->
-      <button type="button" id="btnSyncBidirectional" class="px-2.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold flex items-center gap-1 whitespace-nowrap" title="先上傳本機異動（自動去重），再下載雲端最新資料">
+      <!-- 步驟 2 & 3：待上傳筆數與立即雙向同步（僅於工作人員／計時／後台顯示） -->
+      <button type="button" id="btnSyncBidirectional" class="hidden px-2.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold flex items-center gap-1 whitespace-nowrap" title="先上傳本機異動（自動去重），再下載雲端最新資料">
         <span>☁️ 同步</span><span class="bg-slate-950/60 px-1.5 rounded-full mono">(<span id="pendingQueueCount">0</span>)</span>
       </button>
       <button type="button" id="btnSyncUpload" class="hidden"></button>
@@ -91,23 +91,24 @@
         <button type="button" data-font-scale="large" class="px-2 py-1 rounded text-xs font-bold">A+</button>
         <button type="button" data-font-scale="xlarge" class="px-2 py-1 rounded text-xs font-bold">A++</button>
       </div>
-      <button type="button" id="btnOpenLogin" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold whitespace-nowrap">🔐 作業員 / 管理登入</button>
+      <button type="button" id="btnOpenLogin" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold whitespace-nowrap">🔐 登入</button>
       <button type="button" id="btnLogout" class="hidden px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold whitespace-nowrap">🚪 登出</button>
     </div>
   </div>
 
-  <!-- 頂層四大主入口（一、報名｜二、成績查詢｜三、晶片計時｜四、後台管理） -->
-  <div id="topPillarBar" class="bg-slate-900 border-t border-slate-800 overflow-x-auto">
-    <div id="topPillarInner" class="max-w-7xl mx-auto px-3 py-1.5 flex items-center gap-1.5 min-w-max text-xs sm:text-sm">
-      <button type="button" data-pillar="register" class="pillar-pill px-3.5 py-1.5 rounded-lg font-black whitespace-nowrap transition bg-amber-400 text-slate-950">📝 一、報名</button>
-      <button type="button" data-pillar="scores" class="pillar-pill px-3.5 py-1.5 rounded-lg font-bold whitespace-nowrap transition text-slate-200 hover:bg-slate-800">🏆 二、成績查詢</button>
-      <button type="button" data-pillar="timing" class="pillar-pill px-3.5 py-1.5 rounded-lg font-bold whitespace-nowrap transition text-slate-200 hover:bg-slate-800">📡 三、晶片計時</button>
-      <button type="button" data-pillar="admin" class="pillar-pill px-3.5 py-1.5 rounded-lg font-bold whitespace-nowrap transition text-slate-200 hover:bg-slate-800">⚙️ 四、後台管理</button>
+  <!-- 單區專注導覽列（進入任一區塊後才顯示：[← 回首頁] ＋ 目前區塊標題） -->
+  <div id="sectionFocusBar" class="hidden bg-slate-900 border-t border-slate-800">
+    <div class="max-w-7xl mx-auto px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm">
+      <div class="flex items-center gap-2.5">
+        <button type="button" id="btnBackToPortalHome" class="px-3 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black whitespace-nowrap shadow">← 回首頁</button>
+        <span id="activePillarTitle" class="font-black text-white text-sm sm:text-base"></span>
+      </div>
+      <span id="activePillarHint" class="text-[11px] text-slate-400 hidden sm:inline">完成作業後可點左側「← 回首頁」切換其他區塊</span>
     </div>
   </div>
 
-  <!-- 依目前主入口與角色動態顯示之次級導覽列 -->
-  <nav id="mainNavBar" class="bg-white text-slate-700 border-b border-slate-200 overflow-x-auto">
+  <!-- 僅顯示目前所在區塊專屬之次級頁籤（在首頁大廳時自動隱藏） -->
+  <nav id="mainNavBar" class="hidden bg-white text-slate-700 border-b border-slate-200 overflow-x-auto">
     <div id="mainNavInner" class="max-w-7xl mx-auto px-3 py-1.5 flex items-center gap-1.5 min-w-max"></div>
   </nav>
 </header>
@@ -115,8 +116,11 @@
 <!-- 主內容容器 -->
 <main id="appMain" class="max-w-7xl w-full mx-auto px-3 sm:px-4 py-4 flex-1 space-y-4">
 
+  <!-- ==================== 首頁大廳：四大區塊簡化入口 ==================== -->
+  <section id="view-portal-home" class="app-view space-y-5"></section>
+
   <!-- ==================== 視圖 A：前台公開報名首頁 (/) ==================== -->
-  <section id="view-public-home" class="app-view space-y-5">
+  <section id="view-public-home" class="app-view hidden space-y-5">
     <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 shadow">
       <div class="flex flex-wrap items-center gap-3.5">
         <div class="bg-white rounded-2xl px-3.5 py-2 shadow-lg shrink-0">
@@ -1057,11 +1061,11 @@
   </div>
 </div>
 
-<script src="config.js?v=6.0"></script>
-<script src="js/tur-logo.js?v=6.0"></script>
-<script src="js/tur-core.js?v=6.0"></script>
-<script src="js/tur-scores.js?v=6.0"></script>
-<script src="js/tur-zones.js?v=6.0"></script>
-<script src="js/tur-app.js?v=6.0"></script>
+<script src="config.js?v=6.1"></script>
+<script src="js/tur-logo.js?v=6.1"></script>
+<script src="js/tur-core.js?v=6.1"></script>
+<script src="js/tur-scores.js?v=6.1"></script>
+<script src="js/tur-zones.js?v=6.1"></script>
+<script src="js/tur-app.js?v=6.1"></script>
 </body>
 </html>

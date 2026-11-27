@@ -4,7 +4,7 @@
  * - 連網一律優先取最新程式，絕不卡舊快取；離線時自動回退本機快取
  * - 完全略過 GAS / 外部網域與非 GET 請求，確保同步與金流/報名不受干擾
  */
-const CACHE_NAME = 'tur-run-manager-v6.0';
+const CACHE_NAME = 'tur-run-manager-v6.1';
 const CORE_ASSETS = [
   './',
   './index.html',

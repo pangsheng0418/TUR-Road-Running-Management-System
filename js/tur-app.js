@@ -70,8 +70,8 @@
     gasUrl: initGasUrl,
     syncMode: initSyncMode, // 'offline' (📴 單機離線) | 'cloud' (🌐 雲端連線)
     currentUser: { username: 'public', displayName: '民眾 / 跑者', role: 'public', allowedStation: '' },
-    activePillar: 'register', // 'register' | 'scores' | 'timing' | 'admin'
-    activeView: 'public-home',
+    activePillar: 'portal', // 'portal' | 'register' | 'scores' | 'timing' | 'admin'
+    activeView: 'portal-home',
     scoreSubTab: 'live', // 'live' | 'history' | 'warriors' | 'cert'
     hostSubTab: 'create', // 'create' | 'recon'
     hostReconEventId: '',
@@ -169,15 +169,20 @@
     }
   }
 
+  function shouldShowSyncControls() {
+    const role = State.currentUser?.role || 'public';
+    const pillar = getPillarForView(State.activeView);
+    return role !== 'public' || pillar === 'timing' || pillar === 'admin';
+  }
+
   function updateQueueBadge() {
     const cnt = State.syncQueue.length;
     const el = $('#pendingQueueCount');
     if (el) el.textContent = cnt;
     const btn = $('#btnSyncBidirectional');
     if (btn) {
-      btn.className = cnt > 0
-        ? 'px-2.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black flex items-center gap-1 whitespace-nowrap shadow'
-        : 'px-2.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold flex items-center gap-1 whitespace-nowrap';
+      const show = shouldShowSyncControls();
+      btn.className = `${show ? '' : 'hidden '}px-2.5 py-1.5 rounded-lg ${cnt > 0 ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow' : 'bg-sky-600 hover:bg-sky-500 text-white font-bold'} flex items-center gap-1 whitespace-nowrap`;
     }
   }
 
@@ -186,6 +191,7 @@
     const online = navigator.onLine;
     const hasUrl = Boolean(State.gasUrl);
     const cnt = State.syncQueue.length;
+    const showSync = shouldShowSyncControls();
 
     let label = '🌐 雲端連線';
     let badgeCls = 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
@@ -205,7 +211,10 @@
     }
 
     const b = $('#netBadge');
-    if (b) { b.textContent = label; b.className = `whitespace-nowrap text-[11px] px-2 py-0.5 rounded-full font-bold ${badgeCls}`; }
+    if (b) { b.textContent = label; b.className = `${showSync ? '' : 'hidden '}whitespace-nowrap text-[11px] px-2 py-0.5 rounded-full font-bold ${badgeCls}`; }
+    const sw = $('#syncModeSwitcher');
+    if (sw) sw.classList.toggle('hidden', !showSync);
+
     const dutyB = $('#opDutySyncBadge');
     if (dutyB) {
       dutyB.textContent = `${label}${cnt > 0 ? ` · 待傳 ${cnt}` : ''}`;
@@ -472,13 +481,146 @@
   }
 
   /* --------------------------------------------------------------------------
-   * 4-Pillar RBAC Navigation & View Switcher
+   * Hub-and-Spoke Navigation：首頁四大區塊大廳 → 單區專注作業 → 回首頁
    * -------------------------------------------------------------------------- */
   function getPillarForView(viewId) {
+    if (viewId === 'portal-home') return 'portal';
     if (['public-home', 'public-register', 'public-multi', 'public-lookup', 'host-ops'].includes(viewId)) return 'register';
     if (viewId === 'scores') return 'scores';
     if (viewId === 'operator-station') return 'timing';
     return 'admin';
+  }
+
+  function goPortalHome() {
+    if (State.currentUser?.role === 'operator') {
+      toast('🔒 目前為現場作業員執勤中，請先按右上角「🚪 登出」結束執勤再返回首頁', 'warn');
+      return;
+    }
+    if (location.hash) {
+      try { history.replaceState(null, '', location.pathname + location.search); } catch (_) {}
+    }
+    switchView('portal-home');
+  }
+
+  function renderPortalHome() {
+    const box = $('#view-portal-home');
+    if (!box) return;
+    const u = State.currentUser;
+    const isAdminOrOrg = u && (u.role === 'super_admin' || u.role === 'organizer');
+    const openCnt = State.events.filter((e) => e.status === 'open' || e.status === 'auto').length;
+    const activeCnt = State.events.filter((e) => e.status !== 'finished').length;
+    const finCnt = State.events.filter((e) => e.status === 'finished').length;
+    const syncTag = State.syncMode === 'offline' ? '📴 單機離線' : (navigator.onLine ? '🌐 雲端連線' : '⚠️ 斷網暫存');
+    const adminTag = u.role === 'super_admin'
+      ? `🛡️ 已登入：${u.displayName}`
+      : (u.role === 'organizer' ? `👤 已登入：${u.displayName}` : '🔒 需承辦人／管理員登入');
+
+    box.innerHTML = `
+      <div class="max-w-5xl mx-auto space-y-4 py-1 sm:py-2">
+        <div class="bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 text-white rounded-2xl p-4 sm:p-5 shadow-lg border border-slate-800 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-3.5">
+            <div class="bg-white rounded-xl px-3 py-1.5 shadow shrink-0">
+              <img src="assets/tur-logo.jpg" alt="TUR Taiwan Ultra Runners" class="h-9 sm:h-10 w-auto object-contain" />
+            </div>
+            <div>
+              <h1 class="text-lg sm:text-xl font-black tracking-wide">跑管家｜賽事管理系統</h1>
+              <p class="text-xs text-slate-300 mt-0.5">請點選下方四大功能區塊進入作業；處理完成後，按左上角「← 回首頁」即可切換其他區塊。</p>
+            </div>
+          </div>
+          ${isAdminOrOrg ? `<span class="px-3 py-1.5 rounded-xl bg-amber-400/20 border border-amber-400/50 text-amber-300 text-xs font-black">${C.escapeHtml(adminTag)}</span>` : ''}
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
+          <!-- 區塊一：報名 -->
+          <button type="button" data-enter-pillar="register" class="group text-left bg-white hover:bg-sky-50/60 rounded-2xl border-2 border-slate-200 hover:border-sky-500 p-4 sm:p-5 shadow-sm hover:shadow-lg transition flex flex-col justify-between gap-3">
+            <div class="space-y-2.5">
+              <div class="flex items-center justify-between gap-2">
+                <span class="w-10 h-10 rounded-xl bg-sky-600 text-white text-xl flex items-center justify-center shadow group-hover:scale-105 transition">📝</span>
+                <span class="px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-900 text-xs font-black mono">開放報名 ${openCnt} 場</span>
+              </div>
+              <div>
+                <div class="text-lg font-black text-slate-900 group-hover:text-sky-800">一、報名</div>
+                <p class="text-xs text-slate-600 mt-1 leading-relaxed">選場次個人／團體報名、同主辦人多場聯合報名、主辦建立活動與核帳對帳、報名查詢修改。</p>
+              </div>
+            </div>
+            <div class="flex items-center justify-between pt-2.5 border-t border-slate-100 text-xs font-black text-sky-700">
+              <span>選場次 · 聯報 · 主辦作業</span>
+              <span class="group-hover:translate-x-1 transition">進入作業 →</span>
+            </div>
+          </button>
+
+          <!-- 區塊二：成績查詢 -->
+          <button type="button" data-enter-pillar="scores" class="group text-left bg-white hover:bg-amber-50/60 rounded-2xl border-2 border-slate-200 hover:border-amber-500 p-4 sm:p-5 shadow-sm hover:shadow-lg transition flex flex-col justify-between gap-3">
+            <div class="space-y-2.5">
+              <div class="flex items-center justify-between gap-2">
+                <span class="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 text-xl flex items-center justify-center shadow group-hover:scale-105 transition">🏆</span>
+                <span class="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 text-xs font-black mono">進行中 ${activeCnt} · 已結案 ${finCnt}</span>
+              </div>
+              <div>
+                <div class="text-lg font-black text-slate-900 group-hover:text-amber-800">二、成績查詢</div>
+                <p class="text-xs text-slate-600 mt-1 leading-relaxed">即時賽事分組進度／站點通過／成績排名、歷年年度／個人／場次查詢、八百壯士英雄榜與完賽證書。</p>
+              </div>
+            </div>
+            <div class="flex items-center justify-between pt-2.5 border-t border-slate-100 text-xs font-black text-amber-700">
+              <span>即時 · 歷年 · 八百壯士 · 證書</span>
+              <span class="group-hover:translate-x-1 transition">進入查詢 →</span>
+            </div>
+          </button>
+
+          <!-- 區塊三：晶片計時 -->
+          <button type="button" data-enter-pillar="timing" class="group text-left bg-white hover:bg-emerald-50/60 rounded-2xl border-2 border-slate-200 hover:border-emerald-500 p-4 sm:p-5 shadow-sm hover:shadow-lg transition flex flex-col justify-between gap-3">
+            <div class="space-y-2.5">
+              <div class="flex items-center justify-between gap-2">
+                <span class="w-10 h-10 rounded-xl bg-emerald-600 text-white text-xl flex items-center justify-center shadow group-hover:scale-105 transition">📡</span>
+                <span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 text-xs font-black">${syncTag}</span>
+              </div>
+              <div>
+                <div class="text-lg font-black text-slate-900 group-hover:text-emerald-800">三、晶片計時</div>
+                <p class="text-xs text-slate-600 mt-1 leading-relaxed">現場作業員三步驟登錄（選活動 → 選組別 → 帳密進入），執行 NFC 發卡寫入、站點感應與手動補登。</p>
+              </div>
+            </div>
+            <div class="flex items-center justify-between pt-2.5 border-t border-slate-100 text-xs font-black text-emerald-700">
+              <span>三步驟登錄 · 離線感應作業</span>
+              <span class="group-hover:translate-x-1 transition">進入作業 →</span>
+            </div>
+          </button>
+
+          <!-- 區塊四：後台管理 -->
+          <button type="button" data-enter-pillar="admin" class="group text-left bg-white hover:bg-indigo-50/60 rounded-2xl border-2 border-slate-200 hover:border-indigo-500 p-4 sm:p-5 shadow-sm hover:shadow-lg transition flex flex-col justify-between gap-3">
+            <div class="space-y-2.5">
+              <div class="flex items-center justify-between gap-2">
+                <span class="w-10 h-10 rounded-xl bg-indigo-600 text-white text-xl flex items-center justify-center shadow group-hover:scale-105 transition">⚙️</span>
+                <span class="px-2.5 py-0.5 rounded-full ${isAdminOrOrg ? 'bg-indigo-100 text-indigo-900' : 'bg-slate-100 text-slate-700'} text-xs font-black">${C.escapeHtml(adminTag)}</span>
+              </div>
+              <div>
+                <div class="text-lg font-black text-slate-900 group-hover:text-indigo-800">四、後台管理</div>
+                <p class="text-xs text-slate-600 mt-1 leading-relaxed">賽事作業區（活動／手動名單／起跑站點／作業員）、已結案報表與批次證書、樹狀帳號、歷年匯入與資料庫同步。</p>
+              </div>
+            </div>
+            <div class="flex items-center justify-between pt-2.5 border-t border-slate-100 text-xs font-black text-indigo-700">
+              <span>五大管理專區 · 備份與同步</span>
+              <span class="group-hover:translate-x-1 transition">進入管理 →</span>
+            </div>
+          </button>
+        </div>
+      </div>`;
+
+    $$('[data-enter-pillar]').forEach((btn) => {
+      btn.onclick = () => {
+        const p = btn.dataset.enterPillar;
+        if (p === 'register') switchView('public-home');
+        else if (p === 'scores') switchView('scores');
+        else if (p === 'timing') switchView('operator-station');
+        else if (p === 'admin') {
+          if (isAdminOrOrg) {
+            State.z1ViewMode = 'lobby';
+            switchView('zone1');
+          } else {
+            openLoginModal('organizer');
+          }
+        }
+      };
+    });
   }
 
   function renderNavAndHeader() {
@@ -499,12 +641,25 @@
     const pillar = getPillarForView(State.activeView);
     State.activePillar = pillar;
 
-    $$('[data-pillar]').forEach((b) => {
-      const act = b.dataset.pillar === pillar;
-      b.className = act
-        ? 'pillar-pill px-3.5 py-1.5 rounded-lg font-black whitespace-nowrap transition bg-amber-400 text-slate-950 shadow'
-        : 'pillar-pill px-3.5 py-1.5 rounded-lg font-bold whitespace-nowrap transition text-slate-200 hover:bg-slate-800';
-    });
+    const focusBar = $('#sectionFocusBar');
+    const mainNavBar = $('#mainNavBar');
+    const pillarTitleEl = $('#activePillarTitle');
+    const pillarTitles = {
+      register: '📝 一、報名',
+      scores: '🏆 二、成績查詢',
+      timing: '📡 三、晶片計時',
+      admin: '⚙️ 四、後台管理'
+    };
+
+    if (pillar === 'portal') {
+      if (focusBar) focusBar.classList.add('hidden');
+      if (mainNavBar) mainNavBar.classList.add('hidden');
+      updateNetworkBadge();
+      return;
+    }
+
+    if (focusBar) focusBar.classList.remove('hidden');
+    if (pillarTitleEl) pillarTitleEl.textContent = pillarTitles[pillar] || '';
 
     const nav = $('#mainNavInner');
     let pills = [];
@@ -523,9 +678,7 @@
         ['scores:cert', '🏆 （四）完賽證書']
       ];
     } else if (pillar === 'timing') {
-      pills = u.role === 'operator'
-        ? [['operator-station', `🔒 晶片感應作業（${State.opLockedStation}）`]]
-        : [['operator-station', '📡 作業人員登錄（選活動 → 選組別 → 帳密進入）']];
+      pills = []; // 晶片計時採極簡單頁專注，無需次級頁籤
     } else if (pillar === 'admin') {
       if (u.role === 'super_admin') {
         pills = [
@@ -541,10 +694,10 @@
           ['zone2', '📦 二、已結案區'],
           ['zone5', '🗄️ 五、資料庫同步']
         ];
-      } else {
-        pills = [['zone1', '🔐 請先登入最高管理員或活動承辦人帳號']];
       }
     }
+
+    if (mainNavBar) mainNavBar.classList.toggle('hidden', pills.length === 0);
 
     const activeKey = State.activeView === 'scores'
       ? `scores:${State.scoreSubTab || 'live'}`
@@ -567,16 +720,14 @@
         switchView(key);
       };
     });
-    updateQueueBadge();
     updateNetworkBadge();
   }
 
   function switchView(viewId) {
     const role = State.currentUser?.role || 'public';
-    const isAdminOrOrg = role === 'super_admin' || role === 'organizer';
 
-    if (role === 'operator' && ['zone1', 'zone2', 'zone3', 'zone4', 'zone5', 'host-ops'].includes(viewId)) {
-      toast('⛔ 權限不足：現場作業員無法進入後台管理畫面，請先登出作業員身分', 'error');
+    if (role === 'operator' && ['zone1', 'zone2', 'zone3', 'zone4', 'zone5', 'host-ops', 'portal-home'].includes(viewId)) {
+      toast('⛔ 權限不足：現場作業員執勤中無法切換至其他畫面，請先登出', 'error');
       viewId = 'operator-station';
     } else if (role === 'public' && ['zone1', 'zone2', 'zone3', 'zone4', 'zone5'].includes(viewId)) {
       toast('🔒 請先登入最高管理員或活動承辦人帳號', 'warn');
@@ -598,7 +749,8 @@
 
   function renderCurrentView() {
     const v = State.activeView;
-    if (v === 'public-home') renderPublicHome();
+    if (v === 'portal-home') renderPortalHome();
+    else if (v === 'public-home') renderPublicHome();
     else if (v === 'public-register') renderPublicRegister();
     else if (v === 'public-multi') renderPublicMultiRegister();
     else if (v === 'host-ops') renderHostOps();
@@ -2891,8 +3043,8 @@
     State.opEventId = '';
     State.opLockedStation = '';
     State.nfcScanning = false;
-    switchView('public-home');
-    toast('🚪 已安全登出並清除本機工作階段憑證', 'info');
+    switchView('portal-home');
+    toast('🚪 已安全登出並返回首頁', 'info');
   }
 
   /* --------------------------------------------------------------------------
@@ -2925,26 +3077,8 @@
     if ($('#btnSyncUpload')) $('#btnSyncUpload').onclick = () => syncPushNow(false);
     if ($('#btnSyncPull')) $('#btnSyncPull').onclick = () => syncBidirectional(false);
 
-    // 頂層四大主頁籤切換
-    $$('[data-pillar]').forEach((b) => {
-      b.onclick = () => {
-        const p = b.dataset.pillar;
-        const role = State.currentUser?.role || 'public';
-        if (p === 'register') switchView('public-home');
-        else if (p === 'scores') switchView('scores');
-        else if (p === 'timing') switchView('operator-station');
-        else if (p === 'admin') {
-          if (role === 'super_admin' || role === 'organizer') {
-            State.z1ViewMode = 'lobby';
-            switchView('zone1');
-          } else if (role === 'operator') {
-            toast('⛔ 現場作業員無法進入後台管理，請先登出作業員帳號', 'error');
-          } else {
-            openLoginModal('organizer');
-          }
-        }
-      };
-    });
+    if ($('#btnLogoHome')) $('#btnLogoHome').onclick = goPortalHome;
+    if ($('#btnBackToPortalHome')) $('#btnBackToPortalHome').onclick = goPortalHome;
 
     if ($('#btnGoHostOpsFromHome')) $('#btnGoHostOpsFromHome').onclick = () => switchView('host-ops');
     if ($('#btnGoScoresFromHome')) $('#btnGoScoresFromHome').onclick = () => switchView('scores');
@@ -3772,7 +3906,7 @@
 
     // 註冊 PWA Service Worker（僅在 http/https 下啟用，不干擾本機 file:// 開啟）
     if ('serviceWorker' in navigator && /^https?:/i.test(location.protocol)) {
-      navigator.serviceWorker.register('./sw.js?v=6.0').catch(() => {});
+      navigator.serviceWorker.register('./sw.js?v=6.1').catch(() => {});
     }
 
     // 僅在 🌐 雲端連線模式且連網已綁定 GAS 時，背景自動同步雲端最新資料（單機離線模式絕不自動請求）
