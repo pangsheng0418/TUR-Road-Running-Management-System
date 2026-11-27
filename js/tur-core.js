@@ -8,6 +8,9 @@
   'use strict';
 
   // 若要部署至 GitHub Pages / Vercel 讓所有跑者與作業員免設定自動連線，請將 GAS /exec 網址貼於此處：
+  // 目前尚未開通線上金流，預設全面鎖定「實體銀行轉帳（核對末五碼）」防止誤選；未來完成串接後改為 true 即可啟用
+  const PAYUNi_FEATURE_ENABLED = false;
+
   const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwPoUdjUz_jGTbATwsqTWbydoFW9ycoXb0jx0EY52GYLMRLJ81zUeqKZgKkb0lWwNOd/exec';
 
   /* --------------------------------------------------------------------------
@@ -3084,6 +3087,7 @@
 
   global.TurCore = {
     DEFAULT_GAS_URL,
+    PAYUNi_FEATURE_ENABLED,
     onLogoReady,
     pad2, formatDateTime, parseDateTime, formatDuration, formatPace, escapeHtml, maskIdCard, maskNdefPayload,
     COMPOUND_SURNAMES_28, splitFullName, mergeNameParts, zhToEnEventName,

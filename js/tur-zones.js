@@ -556,12 +556,14 @@
               <input type="hidden" id="z1PayMode" value="${payMode}" />
               <div class="grid grid-cols-2 gap-2">
                 ${(C.PAYMENT_MODES || []).map((pm) => {
+                  const isPayuniDisabled = pm.id === 'ONLINE_PAYUNi' && !C.PAYUNi_FEATURE_ENABLED;
                   const sel = payMode === pm.id;
+                  const disabledBtn = payLocked || isPayuniDisabled;
                   const actCls = pm.id === 'ONLINE_PAYUNi' ? 'border-emerald-600 bg-emerald-50 text-emerald-950' : 'border-amber-500 bg-amber-50 text-amber-950';
                   return `
-                    <button type="button" data-z1-paymode="${pm.id}" ${payLocked ? 'disabled' : ''} class="p-2.5 rounded-xl border-2 text-left transition ${sel ? actCls : 'border-slate-200 bg-white text-slate-500'} ${payLocked ? 'cursor-not-allowed opacity-85' : 'hover:shadow-sm'}">
-                      <div class="font-black">${pm.short}${sel ? ' ✓' : ''}</div>
-                      <div class="text-[10px] opacity-85 mt-0.5">${C.escapeHtml(pm.desc)}</div>
+                    <button type="button" data-z1-paymode="${pm.id}" ${disabledBtn ? 'disabled' : ''} class="p-2.5 rounded-xl border-2 text-left transition ${isPayuniDisabled && !sel ? 'border-slate-200 bg-slate-100 text-slate-400 opacity-60 cursor-not-allowed' : (sel ? actCls : 'border-slate-200 bg-white text-slate-500')} ${disabledBtn ? 'cursor-not-allowed' : 'hover:shadow-sm'}">
+                      <div class="font-black">${pm.short}${sel ? ' ✓' : ''}${isPayuniDisabled ? ' <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">🔒 尚未開通</span>' : ''}</div>
+                      <div class="text-[10px] opacity-85 mt-0.5">${isPayuniDisabled ? '目前尚未串接金流，暫停選用（一律預設轉帳）' : C.escapeHtml(pm.desc)}</div>
                     </button>`;
                 }).join('')}
               </div>
@@ -859,6 +861,9 @@
     });
     $$('[data-z1-paymode]').forEach((b) => {
       b.onclick = async () => {
+        if (b.dataset.z1Paymode === 'ONLINE_PAYUNi' && !C.PAYUNi_FEATURE_ENABLED) {
+          return App.toast('🔒 目前尚未開通線上金流，一律預設使用「實體銀行轉帳（核對末五碼）」', 'warn');
+        }
         if (payLocked) return App.toast('🔒 本活動已有選手報名，金流模式已鎖定至報名結束，不可中途切換！', 'warn');
         schema.paymentMode = b.dataset.z1Paymode === 'ONLINE_PAYUNi' ? 'ONLINE_PAYUNi' : 'MANUAL_ATM';
         ev.formSchemaJson = JSON.stringify(schema);

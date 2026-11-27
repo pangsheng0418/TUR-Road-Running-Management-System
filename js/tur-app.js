@@ -890,7 +890,9 @@
     }
     const activeOrg = organizers.find((o) => o.ownerKey === State.multiOwner) || organizers[0];
     const byMode = getOpenEventsByOwnerAndPayMode(State.multiOwner);
-    if (!State.multiPayMode || !(byMode[State.multiPayMode] || []).length) {
+    if (!C.PAYUNi_FEATURE_ENABLED) {
+      State.multiPayMode = 'MANUAL_ATM';
+    } else if (!State.multiPayMode || !(byMode[State.multiPayMode] || []).length) {
       State.multiPayMode = byMode.MANUAL_ATM.length >= byMode.ONLINE_PAYUNi.length ? 'MANUAL_ATM' : 'ONLINE_PAYUNi';
     }
     const mode = State.multiPayMode;
@@ -933,7 +935,9 @@
           </div>
           <div class="flex flex-wrap gap-2 text-xs">
             <button type="button" data-multi-mode="MANUAL_ATM" class="px-3.5 py-2 rounded-xl border-2 font-black transition ${!isPayuni ? 'border-amber-500 bg-amber-500 text-slate-950 shadow' : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-amber-300'}">🏦 轉帳核對末五碼（${byMode.MANUAL_ATM.length} 場）</button>
-            <button type="button" data-multi-mode="ONLINE_PAYUNi" class="px-3.5 py-2 rounded-xl border-2 font-black transition ${isPayuni ? 'border-emerald-600 bg-emerald-600 text-white shadow' : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-400'}">💳 PAYUNi 線上金流（${byMode.ONLINE_PAYUNi.length} 場）</button>
+            ${C.PAYUNi_FEATURE_ENABLED
+              ? `<button type="button" data-multi-mode="ONLINE_PAYUNi" class="px-3.5 py-2 rounded-xl border-2 font-black transition ${isPayuni ? 'border-emerald-600 bg-emerald-600 text-white shadow' : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-400'}">💳 PAYUNi 線上金流（${byMode.ONLINE_PAYUNi.length} 場）</button>`
+              : `<button type="button" disabled class="px-3.5 py-2 rounded-xl border-2 border-slate-200 bg-slate-100 text-slate-400 font-bold opacity-60 cursor-not-allowed">💳 線上金流（🔒 尚未開通）</button>`}
           </div>
         </div>
       </div>`;
@@ -941,12 +945,15 @@
       b.onclick = () => {
         State.multiOwner = b.dataset.multiOwner;
         const nextByMode = getOpenEventsByOwnerAndPayMode(State.multiOwner);
-        State.multiPayMode = nextByMode.MANUAL_ATM.length >= nextByMode.ONLINE_PAYUNi.length ? 'MANUAL_ATM' : 'ONLINE_PAYUNi';
+        State.multiPayMode = !C.PAYUNi_FEATURE_ENABLED
+          ? 'MANUAL_ATM'
+          : (nextByMode.MANUAL_ATM.length >= nextByMode.ONLINE_PAYUNi.length ? 'MANUAL_ATM' : 'ONLINE_PAYUNi');
         renderPublicMultiRegister();
       };
     });
     $$('[data-multi-mode]').forEach((b) => {
       b.onclick = () => {
+        if (b.dataset.multiMode === 'ONLINE_PAYUNi' && !C.PAYUNi_FEATURE_ENABLED) return;
         State.multiPayMode = b.dataset.multiMode;
         renderPublicMultiRegister();
       };
@@ -2147,7 +2154,7 @@
       if (!isLeader && State.groupCart[0]?.email) res.runner.email = State.groupCart[0].email;
       State.groupCart.push(res.runner);
       renderGroupCart();
-      $('#regName').value = ''; $('#regIdCard').value = ''; $('#regPhone').value = '';
+      $('#regName').value = ''; $('#regIdCard').value = ''; $('#regPhone').value = ''; $('#regCity').value = '';
       validateRegForm();
       toast(isLeader
         ? `👑 已加入團長「${res.runner.name}」（第 1 位），請繼續填寫組員資料`
@@ -2165,7 +2172,7 @@
       const res = validateRegForm();
       if (!res.isValid) return toast('尚有必填欄位未填寫或格式有誤，請檢查紅框提示', 'error');
       await commitRunners([res.runner]);
-      $('#regName').value = ''; $('#regIdCard').value = ''; $('#regConsent').checked = false;
+      $('#regName').value = ''; $('#regIdCard').value = ''; $('#regCity').value = ''; $('#regConsent').checked = false;
       validateRegForm();
     };
     $('#btnSubmitGroup').onclick = async () => {
@@ -2355,7 +2362,7 @@
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             <div><label class="font-bold">手機號碼 (09 開頭 10 碼)</label><input id="lkPhone" ${editLocked ? 'disabled' : ''} value="${C.escapeHtml(p.phone || '')}" maxlength="10" class="w-full px-2.5 py-2 border rounded-lg mono mt-0.5 ${editLocked ? 'bg-slate-100' : ''}" /></div>
             <div><label class="font-bold">電子信箱 Email ${isEditingOtherMember ? '🔒（團長統一收信）' : ''}</label><input id="lkEmail" ${editLocked || isEditingOtherMember ? 'disabled' : ''} type="email" value="${C.escapeHtml(p.email || '')}" class="w-full px-2.5 py-2 border rounded-lg mt-0.5 ${editLocked || isEditingOtherMember ? 'bg-slate-100' : ''}" /></div>
-            <div><label class="font-bold">通訊住址（選填）</label><input id="lkCity" ${editLocked ? 'disabled' : ''} value="${C.escapeHtml(p.city || '')}" placeholder="選填" class="w-full px-2.5 py-2 border rounded-lg mt-0.5 ${editLocked ? 'bg-slate-100' : ''}" /></div>
+            <div><label class="font-bold">通訊住址（選填）</label><input id="lkCity" ${editLocked ? 'disabled' : ''} value="${C.escapeHtml(p.city || '')}" autocomplete="off" class="w-full px-2.5 py-2 border rounded-lg mt-0.5 ${editLocked ? 'bg-slate-100' : ''}" /></div>
             <div><label class="font-bold">緊急聯絡人姓名</label><input id="lkEmergName" ${editLocked ? 'disabled' : ''} value="${C.escapeHtml(p.emergencyName || '')}" class="w-full px-2.5 py-2 border rounded-lg mt-0.5 ${editLocked ? 'bg-slate-100' : ''}" /></div>
             <div><label class="font-bold">緊急聯絡人電話</label><input id="lkEmergPhone" ${editLocked ? 'disabled' : ''} value="${C.escapeHtml(p.emergencyPhone || '')}" maxlength="10" class="w-full px-2.5 py-2 border rounded-lg mono mt-0.5 ${editLocked ? 'bg-slate-100' : ''}" /></div>
             <div><label class="font-bold">飲食習慣</label>
@@ -2566,15 +2573,24 @@
       $('#newEvLapFields').classList.toggle('hidden', !isLap);
     };
     const setNewEventPayMode = (pm) => {
-      const isPayuni = pm === 'ONLINE_PAYUNi';
+      const isPayuni = Boolean(C.PAYUNi_FEATURE_ENABLED && pm === 'ONLINE_PAYUNi');
       $('#newEvPayMode').value = isPayuni ? 'ONLINE_PAYUNi' : 'MANUAL_ATM';
       $('#btnNewEvPayManual').className = `p-3 rounded-xl border-2 text-left transition ${!isPayuni ? 'border-amber-500 bg-amber-50' : 'border-slate-200 bg-white hover:border-amber-400'}`;
-      $('#btnNewEvPayPayuni').className = `p-3 rounded-xl border-2 text-left transition ${isPayuni ? 'border-emerald-600 bg-emerald-50' : 'border-slate-200 bg-white hover:border-emerald-400'}`;
+      if (!C.PAYUNi_FEATURE_ENABLED) {
+        $('#btnNewEvPayPayuni').disabled = true;
+        $('#btnNewEvPayPayuni').className = 'p-3 rounded-xl border-2 border-slate-200 bg-slate-100 text-slate-400 text-left opacity-60 cursor-not-allowed';
+      } else {
+        $('#btnNewEvPayPayuni').disabled = false;
+        $('#btnNewEvPayPayuni').className = `p-3 rounded-xl border-2 text-left transition ${isPayuni ? 'border-emerald-600 bg-emerald-50' : 'border-slate-200 bg-white hover:border-emerald-400'}`;
+      }
     };
     $('#btnNewEvDistance').onclick = () => setNewEventRaceType('distance');
     $('#btnNewEvLap').onclick = () => setNewEventRaceType('lap_timed');
     $('#btnNewEvPayManual').onclick = () => setNewEventPayMode('MANUAL_ATM');
-    $('#btnNewEvPayPayuni').onclick = () => setNewEventPayMode('ONLINE_PAYUNi');
+    $('#btnNewEvPayPayuni').onclick = () => {
+      if (!C.PAYUNi_FEATURE_ENABLED) return toast('🔒 目前尚未開通線上金流，預設鎖定實體銀行轉帳', 'warn');
+      setNewEventPayMode('ONLINE_PAYUNi');
+    };
     $('#newEvEarlyBird').onchange = (e) => $('#newEvEarlyBirdFields').classList.toggle('hidden', !e.target.checked);
     $('#btnCloseNewEvent').onclick = () => $('#newEventModal').classList.add('hidden');
     $('#btnCancelNewEvent').onclick = () => $('#newEventModal').classList.add('hidden');
@@ -2600,7 +2616,7 @@
       const nameZh = $('#newEvNameZh').value.trim();
       if (!nameZh) return toast('請輸入中文活動名稱', 'warn');
       const raceType = $('#newEvRaceType').value === 'lap_timed' ? 'lap_timed' : 'distance';
-      const payMode = $('#newEvPayMode').value === 'ONLINE_PAYUNi' ? 'ONLINE_PAYUNi' : 'MANUAL_ATM';
+      const payMode = (C.PAYUNi_FEATURE_ENABLED && $('#newEvPayMode').value === 'ONLINE_PAYUNi') ? 'ONLINE_PAYUNi' : 'MANUAL_ATM';
       const rawStart = ($('#newEvRaceStart')?.value || '').trim();
       if (!rawStart) return toast('請設定活動起跑日期與時間', 'warn');
       const raceStartNorm = rawStart.replace('T', ' ') + (rawStart.length === 16 ? ':00' : '');
