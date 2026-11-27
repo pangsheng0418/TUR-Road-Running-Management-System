@@ -331,9 +331,9 @@
   ];
 
   const DEFAULT_TUR_ADDONS = [
-    { code: 'chip_buy', name: '晶片採購', price: 300, enabled: true },
-    { code: 'lodging', name: '住宿預訂價', price: 1500, enabled: true },
-    { code: 'sport_gear', name: '運動用品加購價', price: 680, enabled: true }
+    { code: 'chip_buy', name: '晶片採購', price: 300, enabled: false },
+    { code: 'lodging', name: '住宿預訂價', price: 1500, enabled: false },
+    { code: 'sport_gear', name: '運動用品加購價', price: 680, enabled: false }
   ];
 
   const DEFAULT_ADDONS_NOTE_FIELD = {
@@ -342,18 +342,59 @@
     type: 'textarea',
     required: false,
     options: [],
-    placeholder: '請補充晶片採購、住宿預訂（房型／同住人）或運動用品（尺寸／款式）等說明，無加購可留空'
+    placeholder: ''
   };
 
   const CUSTOM_FIELD_PRESETS = [
-    { ...DEFAULT_ADDONS_NOTE_FIELD },
-    { key: 'shirt_size', label: '紀念衣尺寸', type: 'select', required: true, options: ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'], placeholder: '請選擇紀念衣尺寸' },
-    { key: 'shuttle_wave', label: '接駁車搭乘梯次', type: 'radio', required: false, options: ['不需接駁', '04:00 台北車站東三門', '04:30 捷運新店站'], placeholder: '' },
-    { key: 'past_formats', label: '曾參與賽制經驗（可複選）', type: 'checkbox', required: false, options: ['全馬 42K', '50K 超馬', '100K 八百壯士', '12H/24H 繞圈', '山徑越野'], placeholder: '' },
-    { key: 'est_hours', label: '預估完賽時間（小時）', type: 'number', required: false, options: [], placeholder: '例如：8' },
-    { key: 'medical_note', label: '藥物過敏 / 特殊醫療備註', type: 'textarea', required: false, options: [], placeholder: '無特殊病史可留空；如有蠶豆症、氣喘或過敏請填寫' },
-    { key: 'qualify_url', label: '完賽資格證明連結', type: 'url', required: false, options: [], placeholder: 'https://...' }
+    { key: 'address', label: '住址', type: 'text', required: false, options: [], placeholder: '' },
+    { key: 'shirt_size', label: '紀念衣尺寸', type: 'select', required: true, options: ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'], placeholder: '請選擇紀念衣尺寸' }
   ];
+
+  const DEFAULT_REG_FIELDS = [
+    { id: 'nationality', label: '國籍 (三碼國際碼)', required: true },
+    { id: 'name', label: '選手姓名', required: true },
+    { id: 'idCard', label: '身分證字號 / 護照', required: true },
+    { id: 'gender', label: '性別', required: true },
+    { id: 'birthday', label: '出生年月日', required: true },
+    { id: 'phone', label: '手機號碼', required: true },
+    { id: 'email', label: '電子信箱 Email', required: true },
+    { id: 'diet', label: '飲食習慣', required: true },
+    { id: 'remark', label: '備註 / 特殊需求', required: false },
+    { id: 'emergName', label: '緊急聯絡人姓名', required: true },
+    { id: 'emergPhone', label: '緊急聯絡人電話', required: true }
+  ];
+
+  function getEffectiveRegFieldOrder(schema) {
+    const sc = schema && typeof schema === 'object' ? schema : {};
+    const cfs = Array.isArray(sc.customFields) ? sc.customFields : [];
+    const cfMap = new Map(cfs.map((f, idx) => [`cf:${f.key}`, { id: `cf:${f.key}`, label: f.label, required: Boolean(f.required), isCustom: true, cfIndex: idx, cfDef: f }]));
+    const baseMap = new Map(DEFAULT_REG_FIELDS.map((f) => [f.id, { ...f, isCustom: false, cfIndex: -1, cfDef: null }]));
+    const allValid = new Map([...baseMap, ...cfMap]);
+
+    const rawOrder = Array.isArray(sc.fieldOrder) ? sc.fieldOrder : [];
+    const seen = new Set();
+    const out = [];
+    rawOrder.forEach((id) => {
+      if (allValid.has(id) && !seen.has(id)) {
+        seen.add(id);
+        out.push(allValid.get(id));
+      }
+    });
+    DEFAULT_REG_FIELDS.forEach((f) => {
+      if (!seen.has(f.id)) {
+        seen.add(f.id);
+        out.push(baseMap.get(f.id));
+      }
+    });
+    cfs.forEach((f) => {
+      const cid = `cf:${f.key}`;
+      if (!seen.has(cid)) {
+        seen.add(cid);
+        out.push(cfMap.get(cid));
+      }
+    });
+    return out;
+  }
 
   const PAYMENT_MODES = [
     {
@@ -3116,7 +3157,7 @@
     pad2, formatDateTime, parseDateTime, formatDuration, formatPace, escapeHtml, maskIdCard, maskNdefPayload,
     COMPOUND_SURNAMES_28, splitFullName, mergeNameParts, zhToEnEventName,
     verifyTaiwanIdChecksum, inferGenderFromId, calcAge, sha256Hex,
-    CURATED_BANNERS, DEFAULT_BROCHURE_TEMPLATE, DEFAULT_TUR_ADDONS, DEFAULT_ADDONS_NOTE_FIELD, CUSTOM_FIELD_TYPES, CUSTOM_FIELD_PRESETS, HISTORY_IMPORT_SPEC, EXTERNAL_IMPORT_SPEC, PAYMENT_MODES,
+    CURATED_BANNERS, DEFAULT_BROCHURE_TEMPLATE, DEFAULT_TUR_ADDONS, DEFAULT_ADDONS_NOTE_FIELD, CUSTOM_FIELD_TYPES, CUSTOM_FIELD_PRESETS, DEFAULT_REG_FIELDS, getEffectiveRegFieldOrder, HISTORY_IMPORT_SPEC, EXTERNAL_IMPORT_SPEC, PAYMENT_MODES,
     getBannerStyle, sanitizeBrochureText, normalizeEventData, defaultFormSchema, getEventPaymentMode, normalizeEarlyBirdEnd, getEventEarlyBirdConfig, isEarlyBirdActive, getEffectiveCategoryPrice, defaultCertConfig, parseJsonSafe,
     TurDB, validateGasUrl, buildGasQueryUrl, gasGet, gasPost,
     isCategoryWarrior800, isWarrior800Eligible, computeLeaderboard, computeEventProgressAnalytics, evaluateEventStageGates,

@@ -165,7 +165,7 @@
           </div>
 
           <div class="p-2.5 rounded-xl bg-rose-50/70 border border-rose-200 text-[11px] text-rose-950 font-semibold flex flex-wrap items-center justify-between gap-1">
-            <span>📌 欄位說明：標示 <b class="text-rose-600">* 必填</b> 之預設欄位皆為必填；「<b>通訊住址</b>」與「<b>加購服務</b>（依承辦人設定）」為非必填。</span>
+            <span>📌 欄位說明：標示 <b class="text-rose-600">* 必填</b> 之預設基本欄位皆為必填；「<b>加購服務</b>」為非必填（住址等額外欄位由承辦人於自訂欄位依需要啟用）。</span>
           </div>
 
           <!-- 1. 報名組別 -->
@@ -175,9 +175,9 @@
             <p id="err-regCatId" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">2. 國籍 (三碼國際碼) <span class="text-rose-600 font-black">*</span></label>
+          <div id="regBasicFieldsGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div data-reg-field="nationality">
+              <label class="block text-xs font-semibold text-slate-700 mb-1"><span class="reg-field-num">2. </span>國籍 (三碼國際碼) <span class="text-rose-600 font-black">*</span></label>
               <div class="flex gap-1.5">
                 <select id="regNationality" class="flex-1 px-3 py-2 border rounded-lg text-sm">
                   <option value="TWN" selected>TWN - 台灣</option><option value="JPN">JPN - 日本</option>
@@ -190,18 +190,18 @@
               </div>
               <p id="err-regNationality" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">3. 選手姓名 <span class="text-rose-600 font-black">*</span></label>
+            <div data-reg-field="name">
+              <label class="block text-xs font-semibold text-slate-700 mb-1"><span class="reg-field-num">3. </span>選手姓名 <span class="text-rose-600 font-black">*</span></label>
               <input id="regName" type="text" placeholder="支援中文複姓與英文姓名" class="w-full px-3 py-2 border rounded-lg text-sm" />
               <p id="err-regName" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">4. 身分證字號 / 護照 <span class="text-rose-600 font-black">*</span></label>
+            <div data-reg-field="idCard">
+              <label class="block text-xs font-semibold text-slate-700 mb-1"><span class="reg-field-num">4. </span>身分證字號 / 護照 <span class="text-rose-600 font-black">*</span></label>
               <input id="regIdCard" type="text" placeholder="本國檢核台灣身分證演算法" class="w-full px-3 py-2 border rounded-lg text-sm uppercase mono" />
               <p id="err-regIdCard" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">5. 性別 (與身分證第2碼聯動) <span class="text-rose-600 font-black">*</span></label>
+            <div data-reg-field="gender">
+              <label class="block text-xs font-semibold text-slate-700 mb-1"><span class="reg-field-num">5. </span>性別 (與身分證第2碼聯動) <span class="text-rose-600 font-black">*</span></label>
               <select id="regGender" class="w-full px-3 py-2 border rounded-lg text-sm">
                 <option value="">請選擇</option>
                 <option value="M">M - 男 (1/8)</option>
@@ -209,31 +209,26 @@
               </select>
               <p id="err-regGender" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">6. 出生年月日 (限 10～80 歲) <span class="text-rose-600 font-black">*</span></label>
+            <div data-reg-field="birthday">
+              <label class="block text-xs font-semibold text-slate-700 mb-1"><span class="reg-field-num">6. </span>出生年月日 (限 10～80 歲) <span class="text-rose-600 font-black">*</span></label>
               <div class="flex gap-2 items-center">
                 <input id="regBirthday" type="date" class="flex-1 px-3 py-2 border rounded-lg text-sm" />
                 <span id="regAgeDisplay" class="px-2.5 py-2 rounded-lg bg-slate-100 text-xs font-bold min-w-[62px] text-center">-- 歲</span>
               </div>
               <p id="err-regBirthday" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">7. 手機號碼 (09 開頭 10 碼) <span class="text-rose-600 font-black">*</span></label>
+            <div data-reg-field="phone">
+              <label class="block text-xs font-semibold text-slate-700 mb-1"><span class="reg-field-num">7. </span>手機號碼 (09 開頭 10 碼) <span class="text-rose-600 font-black">*</span></label>
               <input id="regPhone" type="tel" maxlength="10" placeholder="0912345678" class="w-full px-3 py-2 border rounded-lg text-sm mono" />
               <p id="err-regPhone" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">8. 電子信箱 Email <span class="text-rose-600 font-black">*</span> <span id="regEmailHint" class="text-[10px] font-bold text-amber-700"></span></label>
+            <div data-reg-field="email">
+              <label class="block text-xs font-semibold text-slate-700 mb-1"><span class="reg-field-num">8. </span>電子信箱 Email <span class="text-rose-600 font-black">*</span> <span id="regEmailHint" class="text-[10px] font-bold text-amber-700"></span></label>
               <input id="regEmail" type="email" placeholder="runner@example.com" class="w-full px-3 py-2 border rounded-lg text-sm" />
               <p id="err-regEmail" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">9. 通訊住址 <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-bold">非必填</span></label>
-              <input id="regCity" type="text" value="" autocomplete="off" class="w-full px-3 py-2 border rounded-lg text-sm" />
-              <p id="err-regCity" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
-            </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">10. 飲食習慣 <span class="text-rose-600 font-black">*</span></label>
+            <div data-reg-field="diet">
+              <label class="block text-xs font-semibold text-slate-700 mb-1"><span class="reg-field-num">9. </span>飲食習慣 <span class="text-rose-600 font-black">*</span></label>
               <select id="regDiet" class="w-full px-3 py-2 border rounded-lg text-sm">
                 <option value="">請選擇飲食習慣</option>
                 <option value="葷">葷食</option>
@@ -241,17 +236,17 @@
               </select>
               <p id="err-regDiet" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">備註 / 特殊需求 <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-bold">選填</span></label>
+            <div data-reg-field="remark">
+              <label class="block text-xs font-semibold text-slate-700 mb-1"><span class="reg-field-num">10. </span>備註 / 特殊需求 <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-bold">選填</span></label>
               <input id="regRemark" type="text" placeholder="選填" class="w-full px-3 py-2 border rounded-lg text-sm" />
             </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">11. 緊急聯絡人姓名 (不可同本人) <span class="text-rose-600 font-black">*</span></label>
+            <div data-reg-field="emergName">
+              <label class="block text-xs font-semibold text-slate-700 mb-1"><span class="reg-field-num">11. </span>緊急聯絡人姓名 (不可同本人) <span class="text-rose-600 font-black">*</span></label>
               <input id="regEmergName" type="text" class="w-full px-3 py-2 border rounded-lg text-sm" />
               <p id="err-regEmergName" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">12. 緊急聯絡人電話 (不可同本人) <span class="text-rose-600 font-black">*</span></label>
+            <div data-reg-field="emergPhone">
+              <label class="block text-xs font-semibold text-slate-700 mb-1"><span class="reg-field-num">12. </span>緊急聯絡人電話 (不可同本人) <span class="text-rose-600 font-black">*</span></label>
               <input id="regEmergPhone" type="tel" maxlength="10" class="w-full px-3 py-2 border rounded-lg text-sm mono" />
               <p id="err-regEmergPhone" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
@@ -393,7 +388,7 @@
         <form id="multiRegForm" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3" novalidate>
           <div class="border-b pb-2.5">
             <h2 class="font-black text-base text-slate-900">步驟 2：填寫選手基本資料（只需填寫一次，自動套用至全部勾選場次）</h2>
-            <p class="text-[11px] text-rose-800 font-semibold mt-1">📌 標示 <b class="text-rose-600">*</b> 之預設基本欄位皆為必填；「通訊住址」與「加購服務」為非必填（選填）。</p>
+            <p class="text-[11px] text-rose-800 font-semibold mt-1">📌 標示 <b class="text-rose-600">*</b> 之預設基本欄位皆為必填；「加購服務」為非必填（住址等欄位由各活動自訂設定）。</p>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
@@ -442,10 +437,6 @@
             <div>
               <label class="block font-semibold text-slate-700 mb-1">電子信箱 Email *</label>
               <input id="mEmail" type="email" placeholder="runner@example.com" class="w-full px-3 py-2 border rounded-lg text-sm" />
-            </div>
-            <div>
-              <label class="block font-semibold text-slate-700 mb-1">通訊住址 <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-bold">非必填</span></label>
-              <input id="mCity" type="text" value="" autocomplete="off" class="w-full px-3 py-2 border rounded-lg text-sm" />
             </div>
             <div>
               <label class="block font-semibold text-slate-700 mb-1">飲食習慣 <span class="text-rose-600 font-black">*</span></label>
@@ -927,11 +918,7 @@
           <label class="font-black text-amber-950 block">🏁 活動起跑日期與時間 *（建立報名表即設定完成，直接作為計時基準）</label>
           <input id="newEvRaceStart" type="datetime-local" step="1" required value="2026-12-20T05:00:00" class="w-full px-3 py-2 border border-amber-400 rounded-lg mt-1 bg-white mono font-bold" />
         </div>
-        <div>
-          <label class="font-bold">活動地點</label>
-          <input id="newEvLocation" value="台北市" class="w-full px-3 py-2 border rounded-lg mt-0.5" />
-        </div>
-        <div>
+        <div class="sm:col-span-2">
           <label class="font-bold">主辦單位</label>
           <input id="newEvOrganizer" value="TUR 台灣超馬協會" class="w-full px-3 py-2 border rounded-lg mt-0.5" />
         </div>
@@ -985,44 +972,44 @@
         </div>
       </div>
 
-      <!-- 🛍️ TUR 預設加購物品與補充說明（預設全勾選，建立前與建立後皆可依需求核取及增減） -->
+      <!-- 🛍️ TUR 預設加購物品與備註欄位（預設空白不預勾，由需求自行勾選與定價） -->
       <div class="p-3 rounded-xl bg-indigo-50/70 border border-indigo-200 space-y-2">
-        <div class="font-black text-indigo-950">🛍️ TUR 預設活動加購物品與備註欄位（可依需求核取或調價）</div>
+        <div class="font-black text-indigo-950">🛍️ TUR 預設活動加購物品與備註欄位（預設空白，有需要再勾選）</div>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <label class="p-2 rounded-lg bg-white border border-indigo-200 space-y-1 cursor-pointer">
             <div class="flex items-center gap-1.5 font-bold text-slate-900">
-              <input id="newEvAddonChip" type="checkbox" checked class="accent-indigo-600" />
+              <input id="newEvAddonChip" type="checkbox" class="accent-indigo-600" />
               <span>晶片採購</span>
             </div>
             <div class="flex items-center gap-1 text-[11px] text-slate-600">
               <span>NT$</span>
-              <input id="newEvAddonChipPrice" type="number" min="0" value="300" class="w-full px-1.5 py-1 border rounded mono bg-slate-50 font-bold" />
+              <input id="newEvAddonChipPrice" type="number" min="0" value="" placeholder="金額" class="w-full px-1.5 py-1 border rounded mono bg-slate-50 font-bold" />
             </div>
           </label>
           <label class="p-2 rounded-lg bg-white border border-indigo-200 space-y-1 cursor-pointer">
             <div class="flex items-center gap-1.5 font-bold text-slate-900">
-              <input id="newEvAddonLodging" type="checkbox" checked class="accent-indigo-600" />
+              <input id="newEvAddonLodging" type="checkbox" class="accent-indigo-600" />
               <span>住宿預訂價</span>
             </div>
             <div class="flex items-center gap-1 text-[11px] text-slate-600">
               <span>NT$</span>
-              <input id="newEvAddonLodgingPrice" type="number" min="0" value="1500" class="w-full px-1.5 py-1 border rounded mono bg-slate-50 font-bold" />
+              <input id="newEvAddonLodgingPrice" type="number" min="0" value="" placeholder="金額" class="w-full px-1.5 py-1 border rounded mono bg-slate-50 font-bold" />
             </div>
           </label>
           <label class="p-2 rounded-lg bg-white border border-indigo-200 space-y-1 cursor-pointer">
             <div class="flex items-center gap-1.5 font-bold text-slate-900">
-              <input id="newEvAddonGear" type="checkbox" checked class="accent-indigo-600" />
+              <input id="newEvAddonGear" type="checkbox" class="accent-indigo-600" />
               <span>運動用品加購價</span>
             </div>
             <div class="flex items-center gap-1 text-[11px] text-slate-600">
               <span>NT$</span>
-              <input id="newEvAddonGearPrice" type="number" min="0" value="680" class="w-full px-1.5 py-1 border rounded mono bg-slate-50 font-bold" />
+              <input id="newEvAddonGearPrice" type="number" min="0" value="" placeholder="金額" class="w-full px-1.5 py-1 border rounded mono bg-slate-50 font-bold" />
             </div>
           </label>
         </div>
         <label class="flex items-center gap-2 pt-1 text-[11px] font-bold text-indigo-900 cursor-pointer">
-          <input id="newEvAddonNote" type="checkbox" checked class="accent-indigo-600" />
-          <span>📝 內建「加購項目補充說明／備註」欄位（讓選手補充晶片／住宿房型／運動用品尺寸等說明）</span>
+          <input id="newEvAddonNote" type="checkbox" class="accent-indigo-600" />
+          <span>📝 啟用「加購項目補充說明／備註」欄位（選填，預設空白）</span>
         </label>
       </div>
 
@@ -1034,9 +1021,9 @@
   </div>
 </div>
 
-<script src="js/tur-logo.js?v=5.14"></script>
-<script src="js/tur-core.js?v=5.14"></script>
-<script src="js/tur-zones.js?v=5.14"></script>
-<script src="js/tur-app.js?v=5.14"></script>
+<script src="js/tur-logo.js?v=5.18"></script>
+<script src="js/tur-core.js?v=5.18"></script>
+<script src="js/tur-zones.js?v=5.18"></script>
+<script src="js/tur-app.js?v=5.18"></script>
 </body>
 </html>

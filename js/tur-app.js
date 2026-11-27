@@ -523,7 +523,7 @@
     if (!ev) return;
     $('#regBannerHero').setAttribute('style', C.getBannerStyle(ev.bannerUrl));
     $('#regEventTitle').textContent = ev.nameZh;
-    $('#regEventMeta').textContent = `${ev.nameEn || ''} · ${ev.location || ''} · 🏁 起跑：${ev.raceStart || '待公告'} · 主辦：${ev.organizerZh || 'TUR'}`;
+    $('#regEventMeta').textContent = [ev.nameEn || '', `🏁 起跑：${ev.raceStart || '待公告'}`, `主辦：${ev.organizerZh || 'TUR'}`].filter(Boolean).join(' · ');
     const brochureTxt = C.sanitizeBrochureText(ev.brochureText);
     if ($('#regBrochureBox')) $('#regBrochureBox').classList.toggle('hidden', !brochureTxt);
     $('#regBrochureContent').textContent = brochureTxt;
@@ -563,57 +563,76 @@
     const customFields = Array.isArray(schema.customFields) ? schema.customFields : [];
     const cfSec = $('#regCustomFieldsSection');
     const cfBox = $('#regCustomFieldsContainer');
-    if (cfSec && cfBox) {
-      if (!customFields.length) {
-        cfSec.classList.add('hidden');
-        cfBox.innerHTML = '';
-      } else {
-        cfSec.classList.remove('hidden');
-        cfBox.innerHTML = customFields.map((f) => {
-          const reqMark = f.required ? ' <span class="text-rose-600">*</span>' : '';
-          const ph = C.escapeHtml(f.placeholder || '');
-          const kAttr = C.escapeHtml(f.key);
-          let ctrl = '';
-          if (f.type === 'textarea') {
-            ctrl = `<textarea data-cf-key="${kAttr}" data-cf-type="textarea" rows="2" placeholder="${ph}" class="reg-cf-input w-full px-3 py-2 border rounded-lg text-xs bg-white"></textarea>`;
-          } else if (f.type === 'select') {
-            ctrl = `<select data-cf-key="${kAttr}" data-cf-type="select" class="reg-cf-input w-full px-3 py-2 border rounded-lg text-xs bg-white">
-              <option value="">${ph || '請選擇'}</option>
-              ${(f.options || []).map((opt) => `<option value="${C.escapeHtml(opt)}">${C.escapeHtml(opt)}</option>`).join('')}
-            </select>`;
-          } else if (f.type === 'radio') {
-            ctrl = `<div class="flex flex-wrap gap-2 pt-1">
-              ${(f.options || []).map((opt, idx) => `
-                <label class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white border cursor-pointer hover:border-indigo-400">
-                  <input type="radio" name="cf_radio_${kAttr}" value="${C.escapeHtml(opt)}" data-cf-key="${kAttr}" data-cf-type="radio" class="reg-cf-input" ${idx === 0 && !f.required ? '' : ''} />
-                  <span>${C.escapeHtml(opt)}</span>
-                </label>`).join('')}
-            </div>`;
-          } else if (f.type === 'checkbox') {
-            ctrl = `<div class="flex flex-wrap gap-2 pt-1">
-              ${(f.options || []).map((opt) => `
-                <label class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white border cursor-pointer hover:border-indigo-400">
-                  <input type="checkbox" value="${C.escapeHtml(opt)}" data-cf-key="${kAttr}" data-cf-type="checkbox" class="reg-cf-input" />
-                  <span>${C.escapeHtml(opt)}</span>
-                </label>`).join('')}
-            </div>`;
-          } else {
-            const htmlType = ['number', 'date', 'url'].includes(f.type) ? f.type : 'text';
-            ctrl = `<input type="${htmlType}" data-cf-key="${kAttr}" data-cf-type="${f.type}" placeholder="${ph}" class="reg-cf-input w-full px-3 py-2 border rounded-lg text-xs bg-white" />`;
-          }
-          const spanClass = (f.type === 'textarea' || f.type === 'radio' || f.type === 'checkbox') ? 'sm:col-span-2' : '';
-          return `
-            <div class="${spanClass}">
-              <label class="block text-xs font-bold text-slate-700 mb-1">${C.escapeHtml(f.label)}${reqMark}</label>
-              ${ctrl}
-              <p id="err-cf-${kAttr}" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
-            </div>`;
-        }).join('');
-        $$('.reg-cf-input').forEach((el) => {
-          el.addEventListener('input', validateRegForm);
-          el.addEventListener('change', validateRegForm);
-        });
-      }
+    const grid = $('#regBasicFieldsGrid');
+    if (cfSec) cfSec.classList.add('hidden');
+    if (cfBox) cfBox.innerHTML = '';
+
+    if (grid) {
+      // 清除前次渲染之行內自訂欄位節點，保留原始預設欄位節點及其事件監聽
+      grid.querySelectorAll('.reg-inline-cf-item').forEach((el) => el.remove());
+
+      // 建立自訂欄位節點（與預設欄位共用同一網格，支援承辦人自由穿插與上下排序）
+      const cfNodes = new Map();
+      customFields.forEach((f) => {
+        const reqMark = f.required ? ' <span class="text-rose-600 font-black">*</span>' : ' <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-bold">選填</span>';
+        const ph = C.escapeHtml(f.placeholder || '');
+        const kAttr = C.escapeHtml(f.key);
+        let ctrl = '';
+        if (f.type === 'textarea') {
+          ctrl = `<textarea data-cf-key="${kAttr}" data-cf-type="textarea" rows="2" placeholder="${ph}" class="reg-cf-input w-full px-3 py-2 border rounded-lg text-sm bg-white"></textarea>`;
+        } else if (f.type === 'select') {
+          ctrl = `<select data-cf-key="${kAttr}" data-cf-type="select" class="reg-cf-input w-full px-3 py-2 border rounded-lg text-sm bg-white">
+            <option value="">${ph || '請選擇'}</option>
+            ${(f.options || []).map((opt) => `<option value="${C.escapeHtml(opt)}">${C.escapeHtml(opt)}</option>`).join('')}
+          </select>`;
+        } else if (f.type === 'radio') {
+          ctrl = `<div class="flex flex-wrap gap-2 pt-1 text-xs">
+            ${(f.options || []).map((opt) => `
+              <label class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white border cursor-pointer hover:border-indigo-400">
+                <input type="radio" name="cf_radio_${kAttr}" value="${C.escapeHtml(opt)}" data-cf-key="${kAttr}" data-cf-type="radio" class="reg-cf-input" />
+                <span>${C.escapeHtml(opt)}</span>
+              </label>`).join('')}
+          </div>`;
+        } else if (f.type === 'checkbox') {
+          ctrl = `<div class="flex flex-wrap gap-2 pt-1 text-xs">
+            ${(f.options || []).map((opt) => `
+              <label class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white border cursor-pointer hover:border-indigo-400">
+                <input type="checkbox" value="${C.escapeHtml(opt)}" data-cf-key="${kAttr}" data-cf-type="checkbox" class="reg-cf-input" />
+                <span>${C.escapeHtml(opt)}</span>
+              </label>`).join('')}
+          </div>`;
+        } else {
+          const htmlType = ['number', 'date', 'url'].includes(f.type) ? f.type : 'text';
+          ctrl = `<input type="${htmlType}" data-cf-key="${kAttr}" data-cf-type="${f.type}" placeholder="${ph}" autocomplete="off" class="reg-cf-input w-full px-3 py-2 border rounded-lg text-sm bg-white" />`;
+        }
+        const wrap = document.createElement('div');
+        const spanClass = (f.type === 'textarea' || f.type === 'radio' || f.type === 'checkbox') ? 'sm:col-span-2' : '';
+        wrap.className = `reg-inline-cf-item ${spanClass}`.trim();
+        wrap.dataset.regField = `cf:${f.key}`;
+        wrap.innerHTML = `
+          <label class="block text-xs font-semibold text-indigo-950 mb-1"><span class="reg-field-num"></span>${C.escapeHtml(f.label)}${reqMark}</label>
+          ${ctrl}
+          <p id="err-cf-${kAttr}" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>`;
+        cfNodes.set(`cf:${f.key}`, wrap);
+      });
+
+      // 嚴格依承辦人設定之 fieldOrder 排序預設欄位與自訂欄位，並自動重新編號（2. 3. 4. ...）
+      const ordered = C.getEffectiveRegFieldOrder(schema);
+      ordered.forEach((item, idx) => {
+        const node = item.isCustom
+          ? cfNodes.get(item.id)
+          : grid.querySelector(`:scope > [data-reg-field="${item.id}"]`);
+        if (node) {
+          const numEl = node.querySelector('.reg-field-num');
+          if (numEl) numEl.textContent = `${idx + 2}. `;
+          grid.appendChild(node);
+        }
+      });
+
+      grid.querySelectorAll('.reg-cf-input').forEach((el) => {
+        el.addEventListener('input', validateRegForm);
+        el.addEventListener('change', validateRegForm);
+      });
     }
 
     const enabledAddons = (schema.addons || []).filter((a) => a && a.enabled !== false);
@@ -674,7 +693,6 @@
     const isGroupMode = State.regMode === 'group';
     const leaderInCart = isGroupMode ? (State.groupCart[0] || null) : null;
     const email = leaderInCart ? String(leaderInCart.email || '').trim() : $('#regEmail').value.trim();
-    const city = $('#regCity').value.trim();
     const diet = $('#regDiet').value;
     const emergName = $('#regEmergName').value.trim();
     const emergPhone = $('#regEmergPhone').value.trim();
@@ -707,7 +725,6 @@
     checks.birthday = age === null ? '請選出生日期' : (age < 10 || age > 80 ? `年齡 ${age} 歲，須 10~80 歲` : '');
     checks.phone = /^09\d{8}$/.test(phone) ? '' : '須為 09 開頭 10 碼';
     checks.email = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) ? '' : 'Email 格式錯誤';
-    checks.city = ''; // 通訊住址預設非必填
     checks.diet = diet ? '' : '請選擇飲食習慣（必填）';
     checks.emergName = !emergName ? '請填緊急聯絡人' : (emergName === name ? '不可與本人同名' : '');
     checks.emergPhone = !/^0\d{8,9}$/.test(emergPhone) ? '電話格式錯誤' : (emergPhone === phone ? '不可同本人手機' : '');
@@ -726,7 +743,7 @@
       ['#regName', 'name', '#err-regName'], ['#regIdCard', 'idCard', '#err-regIdCard'],
       ['#regGender', 'gender', '#err-regGender'], ['#regBirthday', 'birthday', '#err-regBirthday'],
       ['#regPhone', 'phone', '#err-regPhone'], ['#regEmail', 'email', '#err-regEmail'],
-      ['#regCity', 'city', '#err-regCity'], ['#regDiet', 'diet', '#err-regDiet'],
+      ['#regDiet', 'diet', '#err-regDiet'],
       ['#regEmergName', 'emergName', '#err-regEmergName'], ['#regEmergPhone', 'emergPhone', '#err-regEmergPhone'],
       ['#regLast5', 'last5', '#err-regLast5']
     ];
@@ -787,7 +804,7 @@
         eventId: evId, catId, bibNumber: '', groupCode: '', groupName: isGroupMode ? grpName : '',
         groupRole: isGroupMode ? (State.groupCart.length === 0 ? 'leader' : 'member') : '',
         name, lastName: split.lastName, firstName: split.firstName, idCard, gender, birthday, age, nationality: nat,
-        phone, email, city, emergencyName: emergName, emergencyPhone: emergPhone, diet, remark: finalRemark,
+        phone, email, city: String(customValues.address || '').trim(), emergencyName: emergName, emergencyPhone: emergPhone, diet, remark: finalRemark,
         totalAmount, addonsDetail: JSON.stringify(addons.map((a) => a.name)),
         customFieldsJson: JSON.stringify(customValues),
         payMethod, remittanceLast5: payMethod === 'MANUAL_ATM' ? last5 : '',
@@ -1234,7 +1251,7 @@
     $('#mAgeDisplay').textContent = age !== null ? `${age} 歲` : '-- 歲';
     const phone = $('#mPhone').value.trim();
     const email = $('#mEmail').value.trim();
-    const city = $('#mCity').value.trim();
+    const city = '';
     const diet = $('#mDiet').value;
     const emergName = $('#mEmergName').value.trim();
     const emergPhone = $('#mEmergPhone').value.trim();
@@ -2155,7 +2172,7 @@
       if (!isLeader && State.groupCart[0]?.email) res.runner.email = State.groupCart[0].email;
       State.groupCart.push(res.runner);
       renderGroupCart();
-      $('#regName').value = ''; $('#regIdCard').value = ''; $('#regPhone').value = ''; $('#regCity').value = '';
+      $('#regName').value = ''; $('#regIdCard').value = ''; $('#regPhone').value = '';
       validateRegForm();
       toast(isLeader
         ? `👑 已加入團長「${res.runner.name}」（第 1 位），請繼續填寫組員資料`
@@ -2173,7 +2190,7 @@
       const res = validateRegForm();
       if (!res.isValid) return toast('尚有必填欄位未填寫或格式有誤，請檢查紅框提示', 'error');
       await commitRunners([res.runner]);
-      $('#regName').value = ''; $('#regIdCard').value = ''; $('#regCity').value = ''; $('#regConsent').checked = false;
+      $('#regName').value = ''; $('#regIdCard').value = ''; $('#regConsent').checked = false;
       validateRegForm();
     };
     $('#btnSubmitGroup').onclick = async () => {
@@ -2600,13 +2617,13 @@
       $('#newEvCatWarrior800').checked = false;
       $('#newEvEarlyBird').checked = true;
       $('#newEvEarlyBirdFields').classList.remove('hidden');
-      $('#newEvAddonChip').checked = true;
-      $('#newEvAddonChipPrice').value = '300';
-      $('#newEvAddonLodging').checked = true;
-      $('#newEvAddonLodgingPrice').value = '1500';
-      $('#newEvAddonGear').checked = true;
-      $('#newEvAddonGearPrice').value = '680';
-      $('#newEvAddonNote').checked = true;
+      $('#newEvAddonChip').checked = false;
+      $('#newEvAddonChipPrice').value = '';
+      $('#newEvAddonLodging').checked = false;
+      $('#newEvAddonLodgingPrice').value = '';
+      $('#newEvAddonGear').checked = false;
+      $('#newEvAddonGearPrice').value = '';
+      $('#newEvAddonNote').checked = false;
       setNewEventRaceType('distance');
       setNewEventPayMode('MANUAL_ATM');
       $('#newEventModal').classList.remove('hidden');
@@ -2629,9 +2646,9 @@
       newSchema.earlyBirdEnabled = ebOn;
       newSchema.earlyBirdEnd = ebEndNorm;
       newSchema.addons = [
-        { code: 'chip_buy', name: '晶片採購', price: Math.max(0, Number($('#newEvAddonChipPrice')?.value || 300)), enabled: Boolean($('#newEvAddonChip')?.checked) },
-        { code: 'lodging', name: '住宿預訂價', price: Math.max(0, Number($('#newEvAddonLodgingPrice')?.value || 1500)), enabled: Boolean($('#newEvAddonLodging')?.checked) },
-        { code: 'sport_gear', name: '運動用品加購價', price: Math.max(0, Number($('#newEvAddonGearPrice')?.value || 680)), enabled: Boolean($('#newEvAddonGear')?.checked) }
+        { code: 'chip_buy', name: '晶片採購', price: Math.max(0, Number($('#newEvAddonChipPrice')?.value || 0)), enabled: Boolean($('#newEvAddonChip')?.checked) },
+        { code: 'lodging', name: '住宿預訂價', price: Math.max(0, Number($('#newEvAddonLodgingPrice')?.value || 0)), enabled: Boolean($('#newEvAddonLodging')?.checked) },
+        { code: 'sport_gear', name: '運動用品加購價', price: Math.max(0, Number($('#newEvAddonGearPrice')?.value || 0)), enabled: Boolean($('#newEvAddonGear')?.checked) }
       ];
       newSchema.customFields = $('#newEvAddonNote')?.checked ? [{ ...C.DEFAULT_ADDONS_NOTE_FIELD }] : [];
       const evId = `TUR-${Date.now().toString().slice(-6)}`;
@@ -2639,7 +2656,7 @@
       const ev = {
         eventId: evId, ownerUsername: State.currentUser.username, nameZh, nameEn: C.zhToEnEventName(nameZh),
         organizerZh: $('#newEvOrganizer').value.trim() || 'TUR 台灣超馬協會', organizerEn: 'TUR',
-        location: $('#newEvLocation').value.trim() || '台灣', raceType,
+        location: '', raceType,
         lapDistanceKm: lapDist, debounceSeconds: 15, status: 'open',
         regStart: C.formatDateTime(), regEnd: '2026-12-31 23:59:59', raceStart: raceStartNorm, maxQuota: 500,
         bannerUrl: isLap ? 'dyn-track' : 'dyn-road',

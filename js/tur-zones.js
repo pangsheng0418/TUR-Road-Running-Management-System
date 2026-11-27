@@ -612,10 +612,6 @@
               <label class="font-bold">🎖️ 賽事總監姓名（證書最下列顯示）</label>
               <input id="z1Director" value="${C.escapeHtml(C.parseJsonSafe(ev.certConfigJson, C.defaultCertConfig()).raceDirectorName || '')}" placeholder="例如：林政宏" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5" />
             </div>
-            <div class="col-span-2">
-              <label class="font-bold">活動地點</label>
-              <input id="z1Loc" value="${C.escapeHtml(ev.location || '')}" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5" />
-            </div>
           </div>
 
           <!-- 📜 活動簡章內容編輯區（預設空白，有填寫才顯示於前台報名頁） -->
@@ -822,29 +818,45 @@
               <button type="button" id="btnZ1AddCustomField" class="w-full py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-black">+ 加入此自訂欄位至本活動報名表</button>
             </div>
 
-            <!-- 已設定之自訂欄位清單 -->
-            <div class="space-y-1.5">
-              <div class="text-[11px] font-bold text-slate-600">目前已啟用之自訂欄位（${(schema.customFields || []).length} 項）：</div>
-              ${(schema.customFields || []).map((f, idx) => {
-                const typeObj = (C.CUSTOM_FIELD_TYPES || []).find((t) => t.id === f.type);
-                return `
-                  <div class="p-2 rounded-lg bg-indigo-50/50 border border-indigo-100 flex items-center justify-between gap-2">
-                    <div class="min-w-0">
-                      <div class="font-bold text-slate-900">
-                        ${idx + 1}. ${C.escapeHtml(f.label)}
-                        <span class="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 text-[10px] mono">${C.escapeHtml(typeObj ? typeObj.label : f.type)}</span>
-                        ${f.required ? '<span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 text-[10px] font-bold">必填</span>' : '<span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px]">選填</span>'}
+            <!-- 報名表全部欄位填列順序調整（預設欄位 ＋ 自訂欄位統一自由上下調整排序） -->
+            <div class="space-y-1.5 pt-1 border-t">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div class="text-[11px] font-black text-indigo-950">↕️ 報名表欄位填列順序（點 ↑ ↓ 自由調整，前台報名表立即套用）</div>
+                <button type="button" id="btnZ1ResetFieldOrder" class="px-2 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px]">↺ 恢復預設順序</button>
+              </div>
+              <div class="p-2 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-between text-[11px] text-slate-600">
+                <div><b>1. 報名組別</b> <span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 text-[10px] font-bold">必填</span></div>
+                <span class="text-[10px] text-slate-400 font-bold">固定首位</span>
+              </div>
+              ${(() => {
+                const orderedFields = C.getEffectiveRegFieldOrder(schema);
+                return orderedFields.map((item, idx) => {
+                  const typeObj = item.isCustom ? (C.CUSTOM_FIELD_TYPES || []).find((t) => t.id === item.cfDef?.type) : null;
+                  return `
+                    <div class="p-2 rounded-lg border flex items-center justify-between gap-2 ${item.isCustom ? 'bg-indigo-50/70 border-indigo-200' : 'bg-white border-slate-200'}">
+                      <div class="min-w-0">
+                        <div class="font-bold text-slate-900">
+                          ${idx + 2}. ${C.escapeHtml(item.label)}
+                          ${item.isCustom
+                            ? `<span class="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-bold">自訂 · ${C.escapeHtml(typeObj ? typeObj.label : item.cfDef?.type)}</span>`
+                            : '<span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px]">預設欄位</span>'}
+                          ${item.required
+                            ? '<span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 text-[10px] font-bold">必填</span>'
+                            : '<span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 text-[10px]">選填</span>'}
+                        </div>
+                        ${item.isCustom && Array.isArray(item.cfDef?.options) && item.cfDef.options.length ? `<div class="text-[10px] text-slate-500 truncate mt-0.5">選項：${C.escapeHtml(item.cfDef.options.join(' / '))}</div>` : ''}
                       </div>
-                      ${Array.isArray(f.options) && f.options.length ? `<div class="text-[10px] text-slate-500 truncate mt-0.5">選項：${C.escapeHtml(f.options.join(' / '))}</div>` : (f.placeholder ? `<div class="text-[10px] text-slate-500 truncate mt-0.5">提示：${C.escapeHtml(f.placeholder)}</div>` : '')}
-                    </div>
-                    <div class="flex items-center gap-1 shrink-0">
-                      <button type="button" data-move-cf="${idx}" data-dir="-1" class="px-1.5 py-0.5 rounded bg-white border hover:bg-slate-100" title="上移">↑</button>
-                      <button type="button" data-move-cf="${idx}" data-dir="1" class="px-1.5 py-0.5 rounded bg-white border hover:bg-slate-100" title="下移">↓</button>
-                      <button type="button" data-toggle-req-cf="${idx}" class="px-1.5 py-0.5 rounded bg-white border hover:bg-amber-50 text-[10px] font-bold">${f.required ? '改選填' : '改必填'}</button>
-                      <button type="button" data-del-cf="${idx}" class="px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 font-bold">刪</button>
-                    </div>
-                  </div>`;
-              }).join('') || '<p class="text-[11px] text-slate-400 italic py-2 text-center">尚未新增自訂欄位（目前僅使用 TUR 預設 14 項報名欄位）</p>'}
+                      <div class="flex items-center gap-1 shrink-0">
+                        <button type="button" data-move-reg-field="${idx}" data-dir="-1" ${idx === 0 ? 'disabled' : ''} class="px-1.5 py-0.5 rounded bg-white border hover:bg-slate-100 disabled:opacity-35" title="上移">↑</button>
+                        <button type="button" data-move-reg-field="${idx}" data-dir="1" ${idx === orderedFields.length - 1 ? 'disabled' : ''} class="px-1.5 py-0.5 rounded bg-white border hover:bg-slate-100 disabled:opacity-35" title="下移">↓</button>
+                        ${item.isCustom ? `
+                          <button type="button" data-toggle-req-cf="${item.cfIndex}" class="px-1.5 py-0.5 rounded bg-white border hover:bg-amber-50 text-[10px] font-bold">${item.required ? '改選填' : '改必填'}</button>
+                          <button type="button" data-del-cf="${item.cfIndex}" class="px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 font-bold">刪</button>
+                        ` : ''}
+                      </div>
+                    </div>`;
+                }).join('');
+              })()}
             </div>
           </div>
         </div>
@@ -916,7 +928,6 @@
       ev.lapDistanceKm = Number($('#z1LapDist').value || 0);
       ev.maxQuota = Number($('#z1MaxQuota').value || 0);
       ev.organizerZh = $('#z1OrgZh').value.trim();
-      ev.location = $('#z1Loc').value.trim();
       ev.brochureText = $('#z1Brochure').value.trim();
       const certCfg = C.parseJsonSafe(ev.certConfigJson, C.defaultCertConfig());
       certCfg.raceDirectorName = ($('#z1Director')?.value || '').trim();
@@ -1180,17 +1191,30 @@
       await saveSchema(`✅ 已新增自訂欄位「${label}」(${type})`);
     };
 
-    $$('[data-move-cf]').forEach((b) => {
+    $$('[data-move-reg-field]').forEach((b) => {
       b.onclick = async () => {
-        const i = Number(b.dataset.moveCf);
+        const ordered = C.getEffectiveRegFieldOrder(schema).map((x) => x.id);
+        const i = Number(b.dataset.moveRegField);
         const j = i + Number(b.dataset.dir);
-        if (j < 0 || j >= schema.customFields.length) return;
-        const tmp = schema.customFields[i];
-        schema.customFields[i] = schema.customFields[j];
-        schema.customFields[j] = tmp;
-        await saveSchema('已調整欄位排序');
+        if (j < 0 || j >= ordered.length) return;
+        const tmp = ordered[i];
+        ordered[i] = ordered[j];
+        ordered[j] = tmp;
+        schema.fieldOrder = ordered;
+        // 同步更新 customFields 陣列順序，讓多場聯報與 Excel 匯出順序一致
+        const cfById = new Map(schema.customFields.map((f) => [`cf:${f.key}`, f]));
+        const reorderedCfs = ordered.filter((id) => cfById.has(id)).map((id) => cfById.get(id));
+        if (reorderedCfs.length === schema.customFields.length) schema.customFields = reorderedCfs;
+        await saveSchema('✅ 已調整報名表欄位順序並同步雲端');
       };
     });
+    const resetOrderBtn = document.getElementById('btnZ1ResetFieldOrder');
+    if (resetOrderBtn) {
+      resetOrderBtn.onclick = async () => {
+        delete schema.fieldOrder;
+        await saveSchema('↺ 已恢復報名表預設欄位順序');
+      };
+    }
     $$('[data-toggle-req-cf]').forEach((b) => {
       b.onclick = async () => {
         const f = schema.customFields[Number(b.dataset.toggleReqCf)];
@@ -1203,6 +1227,9 @@
       b.onclick = async () => {
         const idx = Number(b.dataset.delCf);
         const removed = schema.customFields.splice(idx, 1)[0];
+        if (removed && Array.isArray(schema.fieldOrder)) {
+          schema.fieldOrder = schema.fieldOrder.filter((id) => id !== `cf:${removed.key}`);
+        }
         await saveSchema(`已移除自訂欄位「${removed?.label || ''}」`);
       };
     });
