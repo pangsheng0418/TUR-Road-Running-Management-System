@@ -218,6 +218,14 @@
           await C.TurDB.clearAndFill(k, rows);
         }
       }
+      const cloudInited = (State.globalConfig || []).some((g) => g.configKey === 'platformInitialized' && String(g.configValue) === '1');
+      if (cloudInited || (Array.isArray(d.events) && d.events.length === 0)) {
+        localStorage.setItem('TUR_CLEAN_RESET', '1');
+      }
+      if (State.currentUser && State.currentUser.role !== 'public') {
+        const refreshed = State.users.find((x) => x.username === State.currentUser.username && Number(x.enabled));
+        if (refreshed) State.currentUser = refreshed;
+      }
       rebuildIndices();
       renderAll();
       if (!silent) toast(`🔄 雙向同步成功！已載入 ${State.events.length} 場賽事、${State.participants.length} 位選手`, 'success');
@@ -2898,7 +2906,16 @@
 
     const oldSeedIds = new Set(['TUR-20260001', 'TUR-20260002', 'TUR-20260003', 'TUR-20260004', 'TUR-20260005', 'TUR-FIN-001', 'TUR-FIN-002', 'TUR-FIN-003', 'TUR-F24-001']);
     const isUntouchedOldSeed = State.events.length > 0 && State.participants.length <= 9 && State.participants.every((p) => oldSeedIds.has(p.participantId));
-    if (!State.events.length || isUntouchedOldSeed) {
+    const isCleanInitialized = localStorage.getItem('TUR_CLEAN_RESET') === '1' ||
+      (State.globalConfig || []).some((g) => g.configKey === 'platformInitialized' && String(g.configValue) === '1');
+
+    if (isCleanInitialized) {
+      // 已主動清空重建：維持乾淨 0 場狀態，絕不自動回填舊示範資料，僅保底確保基礎管理帳號存在
+      if (!State.users.length) {
+        State.users = C.buildCleanBaseUsers();
+        await C.TurDB.clearAndFill('users', State.users);
+      }
+    } else if (!State.events.length || isUntouchedOldSeed) {
       const baseSeed = C.buildFull5EventsSeed();
       const { merged } = C.mergeTestSuiteIntoState(baseSeed);
       const fullInit = { ...baseSeed, ...merged };
@@ -2934,7 +2951,7 @@
 
     // 註冊 PWA Service Worker（僅在 http/https 下啟用，不干擾本機 file:// 開啟）
     if ('serviceWorker' in navigator && /^https?:/i.test(location.protocol)) {
-      navigator.serviceWorker.register('./sw.js?v=5.27').catch(() => {});
+      navigator.serviceWorker.register('./sw.js?v=5.28').catch(() => {});
     }
 
     // 連網且已綁定 GAS 時，背景自動同步雲端最新 Google 試算表資料（不影響開頁秒開速度）

@@ -5222,20 +5222,20 @@
           return `
           <div class="bg-emerald-50/70 p-4 rounded-2xl border-2 border-emerald-400 shadow-sm space-y-3 text-xs">
             <div class="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200 pb-2">
-              <h3 class="font-black text-base text-emerald-950">🧪 測試資料（與正式資料隔離）</h3>
+              <h3 class="font-black text-base text-emerald-950">🧪 預訂全階段測試資料（報名 → 晶片管制 → 結案）</h3>
               <div class="text-right mono text-[11px]">
                 <span class="text-emerald-900 font-black">測試：${ts.events} 場 / ${ts.participants} 人</span> ｜ <span class="text-slate-600">正式：${realEvCnt} 場 / ${realPartCnt} 人</span>
               </div>
             </div>
             <div class="flex flex-wrap gap-2 items-center">
-              <button id="btnZ5LoadTestSuite10" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow">🧪 載入測試資料</button>
-              <button id="btnZ5ClearTestSuite10" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow">🧹 清除測試資料</button>
+              <button id="btnZ5LoadTestSuite10" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black shadow">🧪 載入全階段測試資料</button>
+              <button id="btnZ5ClearTestSuite10" class="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow">🧹 一鍵清空測試資料</button>
             </div>
           </div>`;
         })()}
 
         <div class="bg-white p-4 rounded-2xl border shadow-sm space-y-3 text-xs">
-          <h3 class="font-black text-sm">💾 備份與還原</h3>
+          <h3 class="font-black text-sm">💾 備份、還原與清空重建</h3>
           <div class="flex flex-wrap gap-2 items-center">
             <button id="btnZ5DownloadJson" class="px-3.5 py-2 rounded-lg bg-slate-900 text-white font-bold">⬇️ 備份 JSON</button>
             <label class="px-3.5 py-2 rounded-lg bg-emerald-100 text-emerald-900 font-bold cursor-pointer">
@@ -5245,7 +5245,7 @@
               ♻️ 覆蓋還原<input id="z5RestoreOverwrite" type="file" accept=".json" class="hidden" />
             </label>
             <button id="btnZ5Seed5" class="px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold">⚡ 重建示範資料</button>
-            <button id="btnZ5ClearAll" class="px-3.5 py-2 rounded-lg bg-rose-600 text-white font-bold">🗑️ 清空資料</button>
+            <button id="btnZ5ClearAll" class="px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-black">🗑️ 清空雲端＋本機並重建帳號</button>
           </div>
         </div>
       ` : ``}`;
@@ -5412,6 +5412,7 @@
             cloudMsg = `（雲端清除已排入佇列）`;
           }
         }
+        localStorage.setItem('TUR_CLEAN_RESET', '1');
         App.State.z1EventId = App.State.events.find((e) => e.status !== 'finished')?.eventId || '';
         App.State.z2EventId = App.State.events.find((e) => e.status === 'finished')?.eventId || '';
         App.rebuildIndices();
@@ -5466,15 +5467,52 @@
       };
 
       $('#btnZ5ClearAll').onclick = async () => {
-        const confirmWord = prompt('⚠️ 高風險操作！將清空全平台活動、選手、感應與歷屆資料（保留目前管理員帳號）。\n請輸入大寫 CLEAR 以確認執行：');
-        if (confirmWord !== 'CLEAR') return App.toast('輸入不符，已取消清空操作', 'info');
+        const hasCloud = Boolean(App.State.gasUrl && navigator.onLine);
+        const confirmWord = prompt(
+          `⚠️ 高風險不可逆操作！即將清空「${hasCloud ? '本機＋雲端 Google 試算表' : '本機資料庫'}」：\n` +
+          `• 清空全部活動、分組、站點、報名、計時與歷屆成績（6 張表）\n` +
+          `• 重建基礎帳號：superadmin (tur2026) / org_north (org2026) / org_south (org2026)\n` +
+          `• 保留系統參數 (GlobalConfig)，重整不會自動回填舊示範資料\n\n` +
+          `建議先點「⬇️ 備份 JSON」。確定執行請輸入大寫 RESET：`
+        );
+        if (confirmWord !== 'RESET') return App.toast('輸入不符，已取消清空操作', 'info');
+
         for (const st of ['events', 'categories', 'stations', 'participants', 'timingLogs', 'historyResults', 'syncQueue']) {
           App.State[st] = [];
           await C.TurDB.clear(st);
         }
+        const cleanUsers = C.buildCleanBaseUsers();
+        App.State.users = cleanUsers;
+        await C.TurDB.clearAndFill('users', cleanUsers);
+
+        const initFlag = { configKey: 'platformInitialized', configValue: '1', description: '平台已完成初始化清空重建', updatedAt: C.formatDateTime() };
+        App.State.globalConfig = (App.State.globalConfig || []).filter((g) => g.configKey !== 'platformInitialized');
+        App.State.globalConfig.push(initFlag);
+        await C.TurDB.put('globalConfig', initFlag);
+        localStorage.setItem('TUR_CLEAN_RESET', '1');
+
+        // 維持最高管理員登入狀態
+        const superAcc = cleanUsers.find((x) => x.role === 'super_admin') || cleanUsers[0];
+        App.State.currentUser = superAcc;
+        sessionStorage.setItem('TUR_V3_SESSION', JSON.stringify({ username: superAcc.username, opEventId: '' }));
+
+        let cloudMsg = '（純本機模式）';
+        if (hasCloud) {
+          App.toast('☁️ 正在同步清空雲端 Google 試算表並重建基礎帳號…', 'info');
+          try {
+            const res = await C.gasPost(App.State.gasUrl, { action: 'resetCleanPlatform' });
+            if (res && res.ok) cloudMsg = '（☁️ 雲端 6 表已清空並重建 3 組基礎帳號！）';
+            else cloudMsg = `（⚠️ 雲端回報：${res?.error || '失敗'}，請確認已部署最新版 Code.gs）`;
+          } catch (err) {
+            cloudMsg = `（⚠️ 雲端同步失敗：${err.message}）`;
+          }
+        }
+
+        App.State.z1EventId = '';
+        App.State.z2EventId = '';
         App.rebuildIndices();
         App.renderAll();
-        App.toast('🗑️ 已安全清空全平台賽事資料', 'warn');
+        App.toast(`🗑️ 已清空全部活動、報名與歷屆成績，並重建基礎帳號！${cloudMsg}`, 'success');
       };
     }
   }
