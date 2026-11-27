@@ -277,13 +277,7 @@
     { id: 'banner-10', name: '16. 鋼鐵城市灰藍', css: 'linear-gradient(135deg,#1e293b 0%,#475569 55%,#38bdf8 100%)' }
   ];
 
-  const DEFAULT_BROCHURE_TEMPLATE = [
-    '【一、活動宗旨】推廣台灣超級馬拉松與長距離耐力運動，挑戰自我極限。',
-    '【二、起跑與關門】請於起跑前 40 分鐘完成檢錄報到；逾關門時間請配合收容車撤離。',
-    '【三、補給與環保】賽道每 5~10 km 設補給站（水、運動飲料、鹽錠與熱食），響應環保請自備環保杯。',
-    '【四、晶片與計時】本賽事採用 TUR Web NFC 晶片計時，既有 TUR 晶片跑者可重複共用，免重領晶片。',
-    '【五、退費與安全】報名繳費後如需更改聯絡資訊請至「雙因子查改 (/lookup)」；參賽者請自行評估健康狀況並配合醫護人員指示。'
-  ].join('\n');
+  const DEFAULT_BROCHURE_TEMPLATE = '';
 
   function getBannerStyle(bannerUrl) {
     if (!bannerUrl) {
@@ -3014,6 +3008,80 @@
     return { cleaned, removedCounts, totalRemoved };
   }
 
+  /* --------------------------------------------------------------------------
+   * Group Registration Helpers (第 1 位為團長、其餘為組員，統一匯款與單一管理窗口)
+   * -------------------------------------------------------------------------- */
+  function getGroupMembers(participants, groupCode, eventId = '') {
+    const gc = String(groupCode || '').trim().toUpperCase();
+    if (!gc) return [];
+    return (participants || []).filter((p) => {
+      if (!p) return false;
+      if (String(p.groupCode || '').trim().toUpperCase() !== gc) return false;
+      if (eventId && String(p.eventId || '') !== String(eventId)) return false;
+      return String(p.payStatus || '').toUpperCase() !== 'CANCELLED';
+    });
+  }
+
+  function getGroupLeader(participants, groupCode, eventId = '') {
+    const members = getGroupMembers(participants, groupCode, eventId);
+    if (!members.length) return null;
+    const explicit = members.find((p) => String(p.groupRole || '').toLowerCase() === 'leader');
+    return explicit || members[0];
+  }
+
+  function getParticipantGroupRole(p, participants) {
+    if (!p || !String(p.groupCode || '').trim()) return '';
+    const explicit = String(p.groupRole || '').toLowerCase();
+    if (explicit === 'leader' || explicit === 'member') return explicit;
+    const leader = getGroupLeader(participants, p.groupCode, p.eventId);
+    if (!leader) return '';
+    return leader.participantId === p.participantId ? 'leader' : 'member';
+  }
+
+  function summarizeGroupOrders({ participants = [], categories = [], eventId = '' }) {
+    const catMap = new Map((categories || []).map((c) => [c.catId, c.name]));
+    const scoped = (participants || []).filter((p) => {
+      if (!p || !String(p.groupCode || '').trim()) return false;
+      if (eventId && String(p.eventId || '') !== String(eventId)) return false;
+      return String(p.payStatus || '').toUpperCase() !== 'CANCELLED';
+    });
+    const map = new Map();
+    scoped.forEach((p) => {
+      const gc = String(p.groupCode).trim().toUpperCase();
+      const key = `${p.eventId}::${gc}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(p);
+    });
+    const out = [];
+    map.forEach((members) => {
+      const leader = members.find((m) => String(m.groupRole || '').toLowerCase() === 'leader') || members[0];
+      const ordered = [leader, ...members.filter((m) => m.participantId !== leader.participantId)];
+      const unpaid = ordered.filter((m) => ['UNPAID', 'PENDING_PAY'].includes(String(m.payStatus || '').toUpperCase()));
+      const paid = ordered.filter((m) => String(m.payStatus || '').toUpperCase() === 'PAID');
+      const totalAmount = ordered.reduce((s, m) => s + Number(m.totalAmount || 0), 0);
+      const last5 = leader.remittanceLast5 || (ordered.find((m) => m.remittanceLast5)?.remittanceLast5 || '');
+      out.push({
+        eventId: leader.eventId,
+        groupCode: String(leader.groupCode || '').trim().toUpperCase(),
+        groupName: leader.groupName || '團體報名',
+        leader,
+        members: ordered.map((m) => ({
+          ...m,
+          role: m.participantId === leader.participantId ? 'leader' : 'member',
+          catName: catMap.get(m.catId) || m.catId
+        })),
+        memberCount: ordered.length,
+        totalAmount,
+        paidCount: paid.length,
+        unpaidCount: unpaid.length,
+        allPaid: unpaid.length === 0 && paid.length > 0,
+        payMethod: leader.payMethod || 'MANUAL_ATM',
+        remittanceLast5: last5
+      });
+    });
+    return out.sort((a, b) => Number(a.allPaid) - Number(b.allPaid) || a.groupCode.localeCompare(b.groupCode));
+  }
+
   global.TurCore = {
     DEFAULT_GAS_URL,
     onLogoReady,
@@ -3026,6 +3094,7 @@
     isCategoryWarrior800, isWarrior800Eligible, computeLeaderboard, computeEventProgressAnalytics, evaluateEventStageGates,
     isCertEligible, buildUnifiedHistoryRecords, parseExternalRosterRows,
     isBundleOrderCode, generateBundleOrderCode, summarizeBundleOrders,
+    getGroupMembers, getGroupLeader, getParticipantGroupRole, summarizeGroupOrders,
     FONT_SCALE_MODES, applyFontScale, getSavedFontScale, getRaceTypeWorkflow, getStationSopInfo,
     bindFastInput, ensureExternalLib, ensureCertFonts,
     CERT_LAYOUTS, CERT_PALETTES, CERT_FONTS, CERT_CUSTOM_ELEMENTS, defaultCustomBgElements, getMergedCustomBgElements, compressCustomBgImage, renderCertificateCanvas,

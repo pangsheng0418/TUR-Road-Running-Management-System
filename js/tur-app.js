@@ -451,21 +451,70 @@
       : 'p-3.5 rounded-2xl border-2 border-slate-200 bg-white hover:border-amber-400 text-slate-800 text-left shadow-sm transition';
     $('#btnModeGroup').innerHTML = `
       <div class="font-black text-sm sm:text-base flex items-center gap-1.5"><span>👥 團體報名（2～50 人）</span>${isGroup ? '<span class="text-[10px] px-2 py-0.5 rounded-full bg-slate-900 text-amber-300">目前模式</span>' : ''}</div>
-      <div class="text-[11px] ${isGroup ? 'text-slate-900/80' : 'text-slate-500'} mt-0.5">自動配發 GRP26 團報碼，支援整團統一匯款或各自匯款。</div>`;
+      <div class="text-[11px] ${isGroup ? 'text-slate-900/80' : 'text-slate-500'} mt-0.5">第 1 位為團長、其餘為組員；統一匯款、只寄信給團長並由團長統一管理。</div>`;
 
     $('#groupSettingsPanel').classList.toggle('hidden', !isGroup);
     $('#btnAddToGroup').classList.toggle('hidden', !isGroup);
     $('#btnSubmitSingle').classList.toggle('hidden', isGroup);
-    $('#soloGuideCard').classList.toggle('hidden', isGroup);
+    $('#regRightCol').classList.toggle('hidden', !isGroup);
     $('#groupCartCard').classList.toggle('hidden', !isGroup);
+    $('#regFormCard').classList.toggle('lg:col-span-3', !isGroup);
+    $('#regFormCard').classList.toggle('lg:col-span-2', isGroup);
 
     if (!isGroup) {
       $('#regGroupName').value = '';
       $('#err-regGroupName').textContent = '';
+      if ($('#regEmail')) {
+        $('#regEmail').readOnly = false;
+        $('#regEmail').classList.remove('bg-amber-50', 'text-slate-600');
+      }
+      if ($('#regEmailHint')) $('#regEmailHint').textContent = '';
     }
     updatePayMethodUI();
     renderGroupCart();
     validateRegForm();
+  }
+
+  function syncGroupRoleUI() {
+    const isGroup = State.regMode === 'group';
+    const banner = $('#groupRoleBanner');
+    const emailEl = $('#regEmail');
+    const emailHint = $('#regEmailHint');
+    const addBtn = $('#btnAddToGroup');
+    if (!isGroup) {
+      if (emailEl) {
+        emailEl.readOnly = false;
+        emailEl.classList.remove('bg-amber-50', 'text-slate-600');
+      }
+      if (emailHint) emailHint.textContent = '';
+      return;
+    }
+    const leader = State.groupCart[0] || null;
+    if (!leader) {
+      if (banner) {
+        banner.className = 'p-2.5 rounded-lg bg-amber-200/80 border border-amber-400 text-xs font-black text-amber-950';
+        banner.textContent = '👑 目前填寫：【第 1 位・團長資料】— 請填寫團長 Email，後續所有報名確認信、入帳通知與整團修改權限均由團長統一管理。';
+      }
+      if (emailEl) {
+        emailEl.readOnly = false;
+        emailEl.classList.remove('bg-amber-50', 'text-slate-600');
+      }
+      if (emailHint) emailHint.textContent = '（團長統一收信窗口，必填）';
+      if (addBtn) addBtn.textContent = '👑 加入為團長（第 1 位）';
+    } else {
+      const nextIdx = State.groupCart.length + 1;
+      if (banner) {
+        banner.className = 'p-2.5 rounded-lg bg-sky-100 border border-sky-300 text-xs font-black text-sky-950';
+        banner.textContent = `👥 目前填寫：【第 ${nextIdx} 位・組員資料】— 通知信與匯款由團長「${leader.name} (${leader.email})」統一管理，組員免重複填寫 Email。`;
+      }
+      if (emailEl) {
+        emailEl.value = leader.email || '';
+        emailEl.readOnly = true;
+        emailEl.classList.add('bg-amber-50', 'text-slate-600');
+      }
+      if (emailHint) emailHint.textContent = '（已自動套用團長信箱，由團長統一收信）';
+      if (addBtn) addBtn.textContent = `➕ 加入為組員（第 ${nextIdx} 位）`;
+    }
   }
 
   function renderPublicRegister() {
@@ -474,7 +523,9 @@
     $('#regBannerHero').setAttribute('style', C.getBannerStyle(ev.bannerUrl));
     $('#regEventTitle').textContent = ev.nameZh;
     $('#regEventMeta').textContent = `${ev.nameEn || ''} · ${ev.location || ''} · 🏁 起跑：${ev.raceStart || '待公告'} · 主辦：${ev.organizerZh || 'TUR'}`;
-    $('#regBrochureContent').textContent = (ev.brochureText || '').trim() || C.DEFAULT_BROCHURE_TEMPLATE;
+    const brochureTxt = (ev.brochureText || '').trim();
+    if ($('#regBrochureBox')) $('#regBrochureBox').classList.toggle('hidden', !brochureTxt);
+    $('#regBrochureContent').textContent = brochureTxt;
 
     // 明確顯示本活動屬於「一般距離賽」或「計時繞圈賽」與賽制計分說明
     const wf = C.getRaceTypeWorkflow(ev, State.stations, State.categories);
@@ -590,9 +641,12 @@
     if (rManual) rManual.checked = isManual;
     if (rPayuni) rPayuni.checked = !isManual;
 
+    const isGroup = State.regMode === 'group';
     $('#payCardManual').classList.toggle('hidden', !isManual);
     $('#payCardPayuni').classList.toggle('hidden', isManual);
-    if ($('#regGroupPayModeWrap')) $('#regGroupPayModeWrap').classList.toggle('hidden', !isManual);
+    if ($('#regLast5Wrap')) $('#regLast5Wrap').classList.toggle('hidden', isGroup);
+    if ($('#regLast5GroupNote')) $('#regLast5GroupNote').classList.toggle('hidden', !isGroup);
+    if ($('#groupUnifiedLast5Wrap')) $('#groupUnifiedLast5Wrap').classList.toggle('hidden', !isManual);
     if ($('#regPayModeHeader')) {
       $('#regPayModeHeader').textContent = isManual
         ? '14. 本活動指定繳費方式：🏦 實體銀行轉帳（核對帳號末五碼）'
@@ -616,12 +670,14 @@
     const birthday = $('#regBirthday').value;
     const age = C.calcAge(birthday);
     const phone = $('#regPhone').value.trim();
-    const email = $('#regEmail').value.trim();
-    const city = $('#regCity').value;
+    const isGroupMode = State.regMode === 'group';
+    const leaderInCart = isGroupMode ? (State.groupCart[0] || null) : null;
+    const email = leaderInCart ? String(leaderInCart.email || '').trim() : $('#regEmail').value.trim();
+    const city = $('#regCity').value.trim();
     const diet = $('#regDiet').value;
     const emergName = $('#regEmergName').value.trim();
     const emergPhone = $('#regEmergPhone').value.trim();
-    const last5 = $('#regLast5').value.trim();
+    const last5 = isGroupMode ? String($('#groupUnifiedLast5')?.value || '').trim() : $('#regLast5').value.trim();
     const payMethod = getSelectedPayMethod();
     const consent = $('#regConsent').checked;
 
@@ -650,15 +706,14 @@
     checks.birthday = age === null ? '請選出生日期' : (age < 10 || age > 80 ? `年齡 ${age} 歲，須 10~80 歲` : '');
     checks.phone = /^09\d{8}$/.test(phone) ? '' : '須為 09 開頭 10 碼';
     checks.email = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) ? '' : 'Email 格式錯誤';
-    checks.city = city ? '' : '請選縣市';
-    checks.diet = diet ? '' : '請選飲食';
+    checks.city = ''; // 通訊住址預設非必填
+    checks.diet = diet ? '' : '請選擇飲食習慣（必填）';
     checks.emergName = !emergName ? '請填緊急聯絡人' : (emergName === name ? '不可與本人同名' : '');
     checks.emergPhone = !/^0\d{8,9}$/.test(emergPhone) ? '電話格式錯誤' : (emergPhone === phone ? '不可同本人手機' : '');
-    checks.last5 = (payMethod === 'ONLINE_PAYUNi' || !last5 || /^\d{5}$/.test(last5)) ? '' : '末五碼限 5 位純數字';
+    checks.last5 = (payMethod === 'ONLINE_PAYUNi' || isGroupMode || !last5 || /^\d{5}$/.test(last5)) ? '' : '末五碼限 5 位純數字';
     checks.consent = !consent ? '須勾選同意切結書' : (State.groupCart.length >= 50 ? '團報上限 50 人' : '');
 
     // 團體模式額外檢核：團體名稱必填
-    const isGroupMode = State.regMode === 'group';
     const grpName = $('#regGroupName').value.trim();
     const grpErr = isGroupMode && grpName.length < 2 ? '團體報名請填寫團體名稱（至少 2 字）' : '';
     $('#err-regGroupName').textContent = grpErr;
@@ -720,18 +775,6 @@
     });
     checks.customFields = cfHasErr ? '尚有活動自訂必填欄位未完成' : '';
 
-    const labels = [
-      ['1. 組別名額', 'cat'], ['2. 國籍三碼', 'nat'], ['3. 姓名格式', 'name'], ['4. 身分證防重', 'idCard'],
-      ['5. 性別聯動', 'gender'], ['6. 10~80歲', 'birthday'], ['7. 手機09開頭', 'phone'], ['8. Email', 'email'],
-      ['9. 居住縣市', 'city'], ['10. 飲食', 'diet'], ['11. 緊急不同名', 'emergName'], ['12. 緊急不同號', 'emergPhone'],
-      [payMethod === 'ONLINE_PAYUNi' ? '13. 金流廠商結帳' : '13. 匯款末五碼', 'last5'], ['14. 切結/上限', 'consent']
-    ];
-    if (customFieldDefs.length) labels.push(['15. 活動自訂欄位', 'customFields']);
-    $('#validationSummaryList').innerHTML = labels.map(([lbl, k]) => {
-      const ok = !checks[k];
-      return `<div class="px-2 py-1 rounded border ${ok ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-700'}">${ok ? '✓' : '✕'} ${lbl}</div>`;
-    }).join('');
-
     const split = C.splitFullName(name);
     const rawRemark = $('#regRemark').value.trim();
     const finalRemark = priceInfo.isEarlyBird ? ['[早鳥價]', rawRemark].filter(Boolean).join(' ') : rawRemark;
@@ -741,6 +784,7 @@
       runner: {
         participantId: `TUR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(10000 + Math.random() * 90000)}`,
         eventId: evId, catId, bibNumber: '', groupCode: '', groupName: isGroupMode ? grpName : '',
+        groupRole: isGroupMode ? (State.groupCart.length === 0 ? 'leader' : 'member') : '',
         name, lastName: split.lastName, firstName: split.firstName, idCard, gender, birthday, age, nationality: nat,
         phone, email, city, emergencyName: emergName, emergencyPhone: emergPhone, diet, remark: finalRemark,
         totalAmount, addonsDetail: JSON.stringify(addons.map((a) => a.name)),
@@ -761,20 +805,37 @@
     $('#groupCountBadge').textContent = `${State.groupCart.length} / 50`;
     const box = $('#groupCartList');
     if (!State.groupCart.length) {
-      box.innerHTML = '<p class="text-slate-400 italic py-3 text-center">尚無團報成員（最多 50 人）</p>';
+      box.innerHTML = '<p class="text-slate-400 italic py-3 text-center">尚無成員（第 1 位加入即為 👑 團長，第 2 位起為組員，上限 50 人）</p>';
       $('#groupGrandTotal').textContent = 'NT$ 0';
+      $('#btnSubmitGroup').textContent = '✅ 送出整批團報（至少 2 人）';
       $('#btnSubmitGroup').disabled = true;
+      syncGroupRoleUI();
       return;
     }
+    const leaderEmail = State.groupCart[0].email || '';
+    State.groupCart.forEach((r, idx) => {
+      r.groupRole = idx === 0 ? 'leader' : 'member';
+      if (leaderEmail) r.email = leaderEmail;
+    });
     box.innerHTML = State.groupCart.map((r, i) => `
-      <div class="flex items-center justify-between p-2 rounded-lg bg-slate-50 border">
-        <div><b>${i + 1}. ${C.escapeHtml(r.name)}</b> [${r.nationality}] · NT$${r.totalAmount}</div>
-        <button data-rm-cart="${i}" class="text-rose-600 font-bold px-1.5">✕</button>
+      <div class="flex items-center justify-between p-2 rounded-lg border ${i === 0 ? 'bg-amber-50 border-amber-300' : 'bg-slate-50 border-slate-200'}">
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-1">
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-black ${i === 0 ? 'bg-amber-500 text-slate-950' : 'bg-slate-200 text-slate-700'}">${i === 0 ? '👑 團長' : `組員 #${i}`}</span>
+            <b>${C.escapeHtml(r.name)}</b> <span class="text-slate-500">[${r.nationality}]</span> · <span class="mono font-bold">NT$${Number(r.totalAmount).toLocaleString()}</span>
+          </div>
+          ${i === 0 ? `<div class="text-[10px] text-amber-900 mt-0.5 truncate">✉️ 統一收信：${C.escapeHtml(r.email)}</div>` : ''}
+        </div>
+        <button data-rm-cart="${i}" class="text-rose-600 font-bold px-1.5 shrink-0" title="移除此成員">✕</button>
       </div>`).join('');
     const grandTotal = State.groupCart.reduce((s, r) => s + Number(r.totalAmount), 0);
     $('#groupGrandTotal').textContent = `NT$ ${grandTotal.toLocaleString()}`;
-    $('#btnSubmitGroup').textContent = `✅ 送出整批團報 (${State.groupCart.length} 人)`;
-    $('#btnSubmitGroup').disabled = false;
+    const enough = State.groupCart.length >= 2;
+    $('#btnSubmitGroup').textContent = enough
+      ? `✅ 送出整批團報 (${State.groupCart.length} 人｜統一匯款)`
+      : '➕ 請再加入至少 1 位組員 (1/2)';
+    $('#btnSubmitGroup').disabled = !enough;
+    syncGroupRoleUI();
   }
 
   /* --------------------------------------------------------------------------
@@ -1165,7 +1226,7 @@
     $('#mAgeDisplay').textContent = age !== null ? `${age} 歲` : '-- 歲';
     const phone = $('#mPhone').value.trim();
     const email = $('#mEmail').value.trim();
-    const city = $('#mCity').value;
+    const city = $('#mCity').value.trim();
     const diet = $('#mDiet').value;
     const emergName = $('#mEmergName').value.trim();
     const emergPhone = $('#mEmergPhone').value.trim();
@@ -1182,7 +1243,7 @@
     if (age === null || age < 10 || age > 80) errs.push('出生年月日須介於 10～80 歲');
     if (!/^09\d{8}$/.test(phone)) errs.push('手機須為 09 開頭 10 碼');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) errs.push('Email 格式不正確');
-    if (!city) errs.push('請選擇居住縣市');
+    if (!diet) errs.push('請選擇飲食習慣');
     if (!emergName || emergName === name) errs.push('請填寫緊急聯絡人且不可與本人同名');
     if (!/^0\d{8,9}$/.test(emergPhone) || emergPhone === phone) errs.push('緊急聯絡電話格式錯誤或與本人相同');
     if (!isPayuni && last5 && !/^\d{5}$/.test(last5)) errs.push('匯款末五碼限 5 位純數字');
@@ -1380,15 +1441,25 @@
 
     const isGroup = State.regMode === 'group' || runners.length > 1 || Boolean(runners[0].groupName);
     const grpCode = isGroup ? `GRP26-${Math.floor(1000 + Math.random() * 8999)}` : '';
-    const isSharedPay = $('#regGroupPayMode')?.value === 'shared';
-    const sharedLast5 = runners[0].remittanceLast5;
+    const unifiedLast5 = isGroup
+      ? String($('#groupUnifiedLast5')?.value || runners[0].remittanceLast5 || '').trim()
+      : String(runners[0].remittanceLast5 || '').trim();
+    const leaderEmail = String(runners[0].email || '').trim();
     const usedBibs = new Set(State.participants.filter((p) => p.eventId === evId && p.bibNumber).map((p) => String(p.bibNumber).toUpperCase()));
     const assignedBibs = [];
 
-    for (const r of runners) {
-      if (grpCode) r.groupCode = grpCode;
-      if (r.payMethod === 'MANUAL_ATM' && isSharedPay && sharedLast5) r.remittanceLast5 = sharedLast5;
+    runners.forEach((r, idx) => {
+      if (grpCode) {
+        r.groupCode = grpCode;
+        r.groupRole = idx === 0 ? 'leader' : 'member';
+        if (leaderEmail) r.email = leaderEmail;
+        if (r.payMethod === 'MANUAL_ATM') r.remittanceLast5 = unifiedLast5;
+      } else {
+        r.groupRole = '';
+      }
+    });
 
+    for (const r of runners) {
       // 若為 PAYUNi 秒級自動銷帳，於寫入雲端前直接配好號碼布，單次寫入到位
       if (r.payMethod === 'ONLINE_PAYUNi' && !r.bibNumber) {
         const cat = State.categories.find((c) => c.catId === r.catId);
@@ -1429,10 +1500,15 @@
       cloudNote = '｜📴 離線暫存，連網後自動寫入雲端';
     }
 
+    const grpGrandTotal = runners.reduce((s, r) => s + Number(r.totalAmount || 0), 0);
     if (assignedBibs.length) {
-      toast(`⚡ PAYUNi 銷帳配號成功 (${assignedBibs.join(', ')})｜✉️ 已自動寄發報名＋繳費入帳確認信${cloudNote}`, toastType);
+      toast(grpCode
+        ? `⚡ 團報 ${grpCode}（👑 團長 ${runners[0].name}｜共 ${runners.length} 人）PAYUNi 配號成功｜✉️ 已統一寄發確認信給團長${cloudNote}`
+        : `⚡ PAYUNi 銷帳配號成功 (${assignedBibs.join(', ')})｜✉️ 已自動寄發報名＋繳費入帳確認信${cloudNote}`, toastType);
     } else {
-      toast(`📝 報名成功！序號 ${runners[0].participantId}${grpCode ? `｜團報 ${grpCode}` : ''}｜✉️ 已自動寄發報名確認信（含反向查改說明）${cloudNote}`, toastType);
+      toast(grpCode
+        ? `👑 團報完成！團報碼 ${grpCode}（團長 ${runners[0].name}｜共 ${runners.length} 人｜統一匯款 NT$${grpGrandTotal.toLocaleString()}）｜✉️ 已僅寄發確認信給團長${cloudNote}`
+        : `📝 報名成功！序號 ${runners[0].participantId}｜✉️ 已自動寄發報名確認信（含反向查改說明）${cloudNote}`, toastType);
     }
   }
 
@@ -2046,43 +2122,6 @@
     $('#multiRegForm').addEventListener('input', renderMultiSummaryAndValidate);
     $('#multiRegForm').addEventListener('change', renderMultiSummaryAndValidate);
     $('#btnSubmitMulti').onclick = () => commitMultiBundle();
-    $('#btnFillSampleMulti').onclick = () => {
-      const L = 'ABCDEFGHJKLMNPQRSTUVXYWZIO';
-      const li = Math.floor(Math.random() * L.length);
-      const gc = Math.random() > 0.5 ? 1 : 2;
-      const body = Array.from({ length: 7 }, () => Math.floor(Math.random() * 10));
-      const n = li + 10, w = [1, 9, 8, 7, 6, 5, 4, 3, 2, 1];
-      const d = [Math.floor(n / 10), n % 10, gc, ...body];
-      const chk = (10 - (d.reduce((a, x, i) => a + x * w[i], 0) % 10)) % 10;
-      const byMode = getOpenEventsByOwnerAndPayMode(State.multiOwner);
-      const evs = byMode[State.multiPayMode || 'MANUAL_ATM'] || [];
-      evs.slice(0, 2).forEach((ev) => {
-        const cats = State.categories.filter((c) => c.eventId === ev.eventId);
-        const schema = C.parseJsonSafe(ev.formSchemaJson, C.defaultFormSchema());
-        const cfDefaults = {};
-        (schema.customFields || []).forEach((f) => {
-          if (f.required) cfDefaults[f.key] = (f.options && f.options[0]) || '測試填寫';
-        });
-        State.multiSelected[ev.eventId] = {
-          selected: true,
-          catId: cats[0]?.catId || '',
-          addons: [],
-          customFields: cfDefaults
-        };
-      });
-      $('#mNationality').value = 'TWN'; $('#mNationalityCustom').classList.add('hidden');
-      $('#mName').value = gc === 1 ? '諸葛承翰' : '司馬詠晴';
-      $('#mIdCard').value = `${L[li]}${gc}${body.join('')}${chk}`;
-      $('#mGender').value = gc === 1 ? 'M' : 'F';
-      $('#mBirthday').value = '1988-05-20';
-      $('#mPhone').value = '0933' + String(Math.floor(100000 + Math.random() * 899999));
-      $('#mEmail').value = `multi${Math.floor(100 + Math.random() * 899)}@tur.tw`;
-      $('#mCity').value = '台北市'; $('#mDiet').value = '葷';
-      $('#mEmergName').value = '林家屬'; $('#mEmergPhone').value = '0988776655';
-      $('#mLast5').value = String(Math.floor(10000 + Math.random() * 89999));
-      $('#mConsent').checked = true;
-      renderPublicMultiRegister();
-    };
     $('#btnGoLookupFromHome').onclick = () => switchView('public-lookup');
     $('#btnBackToHome').onclick = () => switchView('public-home');
     $('#btnModeSolo').onclick = () => setRegMode('solo');
@@ -2099,40 +2138,20 @@
     $('#regForm').addEventListener('input', validateRegForm);
     $('#regForm').addEventListener('change', validateRegForm);
 
-    $('#btnFillSampleRunner').onclick = () => {
-      const L = 'ABCDEFGHJKLMNPQRSTUVXYWZIO';
-      const li = Math.floor(Math.random() * L.length);
-      const gc = Math.random() > 0.5 ? 1 : 2;
-      const body = Array.from({ length: 7 }, () => Math.floor(Math.random() * 10));
-      const n = li + 10, w = [1, 9, 8, 7, 6, 5, 4, 3, 2, 1];
-      const d = [Math.floor(n / 10), n % 10, gc, ...body];
-      const chk = (10 - (d.reduce((a, x, i) => a + x * w[i], 0) % 10)) % 10;
-      if (State.regMode === 'group' && !$('#regGroupName').value.trim()) {
-        $('#regGroupName').value = 'TUR 範例跑團';
-      }
-      $('#regNationality').value = 'TWN'; $('#regNationalityCustom').classList.add('hidden');
-      $('#regName').value = gc === 1 ? '歐陽浩宇' : '上官靜怡';
-      $('#regIdCard').value = `${L[li]}${gc}${body.join('')}${chk}`;
-      $('#regGender').value = gc === 1 ? 'M' : 'F';
-      $('#regBirthday').value = '1990-08-18';
-      $('#regPhone').value = '0912' + String(Math.floor(100000 + Math.random() * 899999));
-      $('#regEmail').value = `runner${Math.floor(100 + Math.random() * 899)}@tur.tw`;
-      $('#regCity').value = '台北市'; $('#regDiet').value = '葷';
-      $('#regEmergName').value = '緊急家屬'; $('#regEmergPhone').value = '0987654321';
-      $('#regLast5').value = String(Math.floor(10000 + Math.random() * 89999));
-      $('#regConsent').checked = true;
-      validateRegForm();
-    };
-
     $('#btnAddToGroup').onclick = () => {
       const res = validateRegForm();
       if (!res.isValid) return toast('請先修正紅框錯誤', 'error');
       if (State.groupCart.length >= 50) return toast('團體報名上限 50 人', 'error');
+      const isLeader = State.groupCart.length === 0;
+      res.runner.groupRole = isLeader ? 'leader' : 'member';
+      if (!isLeader && State.groupCart[0]?.email) res.runner.email = State.groupCart[0].email;
       State.groupCart.push(res.runner);
       renderGroupCart();
       $('#regName').value = ''; $('#regIdCard').value = ''; $('#regPhone').value = '';
       validateRegForm();
-      toast(`已加入團報清單 (${State.groupCart.length}/50)`, 'success');
+      toast(isLeader
+        ? `👑 已加入團長「${res.runner.name}」（第 1 位），請繼續填寫組員資料`
+        : `👥 已加入組員「${res.runner.name}」（目前共 ${State.groupCart.length}/50 人）`, 'success');
     };
     $('#groupCartList').onclick = (e) => {
       if (e.target.dataset.rmCart !== undefined) { State.groupCart.splice(Number(e.target.dataset.rmCart), 1); renderGroupCart(); validateRegForm(); }
@@ -2144,22 +2163,31 @@
         return;
       }
       const res = validateRegForm();
-      if (!res.isValid) return toast('尚有欄位未通過 14 項防呆檢核', 'error');
+      if (!res.isValid) return toast('尚有必填欄位未填寫或格式有誤，請檢查紅框提示', 'error');
       await commitRunners([res.runner]);
       $('#regName').value = ''; $('#regIdCard').value = ''; $('#regConsent').checked = false;
       validateRegForm();
     };
     $('#btnSubmitGroup').onclick = async () => {
-      if (!State.groupCart.length) return;
+      if (State.groupCart.length < 2) return toast('團體報名至少須 2 位成員（第 1 位團長 ＋ 至少 1 位組員），單人請改用個人報名', 'warn');
+      const payMethod = getSelectedPayMethod();
+      const uLast5 = String($('#groupUnifiedLast5')?.value || '').trim();
+      if (payMethod === 'MANUAL_ATM' && uLast5 && !/^\d{5}$/.test(uLast5)) {
+        return toast('整團統一匯款末五碼限 5 位純數字（亦可留空，匯款後由團長登入補填）', 'error');
+      }
       await commitRunners([...State.groupCart]);
-      State.groupCart = []; renderGroupCart();
+      State.groupCart = [];
+      if ($('#groupUnifiedLast5')) $('#groupUnifiedLast5').value = '';
+      renderGroupCart();
+      validateRegForm();
     };
 
-    // 雙因子反向查改 (/lookup) — 支援多場聯合報名清單切換＋合併單一次補填末五碼＋已繳費嚴格鎖定費用項目
-    const renderLookupEditor = (allMatches, activePid) => {
+    // 雙因子反向查改 (/lookup) — 支援多場聯合報名＋團長整團統一管理（組員唯讀不可修改）＋已繳費嚴格鎖定費用項目
+    const renderLookupEditor = (allMatches, activePid, authIdCard = '') => {
       const p = allMatches.find((x) => x.participantId === activePid) || allMatches[0];
       if (!p) return;
-      State.lookupSession = { pid: p.participantId, exp: Date.now() + 45 * 60 * 1000 };
+      const verifiedId = String(authIdCard || p.idCard || '').trim().toUpperCase();
+      State.lookupSession = { pid: p.participantId, authIdCard: verifiedId, exp: Date.now() + 45 * 60 * 1000 };
       const ev = State.events.find((e) => e.eventId === p.eventId);
       const cats = State.categories.filter((c) => c.eventId === p.eventId);
       const schema = C.parseJsonSafe(ev?.formSchemaJson, C.defaultFormSchema());
@@ -2172,7 +2200,19 @@
       const isCancelled = paySt === 'CANCELLED';
       const isEventClosed = String(ev?.status || '').toLowerCase() === 'closed';
       const isClosedLock = isCancelled || String(ev?.status || '').toLowerCase() === 'finished' || p.raceStatus === 'finished';
-      const feeLocked = isPaid || isClosedLock || isEventClosed;
+
+      // 團體報名團長／組員權限判定：僅團長可修改整團資料與統一匯款，組員僅可唯讀檢視！
+      const hasGroup = Boolean(String(p.groupCode || '').trim());
+      const groupMembers = hasGroup ? C.getGroupMembers(State.participants, p.groupCode, p.eventId) : [];
+      const groupLeader = hasGroup ? C.getGroupLeader(State.participants, p.groupCode, p.eventId) : null;
+      const isGroupLeaderLogin = Boolean(hasGroup && groupLeader && String(groupLeader.idCard || '').toUpperCase() === verifiedId);
+      const isGroupMemberReadOnly = Boolean(hasGroup && !isGroupLeaderLogin);
+      const isEditingOtherMember = Boolean(isGroupLeaderLogin && groupLeader && p.participantId !== groupLeader.participantId);
+      const groupUnpaid = groupMembers.filter((m) => ['UNPAID', 'PENDING_PAY'].includes(String(m.payStatus || '').toUpperCase()));
+      const groupGrandTotal = groupMembers.reduce((s, m) => s + Number(m.totalAmount || 0), 0);
+
+      const editLocked = isClosedLock || isGroupMemberReadOnly;
+      const feeLocked = isPaid || isClosedLock || isEventClosed || isGroupMemberReadOnly;
       const evPayMode = C.getEventPaymentMode(ev);
       const isPayuniEv = evPayMode === 'ONLINE_PAYUNi';
 
@@ -2187,22 +2227,61 @@
       });
       const bundleGrandTotal = bundleSiblings.reduce((s, x) => s + Number(x.totalAmount || 0), 0);
 
+      // 自己名下報名場次（不含其他組員）
+      const ownMatches = allMatches.filter((m) => String(m.idCard || '').toUpperCase() === verifiedId);
+
       $('#lookupTimerBadge').classList.remove('hidden');
       $('#lookupEditBox').classList.remove('hidden');
       $('#lookupEditBox').innerHTML = `
-        ${allMatches.length > 1 ? `
+        ${ownMatches.length > 1 ? `
           <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2 text-xs">
-            <div class="font-black text-slate-800">📋 您名下共有 ${allMatches.length} 場報名紀錄（點選切換查看或修改）：</div>
+            <div class="font-black text-slate-800">📋 您名下共有 ${ownMatches.length} 場報名紀錄（點選切換查看或修改）：</div>
             <div class="flex flex-wrap gap-1.5">
-              ${allMatches.map((m) => {
+              ${ownMatches.map((m) => {
                 const mev = State.events.find((e) => e.eventId === m.eventId);
                 const mst = String(m.payStatus || 'UNPAID').toUpperCase();
-                const act = m.participantId === p.participantId;
+                const act = m.eventId === p.eventId && (m.participantId === p.participantId || (m.groupCode && m.groupCode === p.groupCode));
                 return `<button type="button" data-lk-switch="${m.participantId}" class="px-3 py-1.5 rounded-lg border text-left transition ${act ? 'bg-slate-900 border-slate-900 text-white font-black' : 'bg-white border-slate-300 text-slate-700 hover:border-amber-400 font-bold'}">
                   ${C.escapeHtml(mev?.nameZh || m.eventId)} <span class="mono opacity-80">(${mst}${m.bibNumber ? `・${m.bibNumber}` : ''})</span>
                 </button>`;
               }).join('')}
             </div>
+          </div>` : ''}
+
+        ${isGroupLeaderLogin ? `
+          <div class="p-4 rounded-xl bg-amber-50 border-2 border-amber-400 space-y-3 text-xs">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200 pb-2">
+              <div>
+                <div class="font-black text-sm text-amber-950">👑 團長專屬管理視圖：${C.escapeHtml(p.groupName || '團體報名')}（團報碼 <span class="mono">${C.escapeHtml(p.groupCode)}</span>）</div>
+                <div class="text-[11px] text-amber-900 mt-0.5">本團共 <b>${groupMembers.length}</b> 人（1 團長 ＋ ${Math.max(0, groupMembers.length - 1)} 組員）｜整團統一匯款總額：<b class="mono text-sm text-rose-700">NT$ ${groupGrandTotal.toLocaleString()}</b>｜所有通知信僅寄送給團長</div>
+              </div>
+              <span class="px-2.5 py-1 rounded-full font-black ${groupUnpaid.length ? 'bg-rose-100 text-rose-800' : 'bg-emerald-600 text-white'}">${groupUnpaid.length ? `整團待對帳 (${groupUnpaid.length}/${groupMembers.length}人)` : '✅ 全團已入帳'}</span>
+            </div>
+            ${groupUnpaid.length >= 1 && !isPayuniEv && !isEventClosed && !isClosedLock ? `
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="font-bold text-amber-950">🏦 整團統一匯款末五碼：</span>
+                <input id="lkGroupLast5" type="text" maxlength="5" value="${C.escapeHtml(groupLeader?.remittanceLast5 || '')}" placeholder="輸入 5 碼匯款末五碼" class="px-3 py-1.5 border border-amber-400 rounded-lg mono bg-white w-48" />
+                <button type="button" id="btnSaveGroupLast5" class="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow">💾 一次套用至全團 ${groupUnpaid.length} 人</button>
+              </div>` : ''}
+            <div class="space-y-1.5">
+              <div class="font-bold text-amber-950">👥 點選切換要修改的團員資料（組員無法自行登入修改，統一由團長維護）：</div>
+              <div class="flex flex-wrap gap-1.5">
+                ${groupMembers.map((m, idx) => {
+                  const isLdr = groupLeader && m.participantId === groupLeader.participantId;
+                  const active = m.participantId === p.participantId;
+                  return `<button type="button" data-lk-switch="${m.participantId}" class="px-2.5 py-1.5 rounded-lg border transition ${active ? 'bg-slate-900 border-slate-900 text-white font-black' : 'bg-white border-amber-300 text-slate-800 hover:border-amber-500 font-bold'}">
+                    ${isLdr ? '👑 團長' : `👥 組員#${idx}`} ${C.escapeHtml(m.name)} <span class="mono opacity-80">(${m.bibNumber || m.payStatus})</span>
+                  </button>`;
+                }).join('')}
+              </div>
+            </div>
+          </div>` : ''}
+
+        ${isGroupMemberReadOnly ? `
+          <div class="p-4 rounded-xl bg-rose-50 border-2 border-rose-400 text-xs text-rose-950 space-y-1">
+            <div class="font-black text-sm">🔒 團體報名組員唯讀檢視模式（無法自行修改資料）</div>
+            <div>您屬於團體報名「<b>${C.escapeHtml(p.groupName || '')}</b>（<span class="mono">${C.escapeHtml(p.groupCode)}</span>）」之【組員】。</div>
+            <div>本團採<b>團長統一匯款、統一收信、統一管理</b>，如需修改組別、聯絡資訊或填報匯款末五碼，請聯繫團長「<b>${C.escapeHtml(groupLeader?.name || '團長')}</b>」登入修改。</div>
           </div>` : ''}
 
         ${bundleSiblings.length >= 2 ? `
@@ -2218,19 +2297,20 @@
               </div>` : ''}
           </div>` : ''}
 
-        <div class="p-3.5 rounded-xl text-xs font-bold ${isClosedLock ? 'bg-slate-200 border border-slate-400 text-slate-800' : (isPaid ? 'bg-amber-50 border-2 border-amber-400 text-amber-950' : 'bg-sky-50 border-2 border-sky-300 text-sky-950')}">
-          ${isClosedLock
-            ? `🔒 此筆報名已${isCancelled ? '取消' : (ev?.status === 'finished' ? '隨活動結案鎖定' : '完賽寫入正式成績')}，僅供查閱不可再修改。`
-            : (isPaid
-              ? '🔒 已繳費入帳 (PAID) 費用防呆鎖定：組別、加購服務、應繳金額與匯款末五碼已全面鎖定不可變更；您仍可自由修改聯絡電話、Email、居住縣市、緊急聯絡人、飲食、備註與活動自訂欄位！'
-              : '✏️ 尚未繳費 (UNPAID)：可自由反向修改「組別、加購服務（即時重算應繳金額）、匯款末五碼」以及所有基本聯絡與活動自訂欄位。')}
-        </div>
+        ${!isGroupMemberReadOnly ? `
+          <div class="p-3.5 rounded-xl text-xs font-bold ${isClosedLock ? 'bg-slate-200 border border-slate-400 text-slate-800' : (isPaid ? 'bg-amber-50 border-2 border-amber-400 text-amber-950' : 'bg-sky-50 border-2 border-sky-300 text-sky-950')}">
+            ${isClosedLock
+              ? `🔒 此筆報名已${isCancelled ? '取消' : (ev?.status === 'finished' ? '隨活動結案鎖定' : '完賽寫入正式成績')}，僅供查閱不可再修改。`
+              : (isPaid
+                ? `🔒 已繳費入帳 (PAID) 費用防呆鎖定：目前編輯對象【${C.escapeHtml(p.name)}】之組別、加購服務、應繳金額與末五碼已鎖定；其餘聯絡資料仍可修改。`
+                : `✏️ 尚未繳費 (UNPAID)：目前編輯對象【${C.escapeHtml(p.name)}】可調整組別、加購服務與所有聯絡欄位${hasGroup ? '（匯款末五碼請於上方「整團統一匯款」處一次更新）' : ''}。`)}
+          </div>` : ''}
 
-        <!-- 區塊 1：費用相關項目（已繳費嚴格鎖定） -->
+        <!-- 區塊 1：費用相關項目（已繳費或組員唯讀嚴格鎖定） -->
         <div class="p-3.5 rounded-xl border ${feeLocked ? 'bg-slate-100/90 border-slate-300' : 'bg-amber-50/40 border-amber-200'} space-y-2.5 text-xs">
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <span class="font-black text-slate-900">💰 費用相關項目（${C.escapeHtml(ev?.nameZh || p.eventId)}） ${feeLocked ? '<span class="ml-1 px-2 py-0.5 rounded-full bg-amber-200 text-amber-950 text-[10px]">🔒 已繳費/鎖定不可修改</span>' : '<span class="ml-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px]">✏️ 未繳費可調整重算</span>'}</span>
-            <span class="mono font-black text-base text-amber-700" id="lkTotalDisplay">本場應繳：NT$ ${Number(p.totalAmount || 0).toLocaleString()}</span>
+            <span class="font-black text-slate-900">💰 費用相關項目（${C.escapeHtml(ev?.nameZh || p.eventId)}｜${C.escapeHtml(p.name)}） ${feeLocked ? '<span class="ml-1 px-2 py-0.5 rounded-full bg-amber-200 text-amber-950 text-[10px]">🔒 已鎖定不可修改</span>' : '<span class="ml-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px]">✏️ 未繳費可調整重算</span>'}</span>
+            <span class="mono font-black text-base text-amber-700" id="lkTotalDisplay">${hasGroup ? `本員小計：NT$ ${Number(p.totalAmount || 0).toLocaleString()}（整團 NT$ ${groupGrandTotal.toLocaleString()}）` : `本場應繳：NT$ ${Number(p.totalAmount || 0).toLocaleString()}`}</span>
           </div>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             <div><label class="font-bold">序號 / 號碼布 / 狀態</label><input disabled value="${p.participantId}｜${p.bibNumber || '待配號'}｜${paySt}" class="w-full px-2.5 py-2 border rounded-lg bg-slate-200/70 mono mt-0.5" /></div>
@@ -2245,15 +2325,17 @@
                 }).join('')}
               </select>
             </div>
-            <div><label class="font-bold">${isPayuniEv ? '金流單號 / 付款別 🔒' : `匯款末五碼 ${feeLocked ? '🔒' : ''}`}</label>
+            <div><label class="font-bold">${isPayuniEv ? '金流單號 / 付款別 🔒' : (hasGroup ? '整團統一匯款末五碼 🔒' : `匯款末五碼 ${feeLocked ? '🔒' : ''}`)}</label>
               ${isPayuniEv
                 ? `<input id="lkLast5" disabled value="${C.escapeHtml(p.merTradeNo || p.paymentType || 'PAYUNi 線上金流')}" class="w-full px-2.5 py-2 border rounded-lg mono mt-0.5 bg-slate-200/70 cursor-not-allowed" />`
-                : `<input id="lkLast5" ${feeLocked ? 'disabled' : ''} value="${C.escapeHtml(p.remittanceLast5 || '')}" maxlength="5" placeholder="5 碼純數字" class="w-full px-2.5 py-2 border rounded-lg mono mt-0.5 ${feeLocked ? 'bg-slate-200/70 cursor-not-allowed' : 'bg-white'}" />`}
+                : (hasGroup
+                  ? `<input id="lkLast5" disabled value="${C.escapeHtml(p.remittanceLast5 || '尚未填報（由團長統一填寫）')}" class="w-full px-2.5 py-2 border rounded-lg mono mt-0.5 bg-slate-200/70 cursor-not-allowed" />`
+                  : `<input id="lkLast5" ${feeLocked ? 'disabled' : ''} value="${C.escapeHtml(p.remittanceLast5 || '')}" maxlength="5" placeholder="5 碼純數字" class="w-full px-2.5 py-2 border rounded-lg mono mt-0.5 ${feeLocked ? 'bg-slate-200/70 cursor-not-allowed' : 'bg-white'}" />`)}
             </div>
           </div>
           ${addonDefs.length ? `
             <div>
-              <label class="font-bold block mb-1">加購服務 ${feeLocked ? '🔒（已繳費鎖定）' : '（勾選即重算應繳金額）'}</label>
+              <label class="font-bold block mb-1">加購服務 ${feeLocked ? '🔒（已鎖定）' : '（勾選即重算應繳金額）'}</label>
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 ${addonDefs.map((a) => {
                   const chk = Array.isArray(curAddons) && curAddons.includes(a.name);
@@ -2267,44 +2349,60 @@
             </div>` : ''}
         </div>
 
-        <!-- 區塊 2：基本聯絡與非費用欄位（賽前皆可自由修改） -->
+        <!-- 區塊 2：基本聯絡與非費用欄位（賽前皆可自由修改；組員登入唯讀） -->
         <div class="p-3.5 rounded-xl border bg-white space-y-2.5 text-xs">
-          <div class="font-black text-slate-900">✏️ 個人聯絡、緊急聯絡人與非費用設定</div>
+          <div class="font-black text-slate-900">✏️ 聯絡、緊急聯絡人與非費用設定（${C.escapeHtml(p.name)}）</div>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-            <div><label class="font-bold">手機號碼 (09 開頭 10 碼)</label><input id="lkPhone" ${isClosedLock ? 'disabled' : ''} value="${C.escapeHtml(p.phone || '')}" maxlength="10" class="w-full px-2.5 py-2 border rounded-lg mono mt-0.5" /></div>
-            <div><label class="font-bold">電子信箱 Email</label><input id="lkEmail" ${isClosedLock ? 'disabled' : ''} type="email" value="${C.escapeHtml(p.email || '')}" class="w-full px-2.5 py-2 border rounded-lg mt-0.5" /></div>
-            <div><label class="font-bold">居住縣市</label><input id="lkCity" ${isClosedLock ? 'disabled' : ''} value="${C.escapeHtml(p.city || '')}" class="w-full px-2.5 py-2 border rounded-lg mt-0.5" /></div>
-            <div><label class="font-bold">緊急聯絡人姓名</label><input id="lkEmergName" ${isClosedLock ? 'disabled' : ''} value="${C.escapeHtml(p.emergencyName || '')}" class="w-full px-2.5 py-2 border rounded-lg mt-0.5" /></div>
-            <div><label class="font-bold">緊急聯絡人電話</label><input id="lkEmergPhone" ${isClosedLock ? 'disabled' : ''} value="${C.escapeHtml(p.emergencyPhone || '')}" maxlength="10" class="w-full px-2.5 py-2 border rounded-lg mono mt-0.5" /></div>
+            <div><label class="font-bold">手機號碼 (09 開頭 10 碼)</label><input id="lkPhone" ${editLocked ? 'disabled' : ''} value="${C.escapeHtml(p.phone || '')}" maxlength="10" class="w-full px-2.5 py-2 border rounded-lg mono mt-0.5 ${editLocked ? 'bg-slate-100' : ''}" /></div>
+            <div><label class="font-bold">電子信箱 Email ${isEditingOtherMember ? '🔒（團長統一收信）' : ''}</label><input id="lkEmail" ${editLocked || isEditingOtherMember ? 'disabled' : ''} type="email" value="${C.escapeHtml(p.email || '')}" class="w-full px-2.5 py-2 border rounded-lg mt-0.5 ${editLocked || isEditingOtherMember ? 'bg-slate-100' : ''}" /></div>
+            <div><label class="font-bold">通訊住址（選填）</label><input id="lkCity" ${editLocked ? 'disabled' : ''} value="${C.escapeHtml(p.city || '')}" placeholder="選填" class="w-full px-2.5 py-2 border rounded-lg mt-0.5 ${editLocked ? 'bg-slate-100' : ''}" /></div>
+            <div><label class="font-bold">緊急聯絡人姓名</label><input id="lkEmergName" ${editLocked ? 'disabled' : ''} value="${C.escapeHtml(p.emergencyName || '')}" class="w-full px-2.5 py-2 border rounded-lg mt-0.5 ${editLocked ? 'bg-slate-100' : ''}" /></div>
+            <div><label class="font-bold">緊急聯絡人電話</label><input id="lkEmergPhone" ${editLocked ? 'disabled' : ''} value="${C.escapeHtml(p.emergencyPhone || '')}" maxlength="10" class="w-full px-2.5 py-2 border rounded-lg mono mt-0.5 ${editLocked ? 'bg-slate-100' : ''}" /></div>
             <div><label class="font-bold">飲食習慣</label>
-              <select id="lkDiet" ${isClosedLock ? 'disabled' : ''} class="w-full px-2.5 py-2 border rounded-lg mt-0.5">
+              <select id="lkDiet" ${editLocked ? 'disabled' : ''} class="w-full px-2.5 py-2 border rounded-lg mt-0.5 ${editLocked ? 'bg-slate-100' : ''}">
                 <option value="葷" ${p.diet === '葷' ? 'selected' : ''}>葷食</option>
                 <option value="素" ${p.diet === '素' ? 'selected' : ''}>素食</option>
               </select>
             </div>
-            <div class="sm:col-span-3"><label class="font-bold">備註 / 特殊需求</label><input id="lkRemark" ${isClosedLock ? 'disabled' : ''} value="${C.escapeHtml(p.remark || '')}" class="w-full px-2.5 py-2 border rounded-lg mt-0.5" /></div>
+            <div class="sm:col-span-3"><label class="font-bold">備註 / 特殊需求</label><input id="lkRemark" ${editLocked ? 'disabled' : ''} value="${C.escapeHtml(p.remark || '')}" class="w-full px-2.5 py-2 border rounded-lg mt-0.5 ${editLocked ? 'bg-slate-100' : ''}" /></div>
           </div>
           ${cfDefs.length ? `
             <div class="pt-2 border-t space-y-2">
-              <div class="font-bold text-indigo-900">📝 活動自訂擴充欄位（非費用欄位，可自由修改）</div>
+              <div class="font-bold text-indigo-900">📝 活動自訂擴充欄位</div>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 ${cfDefs.map((f) => {
                   const v = curCf[f.key];
                   const strV = Array.isArray(v) ? v.join(', ') : String(v ?? '');
                   if (f.type === 'select') {
-                    return `<div><label class="font-bold">${C.escapeHtml(f.label)}</label><select data-lk-cf="${C.escapeHtml(f.key)}" data-lk-cftype="select" ${isClosedLock ? 'disabled' : ''} class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5"><option value="">請選擇</option>${(f.options || []).map((o) => `<option value="${C.escapeHtml(o)}" ${strV === o ? 'selected' : ''}>${C.escapeHtml(o)}</option>`).join('')}</select></div>`;
+                    return `<div><label class="font-bold">${C.escapeHtml(f.label)}</label><select data-lk-cf="${C.escapeHtml(f.key)}" data-lk-cftype="select" ${editLocked ? 'disabled' : ''} class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5 ${editLocked ? 'bg-slate-100' : ''}"><option value="">請選擇</option>${(f.options || []).map((o) => `<option value="${C.escapeHtml(o)}" ${strV === o ? 'selected' : ''}>${C.escapeHtml(o)}</option>`).join('')}</select></div>`;
                   }
-                  return `<div><label class="font-bold">${C.escapeHtml(f.label)}</label><input data-lk-cf="${C.escapeHtml(f.key)}" data-lk-cftype="${f.type}" ${isClosedLock ? 'disabled' : ''} value="${C.escapeHtml(strV)}" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5" /></div>`;
+                  return `<div><label class="font-bold">${C.escapeHtml(f.label)}</label><input data-lk-cf="${C.escapeHtml(f.key)}" data-lk-cftype="${f.type}" ${editLocked ? 'disabled' : ''} value="${C.escapeHtml(strV)}" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5 ${editLocked ? 'bg-slate-100' : ''}" /></div>`;
                 }).join('')}
               </div>
             </div>` : ''}
         </div>
 
-        ${isClosedLock ? '' : '<button id="btnSaveLookup" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow">💾 儲存本場修改並寄送異動通知信</button>'}`;
+        ${editLocked ? '' : `<button id="btnSaveLookup" class="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow">💾 儲存「${C.escapeHtml(p.name)}」修改並寄送通知信${hasGroup ? '（僅寄給團長）' : ''}</button>`}`;
 
       $$('[data-lk-switch]').forEach((b) => {
-        b.onclick = () => renderLookupEditor(allMatches, b.dataset.lkSwitch);
+        b.onclick = () => renderLookupEditor(allMatches, b.dataset.lkSwitch, verifiedId);
       });
+
+      const grpLast5Btn = document.getElementById('btnSaveGroupLast5');
+      if (grpLast5Btn) {
+        grpLast5Btn.onclick = async () => {
+          const inp = document.getElementById('lkGroupLast5');
+          const l5 = String(inp?.value || '').trim();
+          if (!/^\d{5}$/.test(l5)) return toast('整團統一匯款末五碼限 5 位純數字', 'error');
+          for (const item of groupUnpaid) {
+            item.remittanceLast5 = l5;
+            await C.TurDB.put('participants', item);
+          }
+          await enqueueSync('updateGroupLast5', { idCard: verifiedId, eventId: p.eventId, groupCode: p.groupCode, remittanceLast5: l5 });
+          renderLookupEditor(allMatches, p.participantId, verifiedId);
+          toast(`✅ 已由團長一次更新整團 ${p.groupCode}（共 ${groupUnpaid.length} 人）之統一匯款末五碼（${l5}）！`, 'success');
+        };
+      }
 
       const bundleBtn = document.getElementById('btnSaveBundleLast5');
       if (bundleBtn) {
@@ -2316,8 +2414,8 @@
             item.remittanceLast5 = l5;
             await C.TurDB.put('participants', item);
           }
-          await enqueueSync('updateBundleLast5', { idCard: p.idCard, bundleCode, remittanceLast5: l5 });
-          renderLookupEditor(allMatches, p.participantId);
+          await enqueueSync('updateBundleLast5', { idCard: verifiedId, bundleCode, remittanceLast5: l5 });
+          renderLookupEditor(allMatches, p.participantId, verifiedId);
           toast(`✅ 已一次更新合併單 ${bundleCode} 全部 ${bundleUnpaid.length} 場之末五碼（${l5}）！`, 'success');
         };
       }
@@ -2330,13 +2428,17 @@
         const nextAddonsSorted = $$('.lk-addon:checked').map((cb) => cb.dataset.name).sort().join('|');
         // 選項 A：若未更換組別且未改加購，保留原報名鎖定之早鳥價！若更換組別則依修改當下時間重算
         if (selCatId === p.catId && curAddonsSorted === nextAddonsSorted) {
-          document.getElementById('lkTotalDisplay').textContent = `本場應繳：NT$ ${Number(p.totalAmount || 0).toLocaleString()}`;
+          document.getElementById('lkTotalDisplay').textContent = hasGroup
+            ? `本員小計：NT$ ${Number(p.totalAmount || 0).toLocaleString()}（整團 NT$ ${groupGrandTotal.toLocaleString()}）`
+            : `本場應繳：NT$ ${Number(p.totalAmount || 0).toLocaleString()}`;
           return Number(p.totalAmount || 0);
         }
         const addonSum = $$('.lk-addon:checked').reduce((s, cb) => s + Number(cb.dataset.price || 0), 0);
         const pr = C.getEffectiveCategoryPrice(ev, nc);
         const total = pr.fee + addonSum;
-        document.getElementById('lkTotalDisplay').textContent = `本場應繳：NT$ ${total.toLocaleString()}${pr.isEarlyBird ? ' (🐤 早鳥價)' : ''}`;
+        document.getElementById('lkTotalDisplay').textContent = hasGroup
+          ? `本員小計：NT$ ${total.toLocaleString()}${pr.isEarlyBird ? ' (🐤 早鳥價)' : ''}`
+          : `本場應繳：NT$ ${total.toLocaleString()}${pr.isEarlyBird ? ' (🐤 早鳥價)' : ''}`;
         return total;
       };
       if (!feeLocked) {
@@ -2347,9 +2449,10 @@
       const saveBtn = document.getElementById('btnSaveLookup');
       if (saveBtn) {
         saveBtn.onclick = async () => {
+          if (isGroupMemberReadOnly) return toast('團體報名僅限團長登入修改資料', 'error');
           if (!State.lookupSession || Date.now() > State.lookupSession.exp) return toast('查改已逾 45 分鐘效期，請重新驗證', 'error');
           const phone = document.getElementById('lkPhone').value.trim();
-          const email = document.getElementById('lkEmail').value.trim();
+          const email = isEditingOtherMember ? (groupLeader?.email || p.email) : document.getElementById('lkEmail').value.trim();
           const emergName = document.getElementById('lkEmergName').value.trim();
           const emergPhone = document.getElementById('lkEmergPhone').value.trim();
           if (!/^09\d{8}$/.test(phone)) return toast('手機號碼須為 09 開頭 10 碼', 'error');
@@ -2379,8 +2482,11 @@
           }
 
           if (!feeLocked) {
-            const l5 = document.getElementById('lkLast5').value.trim();
-            if (l5 && !/^\d{5}$/.test(l5)) return toast('匯款末五碼限 5 位純數字', 'error');
+            if (!hasGroup) {
+              const l5 = document.getElementById('lkLast5').value.trim();
+              if (l5 && !/^\d{5}$/.test(l5)) return toast('匯款末五碼限 5 位純數字', 'error');
+              patch.remittanceLast5 = l5;
+            }
             const nextCatId = document.getElementById('lkCat').value;
             if (nextCatId !== p.catId) {
               const targetCat = cats.find((c) => c.catId === nextCatId);
@@ -2395,13 +2501,24 @@
             patch.catId = nextCatId;
             patch.addonsDetail = JSON.stringify(addons);
             patch.totalAmount = recalcLookupTotal();
-            patch.remittanceLast5 = l5;
           }
 
           Object.assign(p, patch);
           await C.TurDB.put('participants', p);
-          await enqueueSync('updateSelfRegistration', { participantId: p.participantId, idCard: p.idCard, patch });
-          toast(isPaid ? '✅ 非費用聯絡資料已更新（費用選項維持鎖定）｜✉️ 已觸發異動確認信！' : '✅ 報名資料與應繳金額已更新｜✉️ 已觸發異動確認信！', 'success');
+          // 若團長修改了團長自己的 Email，同步更新全團成員之聯絡 Email
+          if (isGroupLeaderLogin && !isEditingOtherMember && patch.email) {
+            for (const m of groupMembers) {
+              if (m.participantId !== p.participantId) {
+                m.email = patch.email;
+                await C.TurDB.put('participants', m);
+              }
+            }
+          }
+          await enqueueSync('updateSelfRegistration', { participantId: p.participantId, idCard: verifiedId, patch });
+          renderLookupEditor(allMatches, p.participantId, verifiedId);
+          toast(isPaid
+            ? `✅ 已更新「${p.name}」聯絡資料（費用維持鎖定）｜✉️ 已寄出通知信${hasGroup ? '給團長' : ''}！`
+            : `✅ 已更新「${p.name}」報名資料與金額｜✉️ 已寄出通知信${hasGroup ? '給團長' : ''}！`, 'success');
         };
       }
     };
@@ -2412,11 +2529,20 @@
       const matched = State.participants.find((x) => String(x.idCard).toUpperCase() === idCard && (
         String(x.participantId).toUpperCase() === cred ||
         String(x.email).toUpperCase() === cred ||
-        String(x.merTradeNo || '').toUpperCase() === cred
+        String(x.merTradeNo || '').toUpperCase() === cred ||
+        String(x.groupCode || '').toUpperCase() === cred
       ));
-      if (!matched) return toast('查無報名資料，請確認身分證與序號／合併單號／Email', 'error');
-      const allMatches = State.participants.filter((x) => String(x.idCard).toUpperCase() === idCard && String(x.payStatus || '').toUpperCase() !== 'CANCELLED');
-      renderLookupEditor(allMatches.length ? allMatches : [matched], matched.participantId);
+      if (!matched) return toast('查無報名資料，請確認身分證與序號／團報碼／合併單號／Email', 'error');
+      const ownMatches = State.participants.filter((x) => String(x.idCard).toUpperCase() === idCard && String(x.payStatus || '').toUpperCase() !== 'CANCELLED');
+      const allMap = new Map();
+      (ownMatches.length ? ownMatches : [matched]).forEach((m) => {
+        allMap.set(m.participantId, m);
+        // 若驗證者為某團團長，一併載入該團全體組員供團長統一管理
+        if (m.groupCode && C.getParticipantGroupRole(m, State.participants) === 'leader') {
+          C.getGroupMembers(State.participants, m.groupCode, m.eventId).forEach((gm) => allMap.set(gm.participantId, gm));
+        }
+      });
+      renderLookupEditor([...allMap.values()], matched.participantId, idCard);
     };
 
     // Zone 1 Controls
@@ -2454,6 +2580,7 @@
     $('#btnCancelNewEvent').onclick = () => $('#newEventModal').classList.add('hidden');
     $('#btnZ1NewEvent').onclick = () => {
       $('#newEvNameZh').value = '';
+      $('#newEvCatWarrior800').checked = false;
       $('#newEvEarlyBird').checked = true;
       $('#newEvEarlyBirdFields').classList.remove('hidden');
       $('#newEvAddonChip').checked = true;
@@ -2499,9 +2626,7 @@
         lapDistanceKm: lapDist, debounceSeconds: 15, status: 'open',
         regStart: C.formatDateTime(), regEnd: '2026-12-31 23:59:59', raceStart: raceStartNorm, maxQuota: 500,
         bannerUrl: isLap ? 'dyn-track' : 'dyn-road',
-        brochureText: isLap
-          ? `【計時繞圈賽制】單圈 ${lapDist} km，於限時內通過主拱門累計有效圈數與總里程；逾限時圈次留存紀錄不計入有效里程。\n${C.DEFAULT_BROCHURE_TEMPLATE}`
-          : C.DEFAULT_BROCHURE_TEMPLATE,
+        brochureText: '',
         formSchemaJson: JSON.stringify(newSchema), certConfigJson: JSON.stringify(C.defaultCertConfig())
       };
       const isW800Cat = Boolean($('#newEvCatWarrior800')?.checked);

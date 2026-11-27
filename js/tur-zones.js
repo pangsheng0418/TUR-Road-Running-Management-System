@@ -81,7 +81,7 @@
         國籍: p.nationality || 'TWN',
         手機: p.phone || '',
         Email: p.email || '',
-        縣市: p.city || '',
+        通訊住址: p.city || '',
         飲食: p.diet || '',
         緊急聯絡人: p.emergencyName || '',
         緊急聯絡電話: p.emergencyPhone || '',
@@ -616,13 +616,10 @@
             </div>
           </div>
 
-          <!-- 📜 活動簡章內容編輯區（前台報名表上方直接顯示） -->
+          <!-- 📜 活動簡章內容編輯區（預設空白，有填寫才顯示於前台報名頁） -->
           <div class="space-y-1.5 pt-2 border-t">
-            <div class="flex items-center justify-between">
-              <label class="font-bold">📜 活動簡章與參賽須知（跑者於報名表頁可直接展開閱讀）</label>
-              <button type="button" id="btnZ1FillBrochure" class="px-2 py-0.5 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-[11px]">帶入標準簡章範本</button>
-            </div>
-            <textarea id="z1Brochure" rows="5" placeholder="請輸入活動宗旨、路線、起跑/關門時間、補給站、晶片規則與退費須知..." class="w-full px-2.5 py-2 border rounded-lg text-xs leading-relaxed">${C.escapeHtml(ev.brochureText || '')}</textarea>
+            <label class="font-bold block">📜 活動簡章與參賽須知（選填，預設空白）</label>
+            <textarea id="z1Brochure" rows="4" placeholder="選填，留空則前台不顯示簡章區塊..." class="w-full px-2.5 py-2 border rounded-lg text-xs leading-relaxed">${C.escapeHtml(ev.brochureText || '')}</textarea>
           </div>
 
           <!-- 活動橫幅（顯示預覽，16 款樣式預設收合減少表單長度） -->
@@ -658,11 +655,64 @@
           <div class="bg-white p-4 rounded-xl border shadow-sm space-y-2.5">
             <div class="flex items-center justify-between border-b pb-2">
               <div>
-                <h3 class="font-black text-sm">🏷️ 分組里程 / 限時 / 配號前綴 / 八百壯士標示</h3>
-                <p class="text-[11px] text-slate-500 mt-0.5">由承辦人明確標示本活動哪些組別屬「🏅 八百壯士」參加人員，系統將依此計入八百壯士統計與英雄榜。</p>
+                <h3 class="font-black text-sm">🏷️ 分組里程 / 限時 / 配號前綴 / 八百壯士歸類</h3>
+                <p class="text-[11px] text-slate-500 mt-0.5">新增分組欄位預設空白；有需要納入「🏅 八百壯士」再打勾即可，新增後隨時可按「✏️ 修改」調整。</p>
               </div>
-              <button id="btnZ1AddCat" class="px-2.5 py-1 rounded-lg bg-sky-600 text-white font-bold shrink-0">+ 新增分組</button>
+              <button type="button" id="btnZ1AddCat" class="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold shrink-0">+ 新增分組</button>
             </div>
+
+            <!-- 新增 / 修改分組表單（新增時全欄位空白不帶前組資料；八百壯士改純勾選預設不打勾；支援回頭完整修改） -->
+            <div id="z1CatEditorBox" class="hidden p-3 rounded-xl bg-sky-50/80 border-2 border-sky-300 space-y-2.5">
+              <div class="flex items-center justify-between border-b border-sky-200 pb-1.5">
+                <div id="z1CatEditorTitle" class="font-black text-sky-950">➕ 新增分組（所有欄位預設空白）</div>
+                <button type="button" id="btnZ1CancelCatEdit" class="text-xs text-slate-500 hover:text-slate-800 font-bold">✕ 關閉</button>
+              </div>
+              <input type="hidden" id="z1CatEditId" value="" />
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div class="col-span-2">
+                  <label class="font-bold text-[11px]">分組名稱 <span class="text-rose-600">*</span></label>
+                  <input id="z1CatName" type="text" value="" placeholder="例如：50K 超馬組" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5" />
+                </div>
+                <div>
+                  <label class="font-bold text-[11px]">距離 (km) <span class="text-rose-600">*</span></label>
+                  <input id="z1CatDist" type="number" step="0.1" min="0" value="" placeholder="例如：50" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5 mono" />
+                </div>
+                <div>
+                  <label class="font-bold text-[11px]">限時 (小時) <span class="text-rose-600">*</span></label>
+                  <input id="z1CatHrs" type="number" step="0.5" min="0.5" value="" placeholder="例如：8" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5 mono" />
+                </div>
+                <div>
+                  <label class="font-bold text-[11px]">一般報名費 (NT$) <span class="text-rose-600">*</span></label>
+                  <input id="z1CatFee" type="number" min="0" value="" placeholder="例如：1800" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5 mono" />
+                </div>
+                <div>
+                  <label class="font-bold text-[11px]">早鳥優惠價 (NT$)</label>
+                  <input id="z1CatEarlyFee" type="number" min="0" value="" placeholder="選填，須低於一般價" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5 mono" />
+                </div>
+                <div>
+                  <label class="font-bold text-[11px]">號碼布前綴 <span class="text-rose-600">*</span></label>
+                  <input id="z1CatPrefix" type="text" maxlength="4" value="" placeholder="例如：A" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5 mono uppercase" />
+                </div>
+                <div>
+                  <label class="font-bold text-[11px]">起始編號</label>
+                  <input id="z1CatStartNum" type="text" maxlength="5" value="" placeholder="預設 001" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5 mono" />
+                </div>
+                <div>
+                  <label class="font-bold text-[11px]">組別限額人數</label>
+                  <input id="z1CatQuota" type="number" min="1" value="" placeholder="預設 300" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5 mono" />
+                </div>
+                <div class="col-span-2 sm:col-span-3 flex items-end pb-1">
+                  <label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-amber-300 cursor-pointer font-bold text-amber-950 hover:bg-amber-50">
+                    <input id="z1CatW800" type="checkbox" class="accent-amber-600" />
+                    <span>🏅 勾選歸類為「八百壯士 (100K+)」組別（預設空白，有需要再打勾）</span>
+                  </label>
+                </div>
+              </div>
+              <div class="flex justify-end gap-2 pt-1">
+                <button type="button" id="btnZ1SaveCat" class="px-4 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-black shadow">💾 儲存此分組</button>
+              </div>
+            </div>
+
             <div class="space-y-1.5">
               ${cats.map((c) => {
                 const isW800 = C.isCategoryWarrior800(c);
@@ -676,14 +726,17 @@
                 <div class="p-2 rounded-lg ${isW800 ? 'bg-amber-50/80 border-amber-300' : 'bg-slate-50 border-slate-200'} border flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <b>${C.escapeHtml(c.name)}</b>
-                    ${isW800 ? '<span class="ml-1 px-1.5 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black text-[10px]">🏅 八百壯士組</span>' : ''}
+                    ${isW800 ? '<span class="ml-1 px-1.5 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black text-[10px]">🏅 八百壯士</span>' : ''}
                     ${ebTag}
                     <span class="text-slate-600"> · ${c.distanceKm}km / ${c.timeLimitHours}H · 一般 NT$${c.fee} · 前綴 <code>${c.bibPrefix}${c.bibStartNum}</code> · 限額 ${c.quota}</span>
                   </div>
-                  <div class="flex items-center gap-1.5 shrink-0">
-                    <button type="button" data-edit-cat-fee="${c.catId}" class="px-2 py-0.5 rounded-lg font-bold text-[11px] border bg-emerald-50 border-emerald-300 text-emerald-900 hover:bg-emerald-100">✏️ 調價</button>
-                    <button type="button" data-toggle-cat-w800="${c.catId}" class="px-2 py-0.5 rounded-lg font-bold text-[11px] border ${isW800 ? 'bg-amber-400 border-amber-500 text-slate-950' : 'bg-white border-slate-300 text-slate-600 hover:bg-amber-50'}">${isW800 ? '🏅 已標示八百壯士 ✓' : '☆ 標示為八百壯士組'}</button>
-                    <button data-del-cat="${c.catId}" class="text-rose-600 font-bold px-1.5">刪</button>
+                  <div class="flex items-center gap-2 shrink-0">
+                    <label class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border bg-white border-amber-300 text-[11px] font-bold text-amber-950 cursor-pointer hover:bg-amber-50" title="勾選歸類為八百壯士組">
+                      <input type="checkbox" data-toggle-cat-w800="${c.catId}" ${isW800 ? 'checked' : ''} class="accent-amber-600" />
+                      <span>🏅 八百壯士</span>
+                    </label>
+                    <button type="button" data-edit-cat="${c.catId}" class="px-2 py-0.5 rounded-lg font-bold text-[11px] border bg-sky-50 border-sky-300 text-sky-900 hover:bg-sky-100">✏️ 修改</button>
+                    <button type="button" data-del-cat="${c.catId}" class="text-rose-600 font-bold px-1.5">刪</button>
                   </div>
                 </div>`;
               }).join('')}
@@ -796,7 +849,6 @@
       </div>`;
 
     $('#z1NameZh').oninput = (e) => { $('#z1NameEn').value = C.zhToEnEventName(e.target.value); };
-    $('#btnZ1FillBrochure').onclick = () => { $('#z1Brochure').value = C.DEFAULT_BROCHURE_TEMPLATE; };
     $$('[data-z1-racetype]').forEach((b) => {
       b.onclick = () => {
         ev.raceType = b.dataset.z1Racetype;
@@ -869,53 +921,123 @@
       App.renderAll();
       App.toast('✅ 活動設定、早鳥時段、起跑時間、橫幅與簡章已儲存並同步雲端', 'success');
     };
-    $('#btnZ1AddCat').onclick = async () => {
-      const name = prompt('分組名稱（如 21K 半馬組、100K 八百壯士組）：');
-      if (!name) return;
-      const dist = Number(prompt('距離 (km，繞圈賽請填單圈公里數)：', '21.1') || 21.1);
-      const hrs = Number(prompt('限時 (小時)：', '4') || 4);
-      const fee = Number(prompt('一般報名費 (NT$)：', '1200') || 1200);
-      const ebRaw = prompt(`早鳥優惠價 (NT$，須低於一般價 ${fee}；若本組無早鳥優惠請填 0)：`, '0');
-      const earlyBirdFee = Math.max(0, Number(ebRaw || 0));
-      const prefix = (prompt('號碼布前綴 (如 B)：', 'B') || 'B').toUpperCase();
-      const isWarrior800 = confirm(`分組「${name}」是否標示為「🏅 八百壯士」參加人員？\n\n按「確定」＝標示為八百壯士組（完賽將計入英雄榜）\n按「取消」＝一般組別`);
-      const cat = { catId: `CAT-${Date.now().toString().slice(-5)}`, eventId: ev.eventId, name, distanceKm: dist, timeLimitHours: hrs, fee, earlyBirdFee: earlyBirdFee > 0 && earlyBirdFee < fee ? earlyBirdFee : 0, bibPrefix: prefix, bibStartNum: '001', quota: 300, customRaceStart: '', isWarrior800 };
-      App.State.categories.push(cat);
-      await C.TurDB.put('categories', cat);
-      await App.enqueueSync('saveCategory', { category: cat });
-      renderZone1(App);
-      App.toast(`已新增分組「${name}」${cat.earlyBirdFee ? `（🐤 早鳥 NT$${cat.earlyBirdFee}）` : ''}${isWarrior800 ? '（🏅 八百壯士組）' : ''}`, 'success');
+    const resetCatEditor = () => {
+      $('#z1CatEditId').value = '';
+      $('#z1CatName').value = '';
+      $('#z1CatDist').value = '';
+      $('#z1CatHrs').value = '';
+      $('#z1CatFee').value = '';
+      $('#z1CatEarlyFee').value = '';
+      $('#z1CatPrefix').value = '';
+      $('#z1CatStartNum').value = '';
+      $('#z1CatQuota').value = '';
+      $('#z1CatW800').checked = false;
+      $('#z1CatEditorTitle').textContent = '➕ 新增分組（所有欄位預設空白，八百壯士有需要再打勾）';
+      $('#btnZ1SaveCat').textContent = '💾 新增並儲存分組';
     };
-    $$('[data-edit-cat-fee]').forEach((b) => {
-      b.onclick = async () => {
-        const cat = App.State.categories.find((c) => c.catId === b.dataset.editCatFee);
+    $('#btnZ1AddCat').onclick = () => {
+      resetCatEditor();
+      $('#z1CatEditorBox').classList.remove('hidden');
+      $('#z1CatName').focus();
+    };
+    $('#btnZ1CancelCatEdit').onclick = () => {
+      resetCatEditor();
+      $('#z1CatEditorBox').classList.add('hidden');
+    };
+    $$('[data-edit-cat]').forEach((b) => {
+      b.onclick = () => {
+        const cat = App.State.categories.find((c) => c.catId === b.dataset.editCat);
         if (!cat) return;
-        const newFeeStr = prompt(`修改「${cat.name}」一般價格 (NT$)：`, String(cat.fee || 0));
-        if (newFeeStr === null) return;
-        const newFee = Math.max(0, Number(newFeeStr || 0));
-        const newEbStr = prompt(`修改「${cat.name}」早鳥價格 (NT$，填 0 代表本組無早鳥價；須低於一般價 ${newFee})：`, String(cat.earlyBirdFee || 0));
-        if (newEbStr === null) return;
-        const newEb = Math.max(0, Number(newEbStr || 0));
-        if (newEb > 0 && newEb >= newFee) {
-          return App.toast('早鳥價格必須低於一般價格！', 'error');
-        }
-        cat.fee = newFee;
-        cat.earlyBirdFee = newEb;
-        await C.TurDB.put('categories', cat);
-        await App.enqueueSync('saveCategory', { category: cat });
-        renderZone1(App);
-        App.toast(`✅ 已更新「${cat.name}」一般價 NT$${newFee}${newEb > 0 ? ` / 🐤 早鳥價 NT$${newEb}` : '（無早鳥價）'}`, 'success');
+        $('#z1CatEditId').value = cat.catId;
+        $('#z1CatName').value = cat.name || '';
+        $('#z1CatDist').value = cat.distanceKm !== undefined ? String(cat.distanceKm) : '';
+        $('#z1CatHrs').value = cat.timeLimitHours !== undefined ? String(cat.timeLimitHours) : '';
+        $('#z1CatFee').value = cat.fee !== undefined ? String(cat.fee) : '';
+        $('#z1CatEarlyFee').value = Number(cat.earlyBirdFee || 0) > 0 ? String(cat.earlyBirdFee) : '';
+        $('#z1CatPrefix').value = cat.bibPrefix || '';
+        $('#z1CatStartNum').value = cat.bibStartNum || '';
+        $('#z1CatQuota').value = cat.quota !== undefined ? String(cat.quota) : '';
+        $('#z1CatW800').checked = C.isCategoryWarrior800(cat);
+        $('#z1CatEditorTitle').textContent = `✏️ 修改分組：${cat.name}`;
+        $('#btnZ1SaveCat').textContent = '💾 儲存分組修改';
+        $('#z1CatEditorBox').classList.remove('hidden');
+        $('#z1CatName').focus();
       };
     });
-    $$('[data-toggle-cat-w800]').forEach((b) => {
-      b.onclick = async () => {
-        const cat = App.State.categories.find((c) => c.catId === b.dataset.toggleCatW800);
+    $('#btnZ1SaveCat').onclick = async () => {
+      const editId = $('#z1CatEditId').value.trim();
+      const name = $('#z1CatName').value.trim();
+      const distRaw = $('#z1CatDist').value.trim();
+      const hrsRaw = $('#z1CatHrs').value.trim();
+      const feeRaw = $('#z1CatFee').value.trim();
+      const ebRaw = $('#z1CatEarlyFee').value.trim();
+      const prefix = $('#z1CatPrefix').value.trim().toUpperCase();
+      const startNum = $('#z1CatStartNum').value.trim() || '001';
+      const quotaRaw = $('#z1CatQuota').value.trim();
+      const isWarrior800 = Boolean($('#z1CatW800').checked);
+
+      if (!name) return App.toast('請填寫分組名稱', 'error');
+      if (!distRaw || isNaN(Number(distRaw)) || Number(distRaw) <= 0) return App.toast('請填寫正確之距離 (km)', 'error');
+      if (!hrsRaw || isNaN(Number(hrsRaw)) || Number(hrsRaw) <= 0) return App.toast('請填寫正確之限時 (小時)', 'error');
+      if (feeRaw === '' || isNaN(Number(feeRaw)) || Number(feeRaw) < 0) return App.toast('請填寫正確之一般報名費 (NT$)', 'error');
+      if (!prefix) return App.toast('請填寫號碼布前綴（如 A、B）', 'error');
+
+      const fee = Number(feeRaw);
+      const earlyBirdFee = ebRaw === '' ? 0 : Math.max(0, Number(ebRaw));
+      if (earlyBirdFee > 0 && earlyBirdFee >= fee) {
+        return App.toast(`早鳥優惠價 (${earlyBirdFee}) 必須低於一般報名費 (${fee})！`, 'error');
+      }
+      const quota = quotaRaw === '' ? 300 : Math.max(1, Number(quotaRaw));
+
+      if (editId) {
+        const cat = App.State.categories.find((c) => c.catId === editId);
+        if (!cat) return App.toast('找不到要修改的分組', 'error');
+        cat.name = name;
+        cat.distanceKm = Number(distRaw);
+        cat.timeLimitHours = Number(hrsRaw);
+        cat.fee = fee;
+        cat.earlyBirdFee = earlyBirdFee;
+        cat.bibPrefix = prefix;
+        cat.bibStartNum = startNum;
+        cat.quota = quota;
+        cat.isWarrior800 = isWarrior800;
+        await C.TurDB.put('categories', cat);
+        await App.enqueueSync('saveCategory', { category: cat });
+        resetCatEditor();
+        renderZone1(App);
+        App.toast(`✅ 已更新分組「${name}」${earlyBirdFee ? `（🐤 早鳥 NT$${earlyBirdFee}）` : ''}${isWarrior800 ? '（🏅 八百壯士）' : ''}`, 'success');
+      } else {
+        const cat = {
+          catId: `CAT-${Date.now().toString().slice(-5)}`,
+          eventId: ev.eventId,
+          name,
+          distanceKm: Number(distRaw),
+          timeLimitHours: Number(hrsRaw),
+          fee,
+          earlyBirdFee,
+          bibPrefix: prefix,
+          bibStartNum: startNum,
+          quota,
+          customRaceStart: '',
+          isWarrior800
+        };
+        App.State.categories.push(cat);
+        await C.TurDB.put('categories', cat);
+        await App.enqueueSync('saveCategory', { category: cat });
+        resetCatEditor();
+        renderZone1(App);
+        App.toast(`✅ 已新增分組「${name}」${earlyBirdFee ? `（🐤 早鳥 NT$${earlyBirdFee}）` : ''}${isWarrior800 ? '（🏅 八百壯士）' : ''}`, 'success');
+      }
+    };
+    $$('[data-toggle-cat-w800]').forEach((cb) => {
+      cb.onchange = async () => {
+        const cat = App.State.categories.find((c) => c.catId === cb.dataset.toggleCatW800);
         if (!cat) return;
-        cat.isWarrior800 = !C.isCategoryWarrior800(cat);
+        cat.isWarrior800 = Boolean(cb.checked);
         await C.TurDB.put('categories', cat);
         await App.enqueueSync('saveCategory', { category: cat });
         renderZone1(App);
-        App.toast(cat.isWarrior800 ? `🏅 已標示「${cat.name}」為八百壯士參加組別` : `已取消「${cat.name}」的八百壯士標示`, 'info');
+        App.toast(cat.isWarrior800 ? `🏅 已勾選「${cat.name}」歸類為八百壯士組` : `已取消「${cat.name}」的八百壯士勾選`, 'info');
       };
     });
     $$('[data-del-cat]').forEach((b) => {
@@ -1219,6 +1341,48 @@
       </div>
 
       ${(() => {
+        const evGroups = C.summarizeGroupOrders({
+          participants: parts,
+          categories: App.State.categories,
+          eventId: ev.eventId
+        });
+        if (!evGroups.length) return '';
+        return `
+          <div class="bg-amber-50/90 p-4 rounded-2xl border-2 border-amber-400 space-y-2.5 text-xs">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200 pb-2">
+              <div>
+                <div class="font-black text-sm text-amber-950">👥 團體報名「統一匯款」對帳區（本場共 ${evGroups.length} 團）</div>
+                <p class="text-[11px] text-amber-900 mt-0.5">團體報名一律由第 1 位「👑 團長」統一匯款、統一收信與管理；核對整團總金額無誤後，請直接按「💰 整團一次入帳」，系統將僅寄發 1 封整團入帳確認信給團長。</p>
+              </div>
+            </div>
+            <div class="space-y-2">
+              ${evGroups.map((g) => `
+                <div class="p-3 rounded-xl bg-white border ${g.allPaid ? 'border-emerald-200' : 'border-amber-400'} flex flex-wrap items-center justify-between gap-3">
+                  <div class="space-y-1 min-w-0 flex-1">
+                    <div class="flex flex-wrap items-center gap-1.5">
+                      <span class="px-2 py-0.5 rounded bg-amber-500 text-slate-950 font-black mono">${C.escapeHtml(g.groupCode)}</span>
+                      <span class="font-black text-slate-900">${C.escapeHtml(g.groupName)}</span>
+                      <span class="px-2 py-0.5 rounded bg-slate-900 text-amber-300 font-bold">👑 團長：${C.escapeHtml(g.leader.name)} (${C.escapeHtml(C.maskIdCard(g.leader.idCard))})</span>
+                      <span class="px-2 py-0.5 rounded-full font-bold ${g.allPaid ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">${g.allPaid ? `✅ 全團 ${g.memberCount} 人已入帳` : `待對帳 ${g.unpaidCount}/${g.memberCount} 人`}</span>
+                      ${g.remittanceLast5 ? `<span class="px-2 py-0.5 rounded bg-amber-100 text-amber-950 mono font-bold">統一末五碼 ${C.escapeHtml(g.remittanceLast5)}</span>` : '<span class="px-2 py-0.5 rounded bg-slate-100 text-slate-500">尚未填報末五碼</span>'}
+                    </div>
+                    <div class="text-[11px] text-slate-600">
+                      團長信箱：<span class="mono">${C.escapeHtml(g.leader.email || '-')}</span> ｜ 成員：${g.members.map((m) => `<span class="inline-block mr-2">${m.role === 'leader' ? '<b>👑 ' : ''}${C.escapeHtml(m.name)}(${C.escapeHtml(m.catName)}${m.bibNumber ? `・${m.bibNumber}` : ''})${m.role === 'leader' ? '</b>' : ''}</span>`).join('')}
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2 shrink-0">
+                    <div class="text-right">
+                      <div class="text-[10px] text-slate-500">共 ${g.memberCount} 人統一匯款</div>
+                      <div class="font-black text-sm mono text-amber-700">整團總額 NT$${g.totalAmount.toLocaleString()}</div>
+                    </div>
+                    ${!g.allPaid ? `<button type="button" data-group-paid="${C.escapeHtml(g.groupCode)}" class="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black shadow">💰 整團一次入帳 (${g.unpaidCount} 人)</button>` : ''}
+                  </div>
+                </div>`).join('')}
+            </div>
+          </div>`;
+      })()}
+
+      ${(() => {
         const allBundles = C.summarizeBundleOrders({
           participants: App.State.participants,
           events: App.State.events,
@@ -1290,6 +1454,7 @@
               .map((p) => {
               const st = String(p.payStatus).toUpperCase();
               const isUn = st === 'UNPAID' || st === 'PENDING_PAY';
+              const grpRole = p.groupCode ? C.getParticipantGroupRole(p, parts) : '';
               return `
                 <tr class="${isUn ? 'bg-rose-50/90' : ''}">
                   <td class="p-2"><input type="checkbox" class="z1-cb" value="${p.participantId}" ${isUn ? '' : 'disabled'} /></td>
@@ -1299,7 +1464,11 @@
                   </td>
                   <td class="p-2 mono font-black">${p.bibNumber || '<span class="text-slate-400 font-normal">未配</span>'}</td>
                   <td class="p-2">
-                    <div class="font-bold">${C.escapeHtml(p.name)} <span class="px-1 rounded bg-sky-100 text-sky-800 text-[10px]">${p.nationality || 'TWN'}</span></div>
+                    <div class="font-bold flex flex-wrap items-center gap-1">
+                      <span>${C.escapeHtml(p.name)}</span>
+                      <span class="px-1 rounded bg-sky-100 text-sky-800 text-[10px]">${p.nationality || 'TWN'}</span>
+                      ${grpRole === 'leader' ? '<span class="px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 text-[10px] font-black">👑 團長</span>' : (grpRole === 'member' ? '<span class="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 text-[10px] font-bold">👥 組員</span>' : '')}
+                    </div>
                     <div class="text-[10px] text-slate-500 mono">${C.escapeHtml(C.maskIdCard(p.idCard))} · ${p.phone || '-'} ${p.groupCode ? `· <b class="text-amber-700">${p.groupCode}</b>` : ''}</div>
                   </td>
                   <td class="p-2">${C.escapeHtml(catMap.get(p.catId) || p.catId)}</td>
@@ -1309,11 +1478,16 @@
                   </td>
                   <td class="p-2 mono text-[11px]">
                     <div>${C.escapeHtml(p.remittanceLast5 || p.merTradeNo || '-')}</div>
+                    ${p.groupCode ? `<div class="mt-0.5 px-1.5 py-0.5 rounded bg-amber-100 text-amber-950 font-bold text-[10px] inline-block">👥 團報統一匯款</div>` : ''}
                     ${C.isBundleOrderCode(p.merTradeNo) ? `<div class="mt-0.5 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 font-bold text-[10px] inline-block">📦 合併單 ${C.escapeHtml(p.merTradeNo)}</div>` : ''}
                   </td>
                   <td class="p-2 whitespace-nowrap">
                     <div class="flex flex-wrap gap-1">
-                      ${isUn ? `<button data-mark-paid="${p.participantId}" class="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold">入帳</button>` : ''}
+                      ${isUn
+                        ? (p.groupCode
+                          ? `<button data-group-paid="${C.escapeHtml(p.groupCode)}" class="px-2 py-1 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 font-black">👥 整團入帳</button>`
+                          : `<button data-mark-paid="${p.participantId}" class="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold">入帳</button>`)
+                        : ''}
                       <button data-edit-part="${p.participantId}" class="px-2 py-1 rounded bg-sky-600 hover:bg-sky-500 text-white font-bold">✏️ 修改</button>
                       <button data-del-part="${p.participantId}" class="px-2 py-1 rounded bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold">🗑️ 刪除</button>
                     </div>

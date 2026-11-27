@@ -112,7 +112,6 @@
         <div id="regEventTitle" class="font-black text-xl sm:text-2xl drop-shadow">-</div>
         <div id="regEventMeta" class="text-xs sm:text-sm text-white/90 mt-0.5 drop-shadow">-</div>
       </div>
-      <button type="button" id="btnFillSampleRunner" class="text-xs sm:text-sm px-3.5 py-2 rounded-xl bg-white/90 hover:bg-white text-slate-900 font-black shadow">✨ 帶入範例</button>
     </div>
 
     <!-- 賽制類型簡明提示 -->
@@ -135,18 +134,18 @@
       </button>
       <button type="button" id="btnModeGroup" class="p-4 rounded-2xl border-2 border-slate-200 bg-white hover:border-amber-400 text-slate-800 text-left shadow-sm transition">
         <div class="font-black text-base flex items-center gap-2"><span>👥 團體報名（2～50 人）</span></div>
-        <div class="text-xs text-slate-500 mt-1">多人同報，自動配發團報代碼。</div>
+        <div class="text-xs text-slate-500 mt-1">第 1 位為團長、其餘為組員；統一匯款、由團長統一收信與管理。</div>
       </button>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-      <!-- 左 2 欄：14 項防呆表單 + 雙軌金流 -->
-      <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-4">
+      <!-- 報名表單主區塊（個人模式滿版簡潔顯示；團報模式左 2 欄＋右 1 欄成員清單） -->
+      <div id="regFormCard" class="lg:col-span-3 bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-4">
         <form id="regForm" class="space-y-3" novalidate>
           <!-- 團體報名專屬設定區塊（個人模式完全隱藏） -->
           <div id="groupSettingsPanel" class="hidden p-3.5 rounded-xl bg-amber-50 border-2 border-amber-400 space-y-2.5">
             <div class="flex flex-wrap items-center justify-between gap-1">
-              <div class="text-xs font-black text-amber-950">👥 團體報名設定（步驟 ① 填完每位團員後點「➕ 加入團報清單」→ 步驟 ② 右側按「送出整批團報」）</div>
+              <div class="text-xs font-black text-amber-950">👥 團體報名設定（第 1 位為「👑 團長」、其餘為「組員」｜統一匯款・只寄信給團長・僅團長可修改）</div>
             </div>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div>
@@ -154,26 +153,31 @@
                 <input id="regGroupName" type="text" placeholder="例如：台北超馬跑團（自動配發 GRP26-XXXX）" class="w-full px-3 py-2 border rounded-lg text-xs bg-white" />
                 <p id="err-regGroupName" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
               </div>
-              <div id="regGroupPayModeWrap">
-                <label class="block text-xs font-bold text-amber-950 mb-1">團報匯款方式</label>
-                <select id="regGroupPayMode" class="w-full px-3 py-2 border rounded-lg text-xs bg-white font-semibold">
-                  <option value="shared">整團統一匯款（共用第 1 位之末五碼）</option>
-                  <option value="split">團員各自匯款（每人各自填寫末五碼）</option>
-                </select>
+              <div class="p-2.5 rounded-lg bg-white/90 border border-amber-300 text-[11px] text-amber-950 leading-relaxed">
+                <div class="font-black">👑 團長統一管理制</div>
+                <div>• 全團<b>統一匯款</b>（不分個人繳費）</div>
+                <div>• 通知信與入帳信<b>只寄給團長</b>，且<b>僅團長</b>可登入修改全團資料</div>
               </div>
             </div>
+            <div id="groupRoleBanner" class="p-2.5 rounded-lg bg-amber-200/70 border border-amber-400 text-xs font-black text-amber-950">
+              👑 目前填寫：【第 1 位・團長資料】— 請填寫團長 Email，作為本團統一收信與查改管理窗口。
+            </div>
+          </div>
+
+          <div class="p-2.5 rounded-xl bg-rose-50/70 border border-rose-200 text-[11px] text-rose-950 font-semibold flex flex-wrap items-center justify-between gap-1">
+            <span>📌 欄位說明：標示 <b class="text-rose-600">* 必填</b> 之預設欄位皆為必填；「<b>通訊住址</b>」與「<b>加購服務</b>（依承辦人設定）」為非必填。</span>
           </div>
 
           <!-- 1. 報名組別 -->
           <div class="p-3 rounded-xl bg-slate-50 border">
-            <label class="block text-xs font-bold text-slate-700 mb-1">1. 報名組別 *</label>
+            <label class="block text-xs font-bold text-slate-700 mb-1">1. 報名組別 <span class="text-rose-600 font-black">* 必填</span></label>
             <select id="regCatId" class="w-full px-3 py-2 border rounded-lg text-sm bg-white"></select>
             <p id="err-regCatId" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">2. 國籍 (三碼國際碼) *</label>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">2. 國籍 (三碼國際碼) <span class="text-rose-600 font-black">*</span></label>
               <div class="flex gap-1.5">
                 <select id="regNationality" class="flex-1 px-3 py-2 border rounded-lg text-sm">
                   <option value="TWN" selected>TWN - 台灣</option><option value="JPN">JPN - 日本</option>
@@ -187,17 +191,17 @@
               <p id="err-regNationality" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
             <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">3. 選手姓名 *</label>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">3. 選手姓名 <span class="text-rose-600 font-black">*</span></label>
               <input id="regName" type="text" placeholder="支援中文複姓與英文姓名" class="w-full px-3 py-2 border rounded-lg text-sm" />
               <p id="err-regName" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
             <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">4. 身分證字號 / 護照 *</label>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">4. 身分證字號 / 護照 <span class="text-rose-600 font-black">*</span></label>
               <input id="regIdCard" type="text" placeholder="本國檢核台灣身分證演算法" class="w-full px-3 py-2 border rounded-lg text-sm uppercase mono" />
               <p id="err-regIdCard" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
             <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">5. 性別 (與身分證第2碼聯動) *</label>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">5. 性別 (與身分證第2碼聯動) <span class="text-rose-600 font-black">*</span></label>
               <select id="regGender" class="w-full px-3 py-2 border rounded-lg text-sm">
                 <option value="">請選擇</option>
                 <option value="M">M - 男 (1/8)</option>
@@ -206,7 +210,7 @@
               <p id="err-regGender" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
             <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">6. 出生年月日 (限 10～80 歲) *</label>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">6. 出生年月日 (限 10～80 歲) <span class="text-rose-600 font-black">*</span></label>
               <div class="flex gap-2 items-center">
                 <input id="regBirthday" type="date" class="flex-1 px-3 py-2 border rounded-lg text-sm" />
                 <span id="regAgeDisplay" class="px-2.5 py-2 rounded-lg bg-slate-100 text-xs font-bold min-w-[62px] text-center">-- 歲</span>
@@ -214,43 +218,40 @@
               <p id="err-regBirthday" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
             <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">7. 手機號碼 (09 開頭 10 碼) *</label>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">7. 手機號碼 (09 開頭 10 碼) <span class="text-rose-600 font-black">*</span></label>
               <input id="regPhone" type="tel" maxlength="10" placeholder="0912345678" class="w-full px-3 py-2 border rounded-lg text-sm mono" />
               <p id="err-regPhone" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
             <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">8. 電子信箱 Email *</label>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">8. 電子信箱 Email <span class="text-rose-600 font-black">*</span> <span id="regEmailHint" class="text-[10px] font-bold text-amber-700"></span></label>
               <input id="regEmail" type="email" placeholder="runner@example.com" class="w-full px-3 py-2 border rounded-lg text-sm" />
               <p id="err-regEmail" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
             <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">9. 居住縣市 *</label>
-              <select id="regCity" class="w-full px-3 py-2 border rounded-lg text-sm">
-                <option value="">請選擇縣市</option>
-                <option>台北市</option><option>新北市</option><option>桃園市</option><option>台中市</option>
-                <option>台南市</option><option>高雄市</option><option>基隆市</option><option>新竹市</option>
-                <option>新竹縣</option><option>苗栗縣</option><option>彰化縣</option><option>南投縣</option>
-                <option>雲林縣</option><option>嘉義市</option><option>嘉義縣</option><option>屏東縣</option>
-                <option>宜蘭縣</option><option>花蓮縣</option><option>台東縣</option><option>離島 / 海外</option>
-              </select>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">9. 通訊住址 <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-bold">非必填</span></label>
+              <input id="regCity" type="text" placeholder="選填，例如：台北市信義區松仁路100號" class="w-full px-3 py-2 border rounded-lg text-sm" />
               <p id="err-regCity" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
             <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">10. 飲食習慣 *</label>
-              <select id="regDiet" class="w-full px-3 py-2 border rounded-lg text-sm"><option value="葷">葷食</option><option value="素">素食</option></select>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">10. 飲食習慣 <span class="text-rose-600 font-black">*</span></label>
+              <select id="regDiet" class="w-full px-3 py-2 border rounded-lg text-sm">
+                <option value="">請選擇飲食習慣</option>
+                <option value="葷">葷食</option>
+                <option value="素">素食</option>
+              </select>
               <p id="err-regDiet" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
             <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">備註 / 特殊需求</label>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">備註 / 特殊需求 <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-bold">選填</span></label>
               <input id="regRemark" type="text" placeholder="選填" class="w-full px-3 py-2 border rounded-lg text-sm" />
             </div>
             <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">11. 緊急聯絡人姓名 (不可同本人) *</label>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">11. 緊急聯絡人姓名 (不可同本人) <span class="text-rose-600 font-black">*</span></label>
               <input id="regEmergName" type="text" class="w-full px-3 py-2 border rounded-lg text-sm" />
               <p id="err-regEmergName" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
             <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">12. 緊急聯絡人電話 (不可同本人) *</label>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">12. 緊急聯絡人電話 (不可同本人) <span class="text-rose-600 font-black">*</span></label>
               <input id="regEmergPhone" type="tel" maxlength="10" class="w-full px-3 py-2 border rounded-lg text-sm mono" />
               <p id="err-regEmergPhone" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
@@ -267,7 +268,7 @@
 
           <!-- 動態加購項目區 -->
           <div class="p-3 bg-slate-50 rounded-xl border">
-            <div class="text-xs font-bold text-slate-700 mb-2">13. 加購服務（由承辦人於後台動態設定）</div>
+            <div class="text-xs font-bold text-slate-700 mb-2">13. 加購服務（非必填，依承辦人於後台核取增減）</div>
             <div id="regAddonsContainer" class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs"></div>
           </div>
 
@@ -287,9 +288,12 @@
                   <span class="text-[10px] px-2 py-0.5 rounded bg-amber-200 text-amber-950 font-bold">本活動唯一繳費方式</span>
                 </div>
                 <div id="bankAccountPreview" class="text-[11px] text-slate-600 mt-1.5 mono leading-relaxed"></div>
-                <div class="mt-2">
+                <div id="regLast5Wrap" class="mt-2">
                   <input id="regLast5" type="text" maxlength="5" placeholder="預填匯款帳號末五碼 (5碼純數字，亦可報名後至 /lookup 補填)" class="w-full px-2.5 py-1.5 border rounded-lg text-xs mono bg-white" />
                   <p id="err-regLast5" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
+                </div>
+                <div id="regLast5GroupNote" class="hidden mt-2 p-2 rounded-lg bg-amber-100/90 border border-amber-300 text-[11px] font-bold text-amber-950">
+                  👥 團體報名採「整團統一匯款」（不分個人），請於右側「團報成員清單」下方填寫 1 組整團末五碼，或報名後由團長登入補填。
                 </div>
               </label>
 
@@ -330,36 +334,29 @@
         </form>
       </div>
 
-      <!-- 右 1 欄：依模式顯示「個人報名提示」或「團報暫存清單」+ 14 項即時防呆 -->
-      <div class="space-y-4">
-        <div id="soloGuideCard" class="bg-slate-900 text-white rounded-xl p-4 space-y-2 text-xs shadow-sm">
-          <div class="font-black text-amber-400 text-sm">🏃 個人報名模式</div>
-          <p class="text-slate-300 leading-relaxed">只需填寫左側 14 項檢核欄位（全亮綠框）即可一鍵送出報名，連網時立即寫入大會資料庫。</p>
-          <p class="text-slate-400 text-[11px]">若要幫 2 人以上跑團一起報名，請點上方「👥 團體報名」切換。</p>
-        </div>
-
-        <div id="groupCartCard" class="hidden bg-white rounded-xl border-2 border-amber-400 shadow-sm p-4">
-          <div class="flex items-center justify-between mb-2">
+      <!-- 右 1 欄：僅於「團體報名模式」顯示團報成員清單（個人模式自動隱藏以簡化畫面） -->
+      <div id="regRightCol" class="hidden space-y-4">
+        <div id="groupCartCard" class="hidden bg-white rounded-xl border-2 border-amber-400 shadow-sm p-4 space-y-3">
+          <div class="flex items-center justify-between">
             <h3 class="font-black text-sm text-amber-950">👥 團體報名成員清單 (步驟 ②)</h3>
             <span id="groupCountBadge" class="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold">0 / 50</span>
           </div>
+          <div class="text-[11px] text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+            👑 清單第 1 位自動設為<b>團長</b>（統一收信、統一匯款、統一修改），第 2 位起皆為<b>組員</b>。
+          </div>
           <div id="groupCartList" class="space-y-2 max-h-60 overflow-y-auto text-xs"></div>
-          <div class="border-t mt-3 pt-3 flex items-center justify-between">
+          <div id="groupUnifiedLast5Wrap" class="pt-2 border-t space-y-1">
+            <label class="block text-[11px] font-black text-amber-950">🏦 整團統一匯款帳號末五碼（選填，5 碼純數字）</label>
+            <input id="groupUnifiedLast5" type="text" maxlength="5" placeholder="整團 1 筆匯款末五碼（亦可報名後由團長補填）" class="w-full px-2.5 py-1.5 border border-amber-300 rounded-lg text-xs mono bg-amber-50/40" />
+          </div>
+          <div class="border-t pt-3 flex items-center justify-between gap-2">
             <div>
-              <div class="text-[11px] text-slate-500">整團應繳總額</div>
+              <div class="text-[11px] text-slate-500">整團統一應繳總額</div>
               <div id="groupGrandTotal" class="text-lg font-black mono text-amber-700">NT$ 0</div>
             </div>
             <button id="btnSubmitGroup" disabled class="px-4 py-2 rounded-xl bg-emerald-600 disabled:bg-slate-200 disabled:text-slate-400 hover:bg-emerald-500 text-white font-black text-xs shadow">✅ 送出整批團報</button>
           </div>
         </div>
-
-        <details open class="bg-white rounded-xl border border-slate-200 shadow-sm p-4">
-          <summary class="cursor-pointer font-bold text-sm flex items-center justify-between">
-            <span>🛡️ 填寫進度檢核（14 項）</span>
-            <span class="acc-arrow text-xs text-slate-400">▶</span>
-          </summary>
-          <div id="validationSummaryList" class="grid grid-cols-2 gap-1.5 text-xs mt-3"></div>
-        </details>
       </div>
     </div>
   </section>
@@ -372,7 +369,6 @@
         <h1 class="text-xl sm:text-2xl font-black">🛒 多場活動聯合報名（同承辦人合併繳費）</h1>
         <p class="text-xs sm:text-sm text-emerald-100/90 mt-1">因不同承辦人收款不同，請先選擇承辦人與同金流群組 → 勾選其舉辦之多場活動與組別 → 只填 1 次基本資料合併 1 筆匯款記帳！</p>
       </div>
-      <button type="button" id="btnFillSampleMulti" class="text-xs sm:text-sm px-3.5 py-2 rounded-xl bg-white/95 hover:bg-white text-slate-900 font-black shadow">✨ 帶入測試範例</button>
     </div>
 
     <!-- 同金流防呆篩選列 -->
@@ -397,6 +393,7 @@
         <form id="multiRegForm" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3" novalidate>
           <div class="border-b pb-2.5">
             <h2 class="font-black text-base text-slate-900">步驟 2：填寫選手基本資料（只需填寫一次，自動套用至全部勾選場次）</h2>
+            <p class="text-[11px] text-rose-800 font-semibold mt-1">📌 標示 <b class="text-rose-600">*</b> 之預設基本欄位皆為必填；「通訊住址」與「加購服務」為非必填（選填）。</p>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
@@ -447,19 +444,16 @@
               <input id="mEmail" type="email" placeholder="runner@example.com" class="w-full px-3 py-2 border rounded-lg text-sm" />
             </div>
             <div>
-              <label class="block font-semibold text-slate-700 mb-1">居住縣市 *</label>
-              <select id="mCity" class="w-full px-3 py-2 border rounded-lg text-sm">
-                <option value="">請選擇縣市</option>
-                <option>台北市</option><option>新北市</option><option>桃園市</option><option>台中市</option>
-                <option>台南市</option><option>高雄市</option><option>基隆市</option><option>新竹市</option>
-                <option>新竹縣</option><option>苗栗縣</option><option>彰化縣</option><option>南投縣</option>
-                <option>雲林縣</option><option>嘉義市</option><option>嘉義縣</option><option>屏東縣</option>
-                <option>宜蘭縣</option><option>花蓮縣</option><option>台東縣</option><option>離島 / 海外</option>
-              </select>
+              <label class="block font-semibold text-slate-700 mb-1">通訊住址 <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-bold">非必填</span></label>
+              <input id="mCity" type="text" placeholder="選填，例如：台北市信義區松仁路100號" class="w-full px-3 py-2 border rounded-lg text-sm" />
             </div>
             <div>
-              <label class="block font-semibold text-slate-700 mb-1">飲食習慣 *</label>
-              <select id="mDiet" class="w-full px-3 py-2 border rounded-lg text-sm"><option value="葷">葷食</option><option value="素">素食</option></select>
+              <label class="block font-semibold text-slate-700 mb-1">飲食習慣 <span class="text-rose-600 font-black">*</span></label>
+              <select id="mDiet" class="w-full px-3 py-2 border rounded-lg text-sm">
+                <option value="">請選擇飲食習慣</option>
+                <option value="葷">葷食</option>
+                <option value="素">素食</option>
+              </select>
             </div>
             <div>
               <label class="block font-semibold text-slate-700 mb-1">備註 / 跑團名稱（選填）</label>
@@ -532,8 +526,8 @@
         <input id="lookupIdCard" type="text" autocomplete="off" placeholder="例如 A123456789" class="w-full px-3 py-2 border rounded-lg text-sm uppercase mono" />
       </div>
       <div>
-        <label class="block text-xs font-bold mb-1">報名序號、合併單號 (TURM-...) 或 Email</label>
-        <input id="lookupCred" type="text" autocomplete="off" placeholder="TUR-2026... / TURM-... / Email" class="w-full px-3 py-2 border rounded-lg text-sm" />
+        <label class="block text-xs font-bold mb-1">報名序號、團報代碼 (GRP...)、合併單號或 Email</label>
+        <input id="lookupCred" type="text" autocomplete="off" placeholder="TUR-... / GRP26-... / TURM-... / Email" class="w-full px-3 py-2 border rounded-lg text-sm" />
       </div>
       <button id="btnLookupVerify" class="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold">驗證查詢</button>
     </div>
@@ -853,7 +847,7 @@
         <div><label class="font-bold">國籍 (3碼)</label><input id="epNat" maxlength="3" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5 mono uppercase" /></div>
         <div><label class="font-bold">手機</label><input id="epPhone" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5 mono" /></div>
         <div><label class="font-bold">Email</label><input id="epEmail" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5" /></div>
-        <div><label class="font-bold">縣市</label><input id="epCity" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5" /></div>
+        <div><label class="font-bold">通訊住址（選填）</label><input id="epCity" placeholder="選填" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5" /></div>
         <div><label class="font-bold">飲食</label><select id="epDiet" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5"><option value="葷">葷食</option><option value="素">素食</option></select></div>
         <div><label class="font-bold">團報名稱 / 代碼</label><input id="epGroupName" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5" /></div>
         <div><label class="font-bold">緊急聯絡人</label><input id="epEmergName" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5" /></div>
@@ -1040,9 +1034,9 @@
   </div>
 </div>
 
-<script src="js/tur-logo.js?v=5.7"></script>
-<script src="js/tur-core.js?v=5.7"></script>
-<script src="js/tur-zones.js?v=5.7"></script>
-<script src="js/tur-app.js?v=5.7"></script>
+<script src="js/tur-logo.js?v=5.11"></script>
+<script src="js/tur-core.js?v=5.11"></script>
+<script src="js/tur-zones.js?v=5.11"></script>
+<script src="js/tur-app.js?v=5.11"></script>
 </body>
 </html>
