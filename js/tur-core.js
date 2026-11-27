@@ -2171,19 +2171,19 @@
         fallback: '晶片異常請換新卡重新寫入'
       },
       CHECKIN: {
-        roleLabel: '報到檢錄站',
+        roleLabel: stObj?.name || '報到檢錄站',
         action: '感應確認選手報到（不計入成績）',
         guard: '攔截未繳費與重複報到',
         fallback: '異常時用下方手動補登'
       },
       LAP: {
-        roleLabel: `繞圈主拱門 (${Number(ev?.lapDistanceKm || 1.0)}km)`,
+        roleLabel: `${stObj?.name || '繞圈主拱門'} (${Number(ev?.lapDistanceKm || 1.0)}km)`,
         action: '每圈刷卡累圈，逾限時標註超時圈',
         guard: '未鳴槍鎖定；防 15 秒連點',
         fallback: '漏感應請用下方手動補圈'
       },
       FINISH: {
-        roleLabel: `終點站${stObj?.distanceKm ? ` (${stObj.distanceKm}km)` : ''}`,
+        roleLabel: `${stObj?.name || '終點站'}${stObj?.distanceKm ? ` (${stObj.distanceKm}km)` : ''}`,
         action: '感應衝線計算完賽時間與配速',
         guard: '未鳴槍鎖定；不覆蓋首次衝線',
         fallback: '漏感應請用下方手動補登'

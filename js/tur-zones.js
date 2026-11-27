@@ -423,17 +423,28 @@
   }
 
   function renderZone1(App) {
+    const u = App.State.currentUser;
+    if (!u || (u.role !== 'super_admin' && u.role !== 'organizer')) {
+      $$('.z1-panel').forEach((p) => { p.innerHTML = '<div class="bg-rose-50 text-rose-700 p-6 rounded-xl font-bold text-center">⛔ 權限不足：僅限最高權責管理員與承辦人存取。</div>'; });
+      return;
+    }
+    const isSuper = u.role === 'super_admin';
     const managed = getManagedEvents(App, false);
     const sel = $('#z1EventSelect');
+    const badge = $('#z1RoleScopeBadge');
+    if (badge) {
+      badge.className = `px-2 py-0.5 rounded-full text-[11px] font-bold ${isSuper ? 'bg-rose-100 text-rose-800' : 'bg-sky-100 text-sky-800'}`;
+      badge.textContent = isSuper ? `🛡️ 全平台 ${managed.length} 場` : `👤 本人承辦 ${managed.length} 場`;
+    }
     if (!managed.length) {
-      sel.innerHTML = '<option value="">（目前無進行中活動，請建立新活動或至專區 2 解鎖）</option>';
-      $$('.z1-panel').forEach((p) => { p.innerHTML = '<div class="bg-white p-8 rounded-xl border text-center text-slate-400 text-sm">您名下目前沒有進行中的活動。請點擊上方「+ 建立新活動」。</div>'; });
+      sel.innerHTML = '<option value="">（目前無進行中活動，請建立新活動或至已結案解鎖）</option>';
+      $$('.z1-panel').forEach((p) => { p.innerHTML = '<div class="bg-white p-8 rounded-xl border text-center text-slate-400 text-sm">您名下目前沒有進行中的活動。請點擊上方「+ 新活動」。</div>'; });
       return;
     }
     if (!managed.some((e) => e.eventId === App.State.z1EventId)) {
       App.State.z1EventId = managed[0].eventId;
     }
-    sel.innerHTML = managed.map((e) => `<option value="${e.eventId}" ${e.eventId === App.State.z1EventId ? 'selected' : ''}>${C.isTestSuiteId(e.eventId) ? '🧪 ' : ''}${C.escapeHtml(e.nameZh)} (${e.ownerUsername})</option>`).join('');
+    sel.innerHTML = managed.map((e) => `<option value="${e.eventId}" ${e.eventId === App.State.z1EventId ? 'selected' : ''}>${C.isTestSuiteId(e.eventId) ? '🧪 ' : ''}${C.escapeHtml(e.nameZh)}${isSuper ? `（承辦：${C.escapeHtml(e.ownerUsername || '-')}）` : ''}</option>`).join('');
     const ev = managed.find((e) => e.eventId === App.State.z1EventId);
 
     z1DirtyTabs = new Set(['setup', 'recon', 'chip', 'gun', 'score', 'ops']);
@@ -605,6 +616,14 @@
             <div>
               <label class="font-bold">🎖️ 賽事總監</label>
               <input id="z1Director" value="${C.escapeHtml(C.parseJsonSafe(ev.certConfigJson, C.defaultCertConfig()).raceDirectorName || '')}" placeholder="例：林政宏" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5" />
+            </div>
+            <div>
+              <label class="font-bold">👤 負責承辦人</label>
+              ${App.State.currentUser?.role === 'super_admin'
+                ? `<select id="z1OwnerUser" class="w-full px-2.5 py-1.5 border border-rose-300 bg-rose-50/40 rounded-lg mt-0.5 font-bold">
+                    ${App.State.users.filter((x) => x.role === 'organizer' || x.role === 'super_admin').map((x) => `<option value="${C.escapeHtml(x.username)}" ${x.username === ev.ownerUsername ? 'selected' : ''}>${C.escapeHtml(x.displayName)} (${C.escapeHtml(x.username)})</option>`).join('')}
+                  </select>`
+                : `<input disabled value="${C.escapeHtml(ev.ownerUsername || '')}" class="w-full px-2.5 py-1.5 border rounded-lg mt-0.5 bg-slate-100 mono text-slate-600" />`}
             </div>
           </div>
 
@@ -908,6 +927,9 @@
       ev.lapDistanceKm = Number($('#z1LapDist').value || 0);
       ev.maxQuota = Number($('#z1MaxQuota').value || 0);
       ev.organizerZh = $('#z1OrgZh').value.trim();
+      if (App.State.currentUser?.role === 'super_admin' && $('#z1OwnerUser')?.value) {
+        ev.ownerUsername = $('#z1OwnerUser').value.trim();
+      }
       ev.brochureText = $('#z1Brochure').value.trim();
       const certCfg = C.parseJsonSafe(ev.certConfigJson, C.defaultCertConfig());
       certCfg.raceDirectorName = ($('#z1Director')?.value || '').trim();
@@ -2082,8 +2104,252 @@
     });
   }
 
+  function renderEventStationsManager(App, ev, hostEl, onChanged) {
+    if (!hostEl || !ev) return;
+    const sts = App.State.stations
+      .filter((s) => s.eventId === ev.eventId)
+      .sort((a, b) => Number(a.orderIndex) - Number(b.orderIndex));
+    const stTypeMeta = {
+      checkin: { label: '報到檢錄', badge: 'bg-emerald-100 text-emerald-800' },
+      checkpoint: { label: '中繼管制點', badge: 'bg-sky-100 text-sky-800' },
+      finish: { label: '終點衝線', badge: 'bg-rose-100 text-rose-800' },
+      lap: { label: '繞圈主拱門', badge: 'bg-indigo-100 text-indigo-800' }
+    };
+    const evOps = App.State.users.filter((x) => x.role === 'operator' && x.allowedEventId === ev.eventId);
+    const opCountByCode = new Map();
+    evOps.forEach((op) => {
+      const c = String(op.allowedStation || '').toUpperCase();
+      opCountByCode.set(c, (opCountByCode.get(c) || 0) + 1);
+    });
+
+    hostEl.innerHTML = `
+      <div class="bg-white p-4 rounded-xl border shadow-sm space-y-3 text-xs">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+          <div class="flex items-center gap-2">
+            <h3 class="font-black text-sm">📍 管制點與站點配置</h3>
+            <span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold mono">${sts.length} 站</span>
+          </div>
+          <button type="button" data-st-open-add class="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold">+ 新增站點</button>
+        </div>
+
+        <div data-st-editor class="hidden p-3 rounded-xl bg-sky-50/80 border-2 border-sky-300 space-y-2.5">
+          <div class="flex items-center justify-between border-b border-sky-200 pb-1.5">
+            <div data-st-ed-title class="font-black text-sky-950">➕ 新增管制站點</div>
+            <button type="button" data-st-cancel class="text-slate-500 hover:text-slate-800 font-bold">✕ 關閉</button>
+          </div>
+          <input type="hidden" data-st-field="stationId" value="" />
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div>
+              <label class="font-bold text-[11px]">站點代碼 *</label>
+              <input data-st-field="stationCode" type="text" placeholder="CP1 / FINISH / LAP" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5 mono uppercase font-bold" />
+            </div>
+            <div>
+              <label class="font-bold text-[11px]">自訂站點名稱 *</label>
+              <input data-st-field="name" type="text" placeholder="例：水庫折返站" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5" />
+            </div>
+            <div>
+              <label class="font-bold text-[11px]">站點類型</label>
+              <select data-st-field="stationType" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5 font-bold">
+                <option value="checkin">報到檢錄 (checkin)</option>
+                <option value="checkpoint">中繼管制點 (checkpoint)</option>
+                <option value="finish">終點衝線 (finish)</option>
+                <option value="lap">繞圈主拱門 (lap)</option>
+              </select>
+            </div>
+            <div>
+              <label class="font-bold text-[11px]">累計距離 (km)</label>
+              <input data-st-field="distanceKm" type="number" step="0.1" min="0" value="0" class="w-full px-2.5 py-1.5 border rounded-lg bg-white mt-0.5 mono" />
+            </div>
+          </div>
+          <div data-st-lock-hint class="hidden text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5"></div>
+          <div class="flex justify-end gap-2">
+            <button type="button" data-st-cancel class="px-3 py-1.5 rounded-lg bg-white border font-bold text-slate-600">取消</button>
+            <button type="button" data-st-save class="px-4 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-black shadow">💾 儲存站點</button>
+          </div>
+        </div>
+
+        <div class="space-y-1.5">
+          ${sts.map((s, idx) => {
+            const tm = stTypeMeta[s.stationType] || stTypeMeta.checkpoint;
+            const opCnt = opCountByCode.get(String(s.stationCode || '').toUpperCase()) || 0;
+            return `
+              <div class="p-2 rounded-lg bg-slate-50 border flex flex-wrap items-center justify-between gap-2">
+                <div class="flex flex-wrap items-center gap-1.5 min-w-0">
+                  <span class="px-1.5 py-0.5 rounded bg-slate-200 text-slate-700 font-bold mono text-[10px]">#${idx + 1}</span>
+                  <span class="px-2 py-0.5 rounded bg-slate-900 text-amber-300 font-black mono">${C.escapeHtml(s.stationCode)}</span>
+                  <b class="text-slate-900">${C.escapeHtml(s.name)}</b>
+                  <span class="px-1.5 py-0.5 rounded font-bold text-[10px] ${tm.badge}">${tm.label}</span>
+                  <span class="text-slate-500 mono">${Number(s.distanceKm || 0)} km</span>
+                  <span class="px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-700 text-[10px] font-bold">${opCnt} 名作業員</span>
+                </div>
+                <div class="flex items-center gap-1 shrink-0">
+                  <button type="button" data-move-st="${s.stationId}" data-dir="-1" ${idx === 0 ? 'disabled' : ''} class="px-1.5 py-0.5 rounded bg-white border hover:bg-slate-100 disabled:opacity-35" title="上移">↑</button>
+                  <button type="button" data-move-st="${s.stationId}" data-dir="1" ${idx === sts.length - 1 ? 'disabled' : ''} class="px-1.5 py-0.5 rounded bg-white border hover:bg-slate-100 disabled:opacity-35" title="下移">↓</button>
+                  <button type="button" data-edit-st="${s.stationId}" class="px-2 py-0.5 rounded bg-sky-50 border border-sky-300 text-sky-900 hover:bg-sky-100 font-bold text-[11px]">✏️ 修改</button>
+                  <button type="button" data-del-st="${s.stationId}" class="px-2 py-0.5 rounded bg-rose-50 text-rose-600 hover:bg-rose-100 font-bold text-[11px]">刪</button>
+                </div>
+              </div>`;
+          }).join('') || '<div class="text-slate-400 text-center py-4 border border-dashed rounded-lg">本活動尚未建立站點，請點右上「+ 新增站點」</div>'}
+        </div>
+      </div>`;
+
+    const q = (sel) => hostEl.querySelector(sel);
+    const qAll = (sel) => Array.from(hostEl.querySelectorAll(sel));
+    const edBox = q('[data-st-editor]');
+    const fId = q('[data-st-field="stationId"]');
+    const fCode = q('[data-st-field="stationCode"]');
+    const fName = q('[data-st-field="name"]');
+    const fType = q('[data-st-field="stationType"]');
+    const fKm = q('[data-st-field="distanceKm"]');
+    const lockHint = q('[data-st-lock-hint]');
+    const edTitle = q('[data-st-ed-title]');
+
+    const resetEditor = () => {
+      fId.value = '';
+      fCode.value = '';
+      fCode.disabled = false;
+      fName.value = '';
+      fType.value = ev.raceType === 'lap_timed' ? 'lap' : 'checkpoint';
+      fKm.value = '0';
+      lockHint.classList.add('hidden');
+      lockHint.textContent = '';
+      edTitle.textContent = '➕ 新增管制站點';
+      edBox.classList.add('hidden');
+    };
+
+    fCode.oninput = () => {
+      if (fId.value) return;
+      const c = fCode.value.trim().toUpperCase();
+      if (c === 'CHECKIN') fType.value = 'checkin';
+      else if (c === 'FINISH') fType.value = 'finish';
+      else if (c === 'LAP') fType.value = 'lap';
+      else if (c.startsWith('CP')) fType.value = 'checkpoint';
+    };
+
+    q('[data-st-open-add]').onclick = () => {
+      resetEditor();
+      const nextCp = sts.filter((s) => /^CP\d+$/i.test(s.stationCode)).length + 1;
+      fCode.value = ev.raceType === 'lap_timed' && !sts.some((s) => s.stationCode === 'LAP') ? 'LAP' : `CP${nextCp}`;
+      fName.value = fCode.value === 'LAP' ? '主會場繞圈拱門' : `CP${nextCp} 檢查站`;
+      fType.value = fCode.value === 'LAP' ? 'lap' : 'checkpoint';
+      edBox.classList.remove('hidden');
+      fName.focus();
+    };
+    qAll('[data-st-cancel]').forEach((b) => { b.onclick = resetEditor; });
+
+    qAll('[data-edit-st]').forEach((b) => {
+      b.onclick = () => {
+        const stObj = sts.find((x) => x.stationId === b.dataset.editSt);
+        if (!stObj) return;
+        const logCnt = App.State.timingLogs.filter((l) => l.eventId === ev.eventId && l.stationCode === stObj.stationCode).length;
+        fId.value = stObj.stationId;
+        fCode.value = stObj.stationCode;
+        fCode.disabled = logCnt > 0;
+        fName.value = stObj.name || '';
+        fType.value = stObj.stationType || 'checkpoint';
+        fKm.value = String(Number(stObj.distanceKm || 0));
+        if (logCnt > 0) {
+          lockHint.textContent = `🔒 本站已有 ${logCnt} 筆感應紀錄，站點代碼鎖定不可改（仍可自由修改站名、類型與距離）`;
+          lockHint.classList.remove('hidden');
+        } else {
+          lockHint.classList.add('hidden');
+        }
+        edTitle.textContent = `✏️ 修改站點：${stObj.stationCode} ${stObj.name}`;
+        edBox.classList.remove('hidden');
+        fName.focus();
+      };
+    });
+
+    q('[data-st-save]').onclick = async () => {
+      const editId = fId.value.trim();
+      const code = fCode.value.trim().toUpperCase().replace(/\s+/g, '');
+      const name = fName.value.trim();
+      const stationType = fType.value;
+      const distanceKm = Math.max(0, Number(fKm.value || 0));
+      if (!code) return App.toast('請填寫站點代碼（例：CP1、FINISH、LAP）', 'error');
+      if (code === 'WRITER') return App.toast('WRITER 為系統保留之發卡站代碼，請使用其他代碼', 'error');
+      if (!name) return App.toast('請填寫站點名稱', 'error');
+
+      const dup = sts.find((s) => String(s.stationCode).toUpperCase() === code && s.stationId !== editId);
+      if (dup) return App.toast(`本活動已有重複站點代碼「${code}」`, 'error');
+
+      if (editId) {
+        const stObj = App.State.stations.find((s) => s.stationId === editId);
+        if (!stObj) return;
+        const oldCode = stObj.stationCode;
+        stObj.stationCode = code;
+        stObj.name = name;
+        stObj.stationType = stationType;
+        stObj.distanceKm = distanceKm;
+        await C.TurDB.put('stations', stObj);
+        await App.enqueueSync('saveStation', { station: stObj });
+        if (oldCode !== code) {
+          const affectedOps = App.State.users.filter((x) => x.role === 'operator' && x.allowedEventId === ev.eventId && x.allowedStation === oldCode);
+          for (const op of affectedOps) {
+            op.allowedStation = code;
+            await C.TurDB.put('users', op);
+            await App.enqueueSync('saveUser', { user: op });
+          }
+        }
+        App.toast(`✅ 已更新站點「${code} ${name}」`, 'success');
+      } else {
+        const st = {
+          stationId: `ST-${Date.now().toString().slice(-6)}`,
+          eventId: ev.eventId,
+          stationCode: code,
+          name,
+          distanceKm,
+          stationType,
+          orderIndex: sts.length
+        };
+        App.State.stations.push(st);
+        await C.TurDB.put('stations', st);
+        await App.enqueueSync('saveStation', { station: st });
+        App.toast(`✅ 已新增站點「${code} ${name}」`, 'success');
+      }
+      if (onChanged) onChanged();
+    };
+
+    qAll('[data-move-st]').forEach((b) => {
+      b.onclick = async () => {
+        const idx = sts.findIndex((s) => s.stationId === b.dataset.moveSt);
+        const dir = Number(b.dataset.dir);
+        const targetIdx = idx + dir;
+        if (idx < 0 || targetIdx < 0 || targetIdx >= sts.length) return;
+        const reordered = [...sts];
+        const [moved] = reordered.splice(idx, 1);
+        reordered.splice(targetIdx, 0, moved);
+        for (let i = 0; i < reordered.length; i++) {
+          reordered[i].orderIndex = i;
+          await C.TurDB.put('stations', reordered[i]);
+          await App.enqueueSync('saveStation', { station: reordered[i] });
+        }
+        if (onChanged) onChanged();
+      };
+    });
+
+    qAll('[data-del-st]').forEach((b) => {
+      b.onclick = async () => {
+        const sid = b.dataset.delSt;
+        const stObj = App.State.stations.find((s) => s.stationId === sid);
+        if (!stObj) return;
+        const logCnt = App.State.timingLogs.filter((l) => l.eventId === ev.eventId && l.stationCode === stObj.stationCode).length;
+        if (logCnt > 0) {
+          return App.toast(`🔒 防呆攔截：站點「${stObj.stationCode}」已有 ${logCnt} 筆感應紀錄，禁止刪除！`, 'error');
+        }
+        const boundOps = opCountByCode.get(String(stObj.stationCode).toUpperCase()) || 0;
+        const warnOp = boundOps > 0 ? `\n⚠️ 目前有 ${boundOps} 個作業員帳號鎖定此站點，刪除後請記得調整該作業員站點。` : '';
+        if (!confirm(`確定刪除站點「${stObj.stationCode} ${stObj.name}」嗎？${warnOp}`)) return;
+        App.State.stations = App.State.stations.filter((s) => s.stationId !== sid);
+        await C.TurDB.remove('stations', sid);
+        await App.enqueueSync('deleteStation', { stationId: sid });
+        App.toast(`🗑️ 已刪除站點「${stObj.stationCode}」`, 'info');
+        if (onChanged) onChanged();
+      };
+    });
+  }
+
   function renderZ1Gun(App, ev) {
-    const sts = App.State.stations.filter((s) => s.eventId === ev.eventId).sort((a, b) => Number(a.orderIndex) - Number(b.orderIndex));
     const gate = C.evaluateEventStageGates({
       event: ev, categories: App.State.categories, stations: App.State.stations,
       participants: App.State.participants, timingLogs: App.State.timingLogs,
@@ -2114,20 +2380,7 @@
           </div>
         </div>
 
-        <div class="bg-white p-4 rounded-xl border shadow-sm space-y-2.5">
-          <div class="flex items-center justify-between border-b pb-2">
-            <h3 class="font-black text-sm">📍 感應站點</h3>
-            <button id="btnZ1AddStation" class="px-2.5 py-1 rounded-lg bg-sky-600 text-white font-bold">+ 新增站點</button>
-          </div>
-          <div class="space-y-1.5">
-            ${sts.map((s) => `
-              <div class="p-2 rounded-lg bg-slate-50 border flex items-center justify-between">
-                <span><b class="mono">${s.stationCode}</b> · ${C.escapeHtml(s.name)} (${s.distanceKm} km / ${s.stationType})</span>
-                <button data-del-st="${s.stationId}" class="text-rose-600 font-bold">刪</button>
-              </div>
-            `).join('')}
-          </div>
-        </div>
+        <div id="z1GunStationsHost"></div>
       </div>`;
 
     if ($('#btnZ1GunFixBib')) $('#btnZ1GunFixBib').onclick = () => App.autoAssignBibsForEvent(ev.eventId);
@@ -2162,33 +2415,12 @@
     };
     $('#btnZ1GunNow').onclick = () => applyGun(C.formatDateTime());
     $('#btnZ1ApplyGunTime').onclick = () => applyGun($('#z1CustomGunTime').value.trim());
-    $('#btnZ1AddStation').onclick = async () => {
-      const code = (prompt('站點代碼（如 CP3 / FINISH / LAP）：', 'CP3') || '').trim().toUpperCase();
-      if (!code) return;
-      const name = prompt('站點名稱：', `${code} 檢查站`) || code;
-      const km = Number(prompt('累計距離 (km)：', '40') || 0);
-      const st = { stationId: `ST-${Date.now().toString().slice(-5)}`, eventId: ev.eventId, stationCode: code, name, distanceKm: km, stationType: code === 'FINISH' ? 'finish' : (code === 'LAP' ? 'lap' : 'checkpoint'), orderIndex: sts.length };
-      App.State.stations.push(st);
-      await C.TurDB.put('stations', st);
-      await App.enqueueSync('saveStation', { station: st });
-      renderZone1(App);
-    };
-    $$('[data-del-st]').forEach((b) => {
-      b.onclick = async () => {
-        const sid = b.dataset.delSt;
-        const stObj = App.State.stations.find((s) => s.stationId === sid);
-        if (!stObj) return;
-        const logCnt = App.State.timingLogs.filter((l) => l.eventId === ev.eventId && l.stationCode === stObj.stationCode).length;
-        if (logCnt > 0) {
-          return App.toast(`🔒 防呆攔截：站點「${stObj.stationCode}」已有 ${logCnt} 筆感應紀錄，禁止刪除以免影響成績！`, 'error');
-        }
-        if (!confirm(`確定要刪除站點「${stObj.stationCode} ${stObj.name}」並同步雲端嗎？`)) return;
-        App.State.stations = App.State.stations.filter((s) => s.stationId !== sid);
-        await C.TurDB.remove('stations', sid);
-        await App.enqueueSync('deleteStation', { stationId: sid });
-        renderZone1(App);
-        App.toast(`🗑️ 已安全刪除站點「${stObj.stationCode}」並同步雲端`, 'info');
-      };
+
+    renderEventStationsManager(App, ev, $('#z1GunStationsHost'), () => {
+      z1DirtyTabs.add('ops');
+      z1DirtyTabs.add('setup');
+      renderZ1StageGateBar(App, ev);
+      renderZ1Gun(App, ev);
     });
   }
 
@@ -2367,12 +2599,29 @@
 
   function renderZ1Ops(App, ev) {
     const u = App.State.currentUser;
-    const isSuper = u?.role === 'super_admin';
+    if (!u || (u.role !== 'super_admin' && u.role !== 'organizer')) {
+      $('#z1-ops').innerHTML = '<div class="bg-rose-50 text-rose-700 p-6 rounded-xl font-bold text-center">⛔ 權限不足：現場作業員不可進入權限設定，僅限最高權責管理員與承辦人存取。</div>';
+      return;
+    }
+    const isSuper = u.role === 'super_admin';
     const evNameMap = new Map(App.State.events.map((e) => [e.eventId, e.nameZh]));
     const myOwnedEvents = isSuper
       ? App.State.events
       : App.State.events.filter((e) => e.ownerUsername === u.username);
     const myEventIds = new Set(myOwnedEvents.map((e) => e.eventId));
+
+    // 建立「活動+站點代碼 → 自訂站名」對照表
+    const stNameByEvCode = new Map();
+    App.State.stations.forEach((s) => {
+      stNameByEvCode.set(`${s.eventId}::${String(s.stationCode || '').toUpperCase()}`, s.name || s.stationCode);
+    });
+    const getStationLabel = (eventId, code) => {
+      const c = String(code || 'ALL').toUpperCase();
+      if (c === 'WRITER') return 'WRITER（發卡寫入站）';
+      if (c === 'ALL') return 'ALL';
+      const customName = stNameByEvCode.get(`${eventId}::${c}`);
+      return customName ? `${c}（${customName}）` : c;
+    };
 
     // 權限隔離：最高管理員可看全平台全部帳號與密碼；承辦人僅能看到自己承辦場次的鎖定站點作業員與密碼
     const scopedUsers = isSuper
@@ -2384,7 +2633,9 @@
           return x.parentOrganizer === u.username;
         });
 
-    const sts = App.State.stations.filter((s) => s.eventId === ev.eventId);
+    const sts = App.State.stations
+      .filter((s) => s.eventId === ev.eventId)
+      .sort((a, b) => Number(a.orderIndex) - Number(b.orderIndex));
     const allStations = [...new Set(scopedUsers.map((x) => x.allowedStation || 'ALL'))].sort();
     const roleLabelMap = { super_admin: '管理員', organizer: '承辦人', operator: '作業員' };
     const roleBadgeMap = {
@@ -2393,41 +2644,69 @@
       operator: 'bg-sky-100 text-sky-800'
     };
 
-    const flt = App.State.z1OpsFilter || { q: '', role: 'all', eventId: 'all', station: 'all', status: 'all' };
+    const flt = App.State.z1OpsFilter || { q: '', role: 'all', eventId: isSuper ? 'all' : '__CURRENT__', station: 'all', status: 'all' };
     if (!isSuper) {
       flt.role = 'all';
-      if (flt.eventId !== 'all' && !myEventIds.has(flt.eventId)) flt.eventId = 'all';
+      if (flt.eventId !== 'all' && flt.eventId !== '__CURRENT__' && !myEventIds.has(flt.eventId)) flt.eventId = '__CURRENT__';
     }
     if (flt.station !== 'all' && !allStations.includes(flt.station)) flt.station = 'all';
     App.State.z1OpsFilter = flt;
     const box = $('#z1-ops');
 
+    const buildStationOptionsHtml = (targetEvId, selectedCode = '') => {
+      const targetSts = App.State.stations
+        .filter((s) => s.eventId === targetEvId)
+        .sort((a, b) => Number(a.orderIndex) - Number(b.orderIndex));
+      const opts = [
+        `<option value="WRITER" ${selectedCode === 'WRITER' ? 'selected' : ''}>WRITER（發卡寫入站）</option>`,
+        ...targetSts.map((s) => `<option value="${C.escapeHtml(s.stationCode)}" ${selectedCode === s.stationCode ? 'selected' : ''}>${C.escapeHtml(s.stationCode)}（${C.escapeHtml(s.name)}）</option>`)
+      ];
+      if (selectedCode && selectedCode !== 'WRITER' && !targetSts.some((s) => s.stationCode === selectedCode)) {
+        opts.push(`<option value="${C.escapeHtml(selectedCode)}" selected>${C.escapeHtml(selectedCode)}（原鎖定站點）</option>`);
+      }
+      return opts.join('');
+    };
+
     box.innerHTML = `
+      <!-- 區塊 1：本活動管制點與站點配置（承辦人可自由新增／改名／排序） -->
+      <div id="z1OpsStationsHost"></div>
+
+      <!-- 區塊 2：晶片作業員帳號與密碼 -->
       <div class="bg-white p-4 rounded-xl border shadow-sm space-y-3 text-xs">
         <div class="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
           <div class="flex items-center gap-2">
-            <h3 class="font-black text-sm">🔐 權限</h3>
+            <h3 class="font-black text-sm">🔐 晶片作業員與權限</h3>
             <span id="z1OpsCount" class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold mono">${scopedUsers.length} 筆</span>
           </div>
-          <span class="text-[11px] font-bold ${isSuper ? 'text-rose-700' : 'text-sky-700'}">
-            ${isSuper ? '🛡️ 最高管理員：顯示全平台帳號與密碼' : '👤 承辦人：僅顯示本人場次與鎖定站點密碼'}
-          </span>
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-[11px] font-bold ${isSuper ? 'text-rose-700' : 'text-sky-700'}">
+              ${isSuper ? '🛡️ 最高管理員：顯示全平台帳號與密碼' : `👤 承辦人：僅顯示本人場次與站點密碼`}
+            </span>
+            ${isSuper ? '<button type="button" id="btnZ1JumpZone3" class="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-800 font-bold text-[11px]">👥 管理員／承辦人專區 →</button>' : ''}
+          </div>
         </div>
 
-        <form id="z1NewOpForm" autocomplete="off" class="grid grid-cols-2 sm:grid-cols-5 gap-2 bg-slate-50 p-3 rounded-xl border">
-          <input id="opNewUser" required placeholder="帳號 (例 cp2)" class="px-2.5 py-1.5 border rounded-lg bg-white" />
-          <input id="opNewPass" required type="text" autocomplete="off" placeholder="密碼" class="px-2.5 py-1.5 border rounded-lg bg-white mono" />
-          <input id="opNewName" required placeholder="名稱" class="px-2.5 py-1.5 border rounded-lg bg-white" />
-          <select id="opNewStation" class="px-2.5 py-1.5 border rounded-lg bg-white">
-            <option value="WRITER">WRITER (發卡組)</option>
-            ${sts.map((s) => `<option value="${s.stationCode}">${s.stationCode} (${C.escapeHtml(s.name)})</option>`).join('')}
-          </select>
-          <button type="submit" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white font-bold">+ 新增站點帳號</button>
+        <form id="z1NewOpForm" autocomplete="off" class="p-3 rounded-xl bg-slate-50 border space-y-2">
+          <div class="flex items-center justify-between">
+            <div id="z1OpFormTitle" class="font-black text-slate-800">➕ 為「${C.escapeHtml(ev.nameZh)}」新增晶片作業員</div>
+            <button type="button" id="btnZ1CancelOpEdit" class="hidden px-2 py-0.5 rounded bg-white border text-slate-600 font-bold">✕ 取消修改</button>
+          </div>
+          <input type="hidden" id="opEditOrigUser" value="" />
+          <input type="hidden" id="opEditEventId" value="${C.escapeHtml(ev.eventId)}" />
+          <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            <input id="opNewUser" required placeholder="帳號 (例 cp2)" class="px-2.5 py-1.5 border rounded-lg bg-white mono" />
+            <input id="opNewPass" required type="text" autocomplete="off" placeholder="密碼" class="px-2.5 py-1.5 border rounded-lg bg-white mono" />
+            <input id="opNewName" required placeholder="顯示名稱" class="px-2.5 py-1.5 border rounded-lg bg-white" />
+            <select id="opNewStation" class="px-2.5 py-1.5 border rounded-lg bg-white font-bold">
+              ${buildStationOptionsHtml(ev.eventId)}
+            </select>
+            <button type="submit" id="btnZ1SubmitOp" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold">+ 新增站點帳號</button>
+          </div>
         </form>
 
         <!-- 欄位篩選查詢列 -->
         <div class="flex flex-wrap items-center gap-2 bg-slate-50/70 p-2.5 rounded-xl border">
-          <input id="z1OpsSearch" type="text" value="${C.escapeHtml(flt.q)}" placeholder="🔎 搜尋帳號 / 密碼 / 名稱 / 站點" class="flex-1 min-w-[180px] px-2.5 py-1.5 border rounded-lg bg-white" />
+          <input id="z1OpsSearch" type="text" value="${C.escapeHtml(flt.q)}" placeholder="🔎 搜尋帳號 / 密碼 / 名稱 / 站點 / 站名" class="flex-1 min-w-[180px] px-2.5 py-1.5 border rounded-lg bg-white" />
           ${isSuper ? `
             <select id="z1OpsRoleFilter" class="px-2.5 py-1.5 border rounded-lg bg-white font-bold">
               <option value="all" ${flt.role === 'all' ? 'selected' : ''}>全部角色</option>
@@ -2435,7 +2714,8 @@
               <option value="organizer" ${flt.role === 'organizer' ? 'selected' : ''}>承辦人</option>
               <option value="operator" ${flt.role === 'operator' ? 'selected' : ''}>作業員</option>
             </select>` : ''}
-          <select id="z1OpsEventFilter" class="px-2.5 py-1.5 border rounded-lg bg-white font-bold max-w-[220px]">
+          <select id="z1OpsEventFilter" class="px-2.5 py-1.5 border rounded-lg bg-white font-bold max-w-[230px]">
+            <option value="__CURRENT__" ${flt.eventId === '__CURRENT__' ? 'selected' : ''}>📍 僅目前活動</option>
             <option value="all" ${flt.eventId === 'all' ? 'selected' : ''}>${isSuper ? '全部場次' : '本人全部場次'}</option>
             ${isSuper ? `<option value="ALL" ${flt.eventId === 'ALL' ? 'selected' : ''}>全平台 (ALL)</option>` : ''}
             ${myOwnedEvents.map((e) => `<option value="${e.eventId}" ${flt.eventId === e.eventId ? 'selected' : ''}>${C.escapeHtml(e.nameZh)}</option>`).join('')}
@@ -2463,6 +2743,7 @@
                 <th class="p-2">承辦場次</th>
                 <th class="p-2">鎖定站點</th>
                 <th class="p-2">狀態</th>
+                <th class="p-2">操作</th>
               </tr>
             </thead>
             <tbody id="z1OpsTbody" class="divide-y"></tbody>
@@ -2470,26 +2751,57 @@
         </div>
       </div>`;
 
+    // 掛載本活動管制點與站點配置元件（變動時即時重整站點與作業員選單）
+    renderEventStationsManager(App, ev, $('#z1OpsStationsHost'), () => {
+      z1DirtyTabs.add('gun');
+      z1DirtyTabs.add('setup');
+      renderZ1StageGateBar(App, ev);
+      renderZ1Ops(App, ev);
+    });
+
+    if ($('#btnZ1JumpZone3')) {
+      $('#btnZ1JumpZone3').onclick = () => App.switchView('zone3');
+    }
+
+    const resetOpForm = () => {
+      $('#opEditOrigUser').value = '';
+      $('#opEditEventId').value = ev.eventId;
+      $('#opNewUser').value = '';
+      $('#opNewUser').disabled = false;
+      $('#opNewPass').value = '';
+      $('#opNewName').value = '';
+      $('#opNewStation').innerHTML = buildStationOptionsHtml(ev.eventId);
+      $('#z1OpFormTitle').textContent = `➕ 為「${ev.nameZh}」新增晶片作業員`;
+      $('#btnZ1SubmitOp').textContent = '+ 新增站點帳號';
+      $('#btnZ1SubmitOp').className = 'px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold';
+      $('#btnZ1CancelOpEdit').classList.add('hidden');
+    };
+    $('#btnZ1CancelOpEdit').onclick = resetOpForm;
+
     const renderRows = () => {
       const q = String(flt.q || '').trim().toUpperCase();
+      const targetEvFilter = flt.eventId === '__CURRENT__' ? ev.eventId : flt.eventId;
       const filtered = scopedUsers.filter((op) => {
         if (isSuper && flt.role !== 'all' && op.role !== flt.role) return false;
-        if (flt.eventId !== 'all' && String(op.allowedEventId || 'ALL') !== flt.eventId) return false;
+        if (targetEvFilter !== 'all' && String(op.allowedEventId || 'ALL') !== targetEvFilter) return false;
         if (flt.station !== 'all' && String(op.allowedStation || 'ALL') !== flt.station) return false;
         if (flt.status !== 'all' && String(Number(op.enabled) ? 1 : 0) !== flt.status) return false;
         if (!q) return true;
         const evNm = evNameMap.get(op.allowedEventId) || '';
-        return `${op.username} ${op.passwordHash || ''} ${op.displayName || ''} ${op.role || ''} ${roleLabelMap[op.role] || ''} ${op.parentOrganizer || ''} ${op.allowedEventId || ''} ${evNm} ${op.allowedStation || ''}`.toUpperCase().includes(q);
+        const stLbl = getStationLabel(op.allowedEventId, op.allowedStation);
+        return `${op.username} ${op.passwordHash || ''} ${op.displayName || ''} ${op.role || ''} ${roleLabelMap[op.role] || ''} ${op.parentOrganizer || ''} ${op.allowedEventId || ''} ${evNm} ${op.allowedStation || ''} ${stLbl}`.toUpperCase().includes(q);
       });
 
       const cntEl = $('#z1OpsCount');
       if (cntEl) cntEl.textContent = `${filtered.length} / ${scopedUsers.length} 筆`;
 
-      const colSpan = isSuper ? 8 : 6;
+      const colSpan = isSuper ? 9 : 7;
       $('#z1OpsTbody').innerHTML = filtered.map((op) => {
         const evId = op.allowedEventId || 'ALL';
         const evLabel = evId === 'ALL' ? '全部活動 (ALL)' : (evNameMap.get(evId) || evId);
+        const stLbl = getStationLabel(evId, op.allowedStation);
         const canToggle = op.username !== u.username;
+        const isOpRole = op.role === 'operator';
         return `
           <tr class="hover:bg-slate-50">
             <td class="p-2 mono font-bold whitespace-nowrap">${C.escapeHtml(op.username)}</td>
@@ -2503,9 +2815,17 @@
               <div class="font-semibold text-slate-800">${C.escapeHtml(evLabel)}</div>
               ${evId !== 'ALL' ? `<div class="text-[10px] mono text-slate-400">${C.escapeHtml(evId)}</div>` : ''}
             </td>
-            <td class="p-2 whitespace-nowrap"><span class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold mono">${C.escapeHtml(op.allowedStation || 'ALL')}</span></td>
+            <td class="p-2 whitespace-nowrap"><span class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold">${C.escapeHtml(stLbl)}</span></td>
             <td class="p-2 whitespace-nowrap">
               <button data-toggle-op="${C.escapeHtml(op.username)}" ${canToggle ? '' : 'disabled'} class="px-2 py-0.5 rounded font-bold ${Number(op.enabled) ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-500'} ${canToggle ? '' : 'opacity-50 cursor-not-allowed'}">${Number(op.enabled) ? '啟用中' : '已停用'}</button>
+            </td>
+            <td class="p-2 whitespace-nowrap">
+              ${isOpRole
+                ? `<div class="flex items-center gap-1">
+                    <button type="button" data-edit-op="${C.escapeHtml(op.username)}" class="px-2 py-0.5 rounded bg-sky-50 border border-sky-300 text-sky-900 hover:bg-sky-100 font-bold">✏️ 修改</button>
+                    <button type="button" data-del-op="${C.escapeHtml(op.username)}" class="px-2 py-0.5 rounded bg-rose-50 text-rose-600 hover:bg-rose-100 font-bold">刪</button>
+                  </div>`
+                : '<button type="button" data-goto-z3="1" class="px-2 py-0.5 rounded bg-rose-50 border border-rose-200 text-rose-800 font-bold">帳號專區</button>'}
             </td>
           </tr>`;
       }).join('') || `<tr><td colspan="${colSpan}" class="p-6 text-center text-slate-400">查無符合條件之帳號</td></tr>`;
@@ -2514,12 +2834,45 @@
         b.onclick = async () => {
           const target = App.State.users.find((x) => x.username === b.dataset.toggleOp);
           if (!target || target.username === u.username) return;
+          if (!isSuper && target.role !== 'operator') return;
           target.enabled = Number(target.enabled) ? 0 : 1;
           await C.TurDB.put('users', target);
           await App.enqueueSync('saveUser', { user: target });
           renderRows();
         };
       });
+      $$('[data-edit-op]').forEach((b) => {
+        b.onclick = () => {
+          const target = scopedUsers.find((x) => x.username === b.dataset.editOp && x.role === 'operator');
+          if (!target) return;
+          const targetEvId = target.allowedEventId && target.allowedEventId !== 'ALL' ? target.allowedEventId : ev.eventId;
+          $('#opEditOrigUser').value = target.username;
+          $('#opEditEventId').value = targetEvId;
+          $('#opNewUser').value = target.username;
+          $('#opNewUser').disabled = true;
+          $('#opNewPass').value = target.passwordHash || '';
+          $('#opNewName').value = target.displayName || '';
+          $('#opNewStation').innerHTML = buildStationOptionsHtml(targetEvId, target.allowedStation);
+          $('#z1OpFormTitle').textContent = `✏️ 修改作業員：${target.username}（${evNameMap.get(targetEvId) || targetEvId}）`;
+          $('#btnZ1SubmitOp').textContent = '💾 儲存修改';
+          $('#btnZ1SubmitOp').className = 'px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-black';
+          $('#btnZ1CancelOpEdit').classList.remove('hidden');
+          $('#opNewPass').focus();
+        };
+      });
+      $$('[data-del-op]').forEach((b) => {
+        b.onclick = async () => {
+          const target = scopedUsers.find((x) => x.username === b.dataset.delOp && x.role === 'operator');
+          if (!target) return;
+          if (!confirm(`確定要刪除晶片作業員「${target.username}（${target.displayName}）」嗎？`)) return;
+          App.State.users = App.State.users.filter((x) => x.username !== target.username);
+          await C.TurDB.remove('users', target.username);
+          await App.enqueueSync('deleteUser', { username: target.username });
+          renderZ1Ops(App, ev);
+          App.toast(`🗑️ 已刪除作業員 ${target.username}`, 'info');
+        };
+      });
+      $$('[data-goto-z3]').forEach((b) => { b.onclick = () => App.switchView('zone3'); });
     };
 
     renderRows();
@@ -2529,10 +2882,10 @@
     $('#z1OpsStationFilter').onchange = (e) => { flt.station = e.target.value; renderRows(); };
     $('#z1OpsStatusFilter').onchange = (e) => { flt.status = e.target.value; renderRows(); };
     $('#btnZ1OpsResetFilter').onclick = () => {
-      flt.q = ''; flt.role = 'all'; flt.eventId = 'all'; flt.station = 'all'; flt.status = 'all';
+      flt.q = ''; flt.role = 'all'; flt.eventId = isSuper ? 'all' : '__CURRENT__'; flt.station = 'all'; flt.status = 'all';
       $('#z1OpsSearch').value = '';
       if ($('#z1OpsRoleFilter')) $('#z1OpsRoleFilter').value = 'all';
-      $('#z1OpsEventFilter').value = 'all';
+      $('#z1OpsEventFilter').value = flt.eventId;
       $('#z1OpsStationFilter').value = 'all';
       $('#z1OpsStatusFilter').value = 'all';
       renderRows();
@@ -2540,18 +2893,36 @@
 
     $('#z1NewOpForm').onsubmit = async (e) => {
       e.preventDefault();
+      const origUser = $('#opEditOrigUser').value.trim();
       const un = $('#opNewUser').value.trim();
-      if (App.State.users.some((x) => x.username === un)) return App.toast('帳號已存在', 'error');
-      const userObj = {
-        username: un, passwordHash: $('#opNewPass').value.trim(), displayName: $('#opNewName').value.trim(),
-        role: 'operator', parentOrganizer: ev.ownerUsername || u.username, allowedEventId: ev.eventId,
-        allowedStation: $('#opNewStation').value, enabled: 1
-      };
-      App.State.users.push(userObj);
-      await C.TurDB.put('users', userObj);
-      await App.enqueueSync('saveUser', { user: userObj });
-      renderZ1Ops(App, ev);
-      App.toast(`已新增站點帳號 ${un}`, 'success');
+      const pw = $('#opNewPass').value.trim();
+      const nm = $('#opNewName').value.trim();
+      const st = $('#opNewStation').value;
+      if (!un || !pw || !nm) return App.toast('請填寫完整帳號、密碼與顯示名稱', 'error');
+
+      if (origUser) {
+        const target = App.State.users.find((x) => x.username === origUser && x.role === 'operator');
+        if (!target) return App.toast('找不到要修改的作業員', 'error');
+        target.passwordHash = pw;
+        target.displayName = nm;
+        target.allowedStation = st;
+        await C.TurDB.put('users', target);
+        await App.enqueueSync('saveUser', { user: target });
+        renderZ1Ops(App, ev);
+        App.toast(`✅ 已更新作業員「${origUser}」密碼與站點設定`, 'success');
+      } else {
+        if (App.State.users.some((x) => x.username === un)) return App.toast('此帳號已存在，請更換帳號名稱', 'error');
+        const userObj = {
+          username: un, passwordHash: pw, displayName: nm,
+          role: 'operator', parentOrganizer: ev.ownerUsername || u.username, allowedEventId: ev.eventId,
+          allowedStation: st, enabled: 1
+        };
+        App.State.users.push(userObj);
+        await C.TurDB.put('users', userObj);
+        await App.enqueueSync('saveUser', { user: userObj });
+        renderZ1Ops(App, ev);
+        App.toast(`✅ 已新增站點作業員 ${un}（${st}）`, 'success');
+      }
     };
   }
 
@@ -3055,156 +3426,411 @@
   }
 
   /* --------------------------------------------------------------------------
-   * 專區 3：👥 全平台帳號管理 (Super Admin ONLY)
+   * 專區 3：👥 最高管理員與承辦人帳號管制專區 (Super Admin ONLY)
    * -------------------------------------------------------------------------- */
   function renderZone3(App) {
     const box = $('#view-zone3');
-    if (App.State.currentUser?.role !== 'super_admin') {
+    const curUser = App.State.currentUser;
+    if (curUser?.role !== 'super_admin') {
       box.innerHTML = '<div class="bg-rose-50 text-rose-700 p-6 rounded-xl font-bold text-center">⛔ 權限不足：僅限最高管理員存取。</div>';
       return;
     }
 
+    const tab = ['super_admin', 'organizer', 'operator'].includes(App.State.z3Tab) ? App.State.z3Tab : 'organizer';
+    App.State.z3Tab = tab;
+
+    const superList = App.State.users.filter((x) => x.role === 'super_admin');
+    const orgList = App.State.users.filter((x) => x.role === 'organizer');
+    const opList = App.State.users.filter((x) => x.role === 'operator');
     const evNameMap = new Map(App.State.events.map((e) => [e.eventId, e.nameZh]));
-    const roleLabelMap = { super_admin: '管理員', organizer: '承辦人', operator: '作業員' };
-    const allStations = [...new Set(App.State.users.map((x) => x.allowedStation || 'ALL'))].sort();
-    const flt = App.State.z3Filter || { q: '', role: 'all', station: 'all', status: 'all' };
+    const stNameByEvCode = new Map();
+    App.State.stations.forEach((s) => {
+      stNameByEvCode.set(`${s.eventId}::${String(s.stationCode || '').toUpperCase()}`, s.name || s.stationCode);
+    });
+    const getStLabel = (evId, code) => {
+      const c = String(code || 'ALL').toUpperCase();
+      if (c === 'WRITER') return 'WRITER（發卡寫入站）';
+      if (c === 'ALL') return 'ALL';
+      const nm = stNameByEvCode.get(`${evId}::${c}`);
+      return nm ? `${c}（${nm}）` : c;
+    };
+
+    const flt = App.State.z3Filter || { q: '', eventId: 'all', station: 'all', status: 'all' };
     App.State.z3Filter = flt;
+
+    const tabMeta = {
+      super_admin: { label: '🛡️ 最高權責管理員', addTitle: '➕ 新增最高權責管理員', list: superList, activeCls: 'bg-rose-600 text-white shadow' },
+      organizer: { label: '👤 活動承辦人', addTitle: '➕ 新增活動承辦人', list: orgList, activeCls: 'bg-amber-500 text-slate-950 shadow' },
+      operator: { label: '👷 全平台作業員', addTitle: '➕ 新增晶片作業員', list: opList, activeCls: 'bg-sky-600 text-white shadow' }
+    };
+    const activeList = tabMeta[tab].list;
+    const allOpStations = [...new Set(opList.map((x) => x.allowedStation || 'ALL'))].sort();
+
+    const buildOpStationOpts = (evId, selCode = '') => {
+      const targetSts = App.State.stations
+        .filter((s) => s.eventId === evId)
+        .sort((a, b) => Number(a.orderIndex) - Number(b.orderIndex));
+      const opts = [
+        `<option value="WRITER" ${selCode === 'WRITER' ? 'selected' : ''}>WRITER（發卡寫入站）</option>`,
+        ...targetSts.map((s) => `<option value="${C.escapeHtml(s.stationCode)}" ${selCode === s.stationCode ? 'selected' : ''}>${C.escapeHtml(s.stationCode)}（${C.escapeHtml(s.name)}）</option>`)
+      ];
+      if (!targetSts.length) {
+        ['CHECKIN', 'CP1', 'CP2', 'FINISH', 'LAP'].forEach((c) => {
+          opts.push(`<option value="${c}" ${selCode === c ? 'selected' : ''}>${c}</option>`);
+        });
+      }
+      if (selCode && selCode !== 'WRITER' && !targetSts.some((s) => s.stationCode === selCode)) {
+        opts.push(`<option value="${C.escapeHtml(selCode)}" selected>${C.escapeHtml(selCode)}</option>`);
+      }
+      return opts.join('');
+    };
+
+    const firstEvId = App.State.events[0]?.eventId || 'ALL';
 
     box.innerHTML = `
       <div class="bg-white p-4 rounded-2xl border shadow-sm space-y-4 text-xs">
-        <div class="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
-          <h2 class="font-black text-base">👥 帳號管理</h2>
-          <span id="z3UsersCount" class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold mono">${App.State.users.length} 筆</span>
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b pb-2.5">
+          <div class="flex items-center gap-2">
+            <h2 class="font-black text-base">👥 帳號與權責管制專區</h2>
+            <span id="z3UsersCount" class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold mono">${activeList.length} 筆</span>
+          </div>
+          <span class="text-[11px] font-bold text-rose-700">🛡️ 最高管理員專用：管理最高權責、承辦人及全平台帳密</span>
         </div>
-        <form id="z3NewUserForm" autocomplete="off" class="grid grid-cols-2 sm:grid-cols-6 gap-2 bg-slate-50 p-3 rounded-xl border">
-          <input id="z3User" required placeholder="帳號" class="px-2.5 py-1.5 border rounded-lg bg-white" />
-          <input id="z3Pass" required type="text" autocomplete="off" placeholder="密碼" class="px-2.5 py-1.5 border rounded-lg bg-white mono" />
-          <input id="z3Name" required placeholder="姓名" class="px-2.5 py-1.5 border rounded-lg bg-white" />
-          <select id="z3Role" class="px-2.5 py-1.5 border rounded-lg bg-white">
-            <option value="organizer">承辦人</option>
-            <option value="operator">作業員</option>
-            <option value="super_admin">管理員</option>
-          </select>
-          <select id="z3Station" class="px-2.5 py-1.5 border rounded-lg bg-white">
-            <option value="ALL">ALL</option>
-            <option value="WRITER">WRITER</option>
-            <option value="CHECKIN">CHECKIN</option>
-            <option value="CP1">CP1</option><option value="CP2">CP2</option>
-            <option value="FINISH">FINISH</option><option value="LAP">LAP</option>
-          </select>
-          <button type="submit" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white font-black">+ 新增</button>
+
+        <!-- 三大角色管制頁籤 -->
+        <div class="grid grid-cols-3 gap-2 p-1 rounded-xl bg-slate-100">
+          ${['super_admin', 'organizer', 'operator'].map((k) => `
+            <button type="button" data-z3-tab="${k}" class="py-2 px-3 rounded-lg font-black transition flex items-center justify-center gap-1.5 ${tab === k ? tabMeta[k].activeCls : 'text-slate-600 hover:bg-white'}">
+              <span>${tabMeta[k].label}</span>
+              <span class="px-1.5 py-0.5 rounded-full text-[10px] mono ${tab === k ? 'bg-black/15' : 'bg-slate-200 text-slate-700'}">${tabMeta[k].list.length}</span>
+            </button>
+          `).join('')}
+        </div>
+
+        <!-- 新增 / 修訂表單 -->
+        <form id="z3NewUserForm" autocomplete="off" class="p-3 rounded-xl bg-slate-50 border space-y-2">
+          <div class="flex items-center justify-between">
+            <div id="z3FormTitle" class="font-black text-slate-900">${tabMeta[tab].addTitle}</div>
+            <button type="button" id="btnZ3CancelEdit" class="hidden px-2 py-0.5 rounded bg-white border text-slate-600 font-bold">✕ 取消修改</button>
+          </div>
+          <input type="hidden" id="z3EditOrigUser" value="" />
+          ${tab === 'operator' ? `
+            <div class="grid grid-cols-2 sm:grid-cols-6 gap-2">
+              <input id="z3User" required placeholder="帳號" class="px-2.5 py-1.5 border rounded-lg bg-white mono" />
+              <input id="z3Pass" required type="text" autocomplete="off" placeholder="密碼" class="px-2.5 py-1.5 border rounded-lg bg-white mono" />
+              <input id="z3Name" required placeholder="名稱" class="px-2.5 py-1.5 border rounded-lg bg-white" />
+              <select id="z3Event" class="px-2.5 py-1.5 border rounded-lg bg-white font-bold">
+                ${App.State.events.map((e) => `<option value="${e.eventId}">${C.escapeHtml(e.nameZh)} (${C.escapeHtml(e.ownerUsername || '-')})</option>`).join('')}
+                <option value="ALL">ALL（全平台）</option>
+              </select>
+              <select id="z3Station" class="px-2.5 py-1.5 border rounded-lg bg-white font-bold">
+                ${buildOpStationOpts(firstEvId)}
+              </select>
+              <button type="submit" id="btnZ3Submit" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-black">+ 新增作業員</button>
+            </div>
+          ` : `
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              <input id="z3User" required placeholder="帳號" class="px-2.5 py-1.5 border rounded-lg bg-white mono" />
+              <input id="z3Pass" required type="text" autocomplete="off" placeholder="密碼" class="px-2.5 py-1.5 border rounded-lg bg-white mono" />
+              <input id="z3Name" required placeholder="姓名 / 單位名稱" class="px-2.5 py-1.5 border rounded-lg bg-white" />
+              <select id="z3Role" class="px-2.5 py-1.5 border rounded-lg bg-white font-bold">
+                <option value="super_admin" ${tab === 'super_admin' ? 'selected' : ''}>🛡️ 最高管理員</option>
+                <option value="organizer" ${tab === 'organizer' ? 'selected' : ''}>👤 活動承辦人</option>
+              </select>
+              <button type="submit" id="btnZ3Submit" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-black">+ 新增帳號</button>
+            </div>
+          `}
         </form>
 
+        <!-- 篩選列 -->
         <div class="flex flex-wrap items-center gap-2 bg-slate-50/70 p-2.5 rounded-xl border">
-          <input id="z3Search" type="text" value="${C.escapeHtml(flt.q)}" placeholder="🔎 搜尋帳號 / 密碼 / 名稱 / 承辦人 / 場次" class="flex-1 min-w-[200px] px-2.5 py-1.5 border rounded-lg bg-white" />
-          <select id="z3RoleFilter" class="px-2.5 py-1.5 border rounded-lg bg-white font-bold">
-            <option value="all" ${flt.role === 'all' ? 'selected' : ''}>全部角色</option>
-            <option value="super_admin" ${flt.role === 'super_admin' ? 'selected' : ''}>管理員</option>
-            <option value="organizer" ${flt.role === 'organizer' ? 'selected' : ''}>承辦人</option>
-            <option value="operator" ${flt.role === 'operator' ? 'selected' : ''}>作業員</option>
-          </select>
-          <select id="z3StationFilter" class="px-2.5 py-1.5 border rounded-lg bg-white font-bold">
-            <option value="all" ${flt.station === 'all' ? 'selected' : ''}>全部站點</option>
-            ${allStations.map((st) => `<option value="${C.escapeHtml(st)}" ${flt.station === st ? 'selected' : ''}>${C.escapeHtml(st)}</option>`).join('')}
-          </select>
+          <input id="z3Search" type="text" value="${C.escapeHtml(flt.q)}" placeholder="🔎 搜尋帳號 / 密碼 / 名稱${tab === 'operator' ? ' / 承辦人 / 場次 / 站點' : ''}" class="flex-1 min-w-[200px] px-2.5 py-1.5 border rounded-lg bg-white" />
+          ${tab === 'operator' ? `
+            <select id="z3EventFilter" class="px-2.5 py-1.5 border rounded-lg bg-white font-bold max-w-[210px]">
+              <option value="all" ${flt.eventId === 'all' ? 'selected' : ''}>全部場次</option>
+              ${App.State.events.map((e) => `<option value="${e.eventId}" ${flt.eventId === e.eventId ? 'selected' : ''}>${C.escapeHtml(e.nameZh)}</option>`).join('')}
+            </select>
+            <select id="z3StationFilter" class="px-2.5 py-1.5 border rounded-lg bg-white font-bold">
+              <option value="all" ${flt.station === 'all' ? 'selected' : ''}>全部站點</option>
+              ${allOpStations.map((st) => `<option value="${C.escapeHtml(st)}" ${flt.station === st ? 'selected' : ''}>${C.escapeHtml(st)}</option>`).join('')}
+            </select>
+          ` : ''}
           <select id="z3StatusFilter" class="px-2.5 py-1.5 border rounded-lg bg-white font-bold">
             <option value="all" ${flt.status === 'all' ? 'selected' : ''}>全部狀態</option>
-            <option value="1" ${flt.status === '1' ? 'selected' : ''}>啟用</option>
-            <option value="0" ${flt.status === '0' ? 'selected' : ''}>停用</option>
+            <option value="1" ${flt.status === '1' ? 'selected' : ''}>啟用中</option>
+            <option value="0" ${flt.status === '0' ? 'selected' : ''}>已停用</option>
           </select>
           <button type="button" id="btnZ3ResetFilter" class="px-2.5 py-1.5 rounded-lg bg-white border hover:bg-slate-100 font-bold text-slate-600">↺ 重設</button>
         </div>
 
+        <!-- 清冊表格 -->
         <div class="overflow-x-auto">
           <table class="w-full text-left">
             <thead class="bg-slate-100">
-              <tr>
-                <th class="p-2">帳號</th>
-                <th class="p-2">密碼</th>
-                <th class="p-2">名稱</th>
-                <th class="p-2">角色</th>
-                <th class="p-2">承辦人</th>
-                <th class="p-2">鎖定場次</th>
-                <th class="p-2">鎖定站點</th>
-                <th class="p-2">啟用</th>
-              </tr>
+              ${tab === 'operator' ? `
+                <tr>
+                  <th class="p-2">帳號</th>
+                  <th class="p-2">密碼</th>
+                  <th class="p-2">名稱</th>
+                  <th class="p-2">承辦人</th>
+                  <th class="p-2">鎖定場次</th>
+                  <th class="p-2">鎖定站點</th>
+                  <th class="p-2">狀態</th>
+                  <th class="p-2">操作</th>
+                </tr>
+              ` : `
+                <tr>
+                  <th class="p-2">帳號</th>
+                  <th class="p-2">密碼</th>
+                  <th class="p-2">姓名 / 單位</th>
+                  <th class="p-2">名下承辦活動</th>
+                  <th class="p-2">狀態</th>
+                  <th class="p-2">操作</th>
+                </tr>
+              `}
             </thead>
             <tbody id="z3UsersTbody" class="divide-y"></tbody>
           </table>
         </div>
       </div>`;
 
+    $$('[data-z3-tab]').forEach((b) => {
+      b.onclick = () => {
+        App.State.z3Tab = b.dataset.z3Tab;
+        renderZone3(App);
+      };
+    });
+
+    if ($('#z3Event')) {
+      $('#z3Event').onchange = () => {
+        if ($('#z3Station')) $('#z3Station').innerHTML = buildOpStationOpts($('#z3Event').value);
+      };
+    }
+
+    const resetForm = () => {
+      $('#z3EditOrigUser').value = '';
+      $('#z3User').value = '';
+      $('#z3User').disabled = false;
+      $('#z3Pass').value = '';
+      $('#z3Name').value = '';
+      if ($('#z3Role')) { $('#z3Role').value = tab; $('#z3Role').disabled = false; }
+      if ($('#z3Event')) {
+        $('#z3Event').value = firstEvId;
+        if ($('#z3Station')) $('#z3Station').innerHTML = buildOpStationOpts(firstEvId);
+      }
+      $('#z3FormTitle').textContent = tabMeta[tab].addTitle;
+      $('#btnZ3Submit').textContent = tab === 'operator' ? '+ 新增作業員' : '+ 新增帳號';
+      $('#btnZ3Submit').className = 'px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-black';
+      $('#btnZ3CancelEdit').classList.add('hidden');
+    };
+    $('#btnZ3CancelEdit').onclick = resetForm;
+
     const renderZ3Rows = () => {
       const q = String(flt.q || '').trim().toUpperCase();
-      const filtered = App.State.users.filter((u) => {
-        if (flt.role !== 'all' && u.role !== flt.role) return false;
-        if (flt.station !== 'all' && String(u.allowedStation || 'ALL') !== flt.station) return false;
+      const filtered = activeList.filter((u) => {
+        if (tab === 'operator') {
+          if (flt.eventId !== 'all' && String(u.allowedEventId || 'ALL') !== flt.eventId) return false;
+          if (flt.station !== 'all' && String(u.allowedStation || 'ALL') !== flt.station) return false;
+        }
         if (flt.status !== 'all' && String(Number(u.enabled) ? 1 : 0) !== flt.status) return false;
         if (!q) return true;
         const evNm = evNameMap.get(u.allowedEventId) || '';
-        return `${u.username} ${u.passwordHash || ''} ${u.displayName || ''} ${u.role || ''} ${roleLabelMap[u.role] || ''} ${u.parentOrganizer || ''} ${u.allowedEventId || ''} ${evNm} ${u.allowedStation || ''}`.toUpperCase().includes(q);
+        const stLbl = getStLabel(u.allowedEventId, u.allowedStation);
+        return `${u.username} ${u.passwordHash || ''} ${u.displayName || ''} ${u.parentOrganizer || ''} ${u.allowedEventId || ''} ${evNm} ${u.allowedStation || ''} ${stLbl}`.toUpperCase().includes(q);
       });
 
       const cntEl = $('#z3UsersCount');
-      if (cntEl) cntEl.textContent = `${filtered.length} / ${App.State.users.length} 筆`;
+      if (cntEl) cntEl.textContent = `${filtered.length} / ${activeList.length} 筆`;
 
-      $('#z3UsersTbody').innerHTML = filtered.map((u) => {
-        const evId = u.allowedEventId || 'ALL';
-        const evLabel = evId === 'ALL' ? 'ALL' : (evNameMap.get(evId) || evId);
-        return `
-          <tr class="hover:bg-slate-50">
-            <td class="p-2 mono font-bold whitespace-nowrap">${C.escapeHtml(u.username)}</td>
-            <td class="p-2 whitespace-nowrap"><span class="px-2 py-0.5 rounded bg-amber-50 border border-amber-300 text-amber-950 mono font-bold select-all">${C.escapeHtml(u.passwordHash || '-')}</span></td>
-            <td class="p-2 whitespace-nowrap">${C.escapeHtml(u.displayName)}</td>
-            <td class="p-2 whitespace-nowrap"><span class="px-2 py-0.5 rounded font-bold ${u.role === 'super_admin' ? 'bg-rose-100 text-rose-800' : (u.role === 'organizer' ? 'bg-amber-100 text-amber-900' : 'bg-sky-100 text-sky-800')}">${roleLabelMap[u.role] || u.role}</span></td>
-            <td class="p-2 mono whitespace-nowrap">${C.escapeHtml(u.parentOrganizer || '-')}</td>
-            <td class="p-2">
-              <div class="font-semibold text-slate-800">${C.escapeHtml(evLabel)}</div>
-              ${evId !== 'ALL' ? `<div class="text-[10px] mono text-slate-400">${C.escapeHtml(evId)}</div>` : ''}
-            </td>
-            <td class="p-2 mono whitespace-nowrap">${C.escapeHtml(u.allowedStation || 'ALL')}</td>
-            <td class="p-2 whitespace-nowrap"><button data-z3-toggle="${C.escapeHtml(u.username)}" class="px-2 py-0.5 rounded font-bold ${Number(u.enabled) ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-500'}">${Number(u.enabled) ? '啟用' : '停用'}</button></td>
-          </tr>`;
-      }).join('') || '<tr><td colspan="8" class="p-6 text-center text-slate-400">查無符合條件之帳號</td></tr>';
+      if (tab === 'operator') {
+        $('#z3UsersTbody').innerHTML = filtered.map((u) => {
+          const evId = u.allowedEventId || 'ALL';
+          const evLabel = evId === 'ALL' ? 'ALL' : (evNameMap.get(evId) || evId);
+          return `
+            <tr class="hover:bg-slate-50">
+              <td class="p-2 mono font-bold whitespace-nowrap">${C.escapeHtml(u.username)}</td>
+              <td class="p-2 whitespace-nowrap"><span class="px-2 py-0.5 rounded bg-amber-50 border border-amber-300 text-amber-950 mono font-bold select-all">${C.escapeHtml(u.passwordHash || '-')}</span></td>
+              <td class="p-2 whitespace-nowrap">${C.escapeHtml(u.displayName)}</td>
+              <td class="p-2 mono whitespace-nowrap">${C.escapeHtml(u.parentOrganizer || '-')}</td>
+              <td class="p-2">
+                <div class="font-semibold text-slate-800">${C.escapeHtml(evLabel)}</div>
+                ${evId !== 'ALL' ? `<div class="text-[10px] mono text-slate-400">${C.escapeHtml(evId)}</div>` : ''}
+              </td>
+              <td class="p-2 whitespace-nowrap"><span class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold">${C.escapeHtml(getStLabel(evId, u.allowedStation))}</span></td>
+              <td class="p-2 whitespace-nowrap"><button data-z3-toggle="${C.escapeHtml(u.username)}" class="px-2 py-0.5 rounded font-bold ${Number(u.enabled) ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-500'}">${Number(u.enabled) ? '啟用中' : '已停用'}</button></td>
+              <td class="p-2 whitespace-nowrap">
+                <div class="flex items-center gap-1">
+                  <button type="button" data-z3-edit="${C.escapeHtml(u.username)}" class="px-2 py-0.5 rounded bg-sky-50 border border-sky-300 text-sky-900 hover:bg-sky-100 font-bold">✏️ 修改</button>
+                  <button type="button" data-z3-del="${C.escapeHtml(u.username)}" class="px-2 py-0.5 rounded bg-rose-50 text-rose-600 hover:bg-rose-100 font-bold">刪</button>
+                </div>
+              </td>
+            </tr>`;
+        }).join('') || '<tr><td colspan="8" class="p-6 text-center text-slate-400">查無符合條件之作業員</td></tr>';
+      } else {
+        $('#z3UsersTbody').innerHTML = filtered.map((u) => {
+          const isSelf = u.username === curUser.username;
+          const ownEvs = App.State.events.filter((e) => e.ownerUsername === u.username);
+          const evSummary = ownEvs.length
+            ? `${ownEvs.length} 場（${ownEvs.slice(0, 2).map((e) => e.nameZh).join('、')}${ownEvs.length > 2 ? '…' : ''}）`
+            : '0 場';
+          return `
+            <tr class="hover:bg-slate-50 ${isSelf ? 'bg-amber-50/40' : ''}">
+              <td class="p-2 mono font-bold whitespace-nowrap">
+                ${C.escapeHtml(u.username)}
+                ${isSelf ? '<span class="ml-1 px-1.5 py-0.5 rounded bg-amber-200 text-amber-950 text-[10px]">本人</span>' : ''}
+              </td>
+              <td class="p-2 whitespace-nowrap"><span class="px-2 py-0.5 rounded bg-amber-50 border border-amber-300 text-amber-950 mono font-bold select-all">${C.escapeHtml(u.passwordHash || '-')}</span></td>
+              <td class="p-2 whitespace-nowrap font-semibold">${C.escapeHtml(u.displayName)}</td>
+              <td class="p-2 text-slate-600">${C.escapeHtml(evSummary)}</td>
+              <td class="p-2 whitespace-nowrap">
+                <button data-z3-toggle="${C.escapeHtml(u.username)}" ${isSelf ? 'disabled' : ''} class="px-2 py-0.5 rounded font-bold ${Number(u.enabled) ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-500'} ${isSelf ? 'opacity-50 cursor-not-allowed' : ''}">${Number(u.enabled) ? '啟用中' : '已停用'}</button>
+              </td>
+              <td class="p-2 whitespace-nowrap">
+                <div class="flex items-center gap-1">
+                  <button type="button" data-z3-edit="${C.escapeHtml(u.username)}" class="px-2 py-0.5 rounded bg-sky-50 border border-sky-300 text-sky-900 hover:bg-sky-100 font-bold">✏️ 修改</button>
+                  ${isSelf ? '' : `<button type="button" data-z3-del="${C.escapeHtml(u.username)}" class="px-2 py-0.5 rounded bg-rose-50 text-rose-600 hover:bg-rose-100 font-bold">刪</button>`}
+                </div>
+              </td>
+            </tr>`;
+        }).join('') || '<tr><td colspan="6" class="p-6 text-center text-slate-400">查無符合條件之帳號</td></tr>';
+      }
 
       $$('[data-z3-toggle]').forEach((b) => {
         b.onclick = async () => {
-          const u = App.State.users.find((x) => x.username === b.dataset.z3Toggle);
-          if (!u || u.username === App.State.currentUser.username) return;
-          u.enabled = Number(u.enabled) ? 0 : 1;
-          await C.TurDB.put('users', u);
-          await App.enqueueSync('saveUser', { user: u });
+          const target = App.State.users.find((x) => x.username === b.dataset.z3Toggle);
+          if (!target || target.username === curUser.username) return;
+          const enabledSupers = App.State.users.filter((x) => x.role === 'super_admin' && Number(x.enabled)).length;
+          if (target.role === 'super_admin' && Number(target.enabled) && enabledSupers <= 1) {
+            return App.toast('🔒 系統至少須保留 1 位啟用中之最高管理員！', 'error');
+          }
+          target.enabled = Number(target.enabled) ? 0 : 1;
+          await C.TurDB.put('users', target);
+          await App.enqueueSync('saveUser', { user: target });
           renderZ3Rows();
+        };
+      });
+
+      $$('[data-z3-edit]').forEach((b) => {
+        b.onclick = () => {
+          const target = App.State.users.find((x) => x.username === b.dataset.z3Edit);
+          if (!target) return;
+          const isSelf = target.username === curUser.username;
+          $('#z3EditOrigUser').value = target.username;
+          $('#z3User').value = target.username;
+          $('#z3User').disabled = true;
+          $('#z3Pass').value = target.passwordHash || '';
+          $('#z3Name').value = target.displayName || '';
+          if ($('#z3Role')) {
+            $('#z3Role').value = target.role;
+            $('#z3Role').disabled = isSelf;
+          }
+          if ($('#z3Event')) {
+            $('#z3Event').value = target.allowedEventId || 'ALL';
+            if ($('#z3Station')) $('#z3Station').innerHTML = buildOpStationOpts($('#z3Event').value, target.allowedStation);
+          }
+          $('#z3FormTitle').textContent = `✏️ 修訂帳號：${target.username}`;
+          $('#btnZ3Submit').textContent = '💾 儲存修訂';
+          $('#btnZ3Submit').className = 'px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-black';
+          $('#btnZ3CancelEdit').classList.remove('hidden');
+          $('#z3Pass').focus();
+        };
+      });
+
+      $$('[data-z3-del]').forEach((b) => {
+        b.onclick = async () => {
+          const target = App.State.users.find((x) => x.username === b.dataset.z3Del);
+          if (!target || target.username === curUser.username) return;
+          const enabledSupers = App.State.users.filter((x) => x.role === 'super_admin' && Number(x.enabled)).length;
+          if (target.role === 'super_admin' && Number(target.enabled) && enabledSupers <= 1) {
+            return App.toast('🔒 系統至少須保留 1 位啟用中之最高管理員，禁止刪除！', 'error');
+          }
+          const ownEvCnt = App.State.events.filter((e) => e.ownerUsername === target.username).length;
+          const warnTxt = ownEvCnt > 0 ? `\n⚠️ 此帳號名下仍有 ${ownEvCnt} 場活動，建議先至「1. 設定」移轉承辦人或改用停用。` : '';
+          if (!confirm(`確定永久刪除帳號「${target.username}（${target.displayName}）」嗎？${warnTxt}`)) return;
+          App.State.users = App.State.users.filter((x) => x.username !== target.username);
+          await C.TurDB.remove('users', target.username);
+          await App.enqueueSync('deleteUser', { username: target.username });
+          renderZone3(App);
+          App.toast(`🗑️ 已刪除帳號 ${target.username}`, 'info');
         };
       });
     };
 
     renderZ3Rows();
     C.bindFastInput($('#z3Search'), (e) => { flt.q = e.target.value; renderZ3Rows(); }, 100);
-    $('#z3RoleFilter').onchange = (e) => { flt.role = e.target.value; renderZ3Rows(); };
-    $('#z3StationFilter').onchange = (e) => { flt.station = e.target.value; renderZ3Rows(); };
+    if ($('#z3EventFilter')) $('#z3EventFilter').onchange = (e) => { flt.eventId = e.target.value; renderZ3Rows(); };
+    if ($('#z3StationFilter')) $('#z3StationFilter').onchange = (e) => { flt.station = e.target.value; renderZ3Rows(); };
     $('#z3StatusFilter').onchange = (e) => { flt.status = e.target.value; renderZ3Rows(); };
     $('#btnZ3ResetFilter').onclick = () => {
-      flt.q = ''; flt.role = 'all'; flt.station = 'all'; flt.status = 'all';
-      $('#z3Search').value = ''; $('#z3RoleFilter').value = 'all';
-      $('#z3StationFilter').value = 'all'; $('#z3StatusFilter').value = 'all';
+      flt.q = ''; flt.eventId = 'all'; flt.station = 'all'; flt.status = 'all';
+      $('#z3Search').value = '';
+      if ($('#z3EventFilter')) $('#z3EventFilter').value = 'all';
+      if ($('#z3StationFilter')) $('#z3StationFilter').value = 'all';
+      $('#z3StatusFilter').value = 'all';
       renderZ3Rows();
     };
 
     $('#z3NewUserForm').onsubmit = async (e) => {
       e.preventDefault();
+      const origUser = $('#z3EditOrigUser').value.trim();
       const un = $('#z3User').value.trim();
-      if (App.State.users.some((x) => x.username === un)) return App.toast('此帳號已存在', 'error');
-      const obj = {
-        username: un, passwordHash: $('#z3Pass').value.trim(), displayName: $('#z3Name').value.trim(),
-        role: $('#z3Role').value, parentOrganizer: '', allowedEventId: 'ALL',
-        allowedStation: $('#z3Station').value, enabled: 1
-      };
-      App.State.users.push(obj);
-      await C.TurDB.put('users', obj);
-      await App.enqueueSync('saveUser', { user: obj });
-      renderZone3(App);
-      App.toast(`✅ 已新增帳號 ${un}`, 'success');
+      const pw = $('#z3Pass').value.trim();
+      const nm = $('#z3Name').value.trim();
+      if (!un || !pw || !nm) return App.toast('請填寫完整帳號、密碼與名稱', 'error');
+
+      if (origUser) {
+        const target = App.State.users.find((x) => x.username === origUser);
+        if (!target) return App.toast('找不到要修改的帳號', 'error');
+        const nextRole = tab === 'operator' ? 'operator' : ($('#z3Role')?.value || target.role);
+        if (target.role === 'super_admin' && nextRole !== 'super_admin') {
+          const enabledSupers = App.State.users.filter((x) => x.role === 'super_admin' && Number(x.enabled)).length;
+          if (enabledSupers <= 1) return App.toast('🔒 系統至少須保留 1 位最高管理員！', 'error');
+        }
+        target.passwordHash = pw;
+        target.displayName = nm;
+        target.role = nextRole;
+        if (tab === 'operator') {
+          const evId = $('#z3Event')?.value || 'ALL';
+          const evObj = App.State.events.find((x) => x.eventId === evId);
+          target.allowedEventId = evId;
+          target.parentOrganizer = evObj ? (evObj.ownerUsername || '') : '';
+          target.allowedStation = $('#z3Station')?.value || 'WRITER';
+        } else {
+          target.allowedEventId = 'ALL';
+          target.allowedStation = 'ALL';
+          target.parentOrganizer = '';
+        }
+        await C.TurDB.put('users', target);
+        await App.enqueueSync('saveUser', { user: target });
+        App.State.z3Tab = target.role;
+        renderZone3(App);
+        App.toast(`✅ 已修訂帳號「${origUser}」`, 'success');
+      } else {
+        if (App.State.users.some((x) => x.username === un)) return App.toast('此帳號已存在', 'error');
+        let obj;
+        if (tab === 'operator') {
+          const evId = $('#z3Event')?.value || 'ALL';
+          const evObj = App.State.events.find((x) => x.eventId === evId);
+          obj = {
+            username: un, passwordHash: pw, displayName: nm,
+            role: 'operator', parentOrganizer: evObj ? (evObj.ownerUsername || '') : '',
+            allowedEventId: evId, allowedStation: $('#z3Station')?.value || 'WRITER', enabled: 1
+          };
+        } else {
+          const roleVal = $('#z3Role')?.value || tab;
+          obj = {
+            username: un, passwordHash: pw, displayName: nm,
+            role: roleVal, parentOrganizer: '', allowedEventId: 'ALL',
+            allowedStation: 'ALL', enabled: 1
+          };
+        }
+        App.State.users.push(obj);
+        await C.TurDB.put('users', obj);
+        await App.enqueueSync('saveUser', { user: obj });
+        App.State.z3Tab = obj.role;
+        renderZone3(App);
+        App.toast(`✅ 已新增帳號 ${un}`, 'success');
+      }
     };
   }
 

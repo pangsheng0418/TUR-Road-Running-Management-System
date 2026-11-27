@@ -322,6 +322,22 @@
   }
 
   function switchView(viewId) {
+    const role = State.currentUser?.role || 'public';
+    const isAdminOrOrg = role === 'super_admin' || role === 'organizer';
+    // 嚴格 RBAC 路由守衛：作業員鎖定於執勤站點，禁止進入任何後台與權限畫面；承辦人禁止進入專區 3/4
+    if (role === 'operator' && viewId !== 'operator-station') {
+      toast('⛔ 權限不足：現場作業員無法進入管理與權限設定畫面', 'error');
+      viewId = 'operator-station';
+    } else if (role === 'public' && !['public-home', 'public-register', 'public-multi', 'public-lookup'].includes(viewId)) {
+      toast('🔒 請先登入管理員或承辦人帳號', 'warn');
+      viewId = 'public-home';
+    } else if (role === 'organizer' && (viewId === 'zone3' || viewId === 'zone4' || viewId === 'operator-station')) {
+      toast('⛔ 權限不足：最高管理員與承辦人帳號管制僅限最高權責管理員進入', 'error');
+      viewId = 'zone1';
+    } else if (isAdminOrOrg && viewId === 'operator-station') {
+      viewId = 'zone1';
+    }
+
     State.activeView = viewId;
     $$('.app-view').forEach((v) => v.classList.add('hidden'));
     const target = $(`#view-${viewId}`);
@@ -2073,17 +2089,36 @@
 
   function renderOpStationCards() {
     const evId = $('#opLoginEventSelect').value;
+    const stNameMap = new Map(
+      State.stations.filter((s) => s.eventId === evId).map((s) => [String(s.stationCode || '').toUpperCase(), s.name])
+    );
     const ops = State.users.filter((u) => u.role === 'operator' && Number(u.enabled) && (u.allowedEventId === evId || u.allowedEventId === 'ALL'));
-    const cards = ops.length ? ops : State.users.filter((u) => u.role === 'operator' && Number(u.enabled));
-    $('#opStationCardGrid').innerHTML = cards.map((op) => `
-      <button type="button" data-pick-op="${op.username}" class="p-2.5 rounded-xl border-2 text-left transition ${State.pickedOpUser?.username === op.username ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-400'}">
-        <div class="font-black text-xs mono text-slate-900">${op.allowedStation}</div>
-        <div class="text-[11px] text-slate-600">${C.escapeHtml(op.displayName)}</div>
-      </button>`).join('');
+    if (State.pickedOpUser && !ops.some((x) => x.username === State.pickedOpUser.username)) {
+      State.pickedOpUser = null;
+      $('#opPickedAccountHint').textContent = '請先點選站點';
+    }
+    if (!ops.length) {
+      $('#opStationCardGrid').innerHTML = '<div class="col-span-full p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold text-center">本活動尚未設定晶片作業員，請承辦人登入後於「6. 權限」建立站點帳密</div>';
+      return;
+    }
+    $('#opStationCardGrid').innerHTML = ops.map((op) => {
+      const stCode = String(op.allowedStation || '').toUpperCase();
+      const customStName = stCode === 'WRITER' ? '發卡寫入站' : (stNameMap.get(stCode) || '');
+      return `
+        <button type="button" data-pick-op="${C.escapeHtml(op.username)}" class="p-2.5 rounded-xl border-2 text-left transition ${State.pickedOpUser?.username === op.username ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:border-slate-400'}">
+          <div class="font-black text-xs mono text-slate-900">${C.escapeHtml(op.allowedStation)}</div>
+          ${customStName ? `<div class="text-[11px] font-bold text-indigo-700 truncate">${C.escapeHtml(customStName)}</div>` : ''}
+          <div class="text-[11px] text-slate-500 truncate">${C.escapeHtml(op.displayName)}</div>
+        </button>`;
+    }).join('');
     $$('[data-pick-op]').forEach((b) => {
       b.onclick = () => {
-        State.pickedOpUser = State.users.find((x) => x.username === b.dataset.pickOp);
-        $('#opPickedAccountHint').textContent = `已選：${State.pickedOpUser.username} (${State.pickedOpUser.allowedStation})`;
+        State.pickedOpUser = ops.find((x) => x.username === b.dataset.pickOp) || null;
+        if (State.pickedOpUser) {
+          const stCode = String(State.pickedOpUser.allowedStation || '').toUpperCase();
+          const stNm = stCode === 'WRITER' ? '發卡寫入站' : (stNameMap.get(stCode) || '');
+          $('#opPickedAccountHint').textContent = `已選：${State.pickedOpUser.username} (${State.pickedOpUser.allowedStation}${stNm ? ' ' + stNm : ''})`;
+        }
         renderOpStationCards();
       };
     });
@@ -2165,9 +2200,13 @@
     $('#opLoginForm').onsubmit = (e) => {
       e.preventDefault();
       if (!State.pickedOpUser) return toast('請先於步驟 2 點選執勤站點卡片', 'warn');
+      const selEvId = $('#opLoginEventSelect').value;
+      if (State.pickedOpUser.allowedEventId !== 'ALL' && State.pickedOpUser.allowedEventId !== selEvId) {
+        return toast('🔒 此站點帳號不屬於目前選擇的活動，請重新點選', 'error');
+      }
       const pw = $('#opLoginPass').value.trim();
       if (String(State.pickedOpUser.passwordHash) !== pw) return toast('站點密碼錯誤', 'error');
-      applySessionLogin(State.pickedOpUser, $('#opLoginEventSelect').value);
+      applySessionLogin(State.pickedOpUser, selEvId);
     };
 
     // Public Navigation & Form
@@ -2872,7 +2911,7 @@
 
     // 註冊 PWA Service Worker（僅在 http/https 下啟用，不干擾本機 file:// 開啟）
     if ('serviceWorker' in navigator && /^https?:/i.test(location.protocol)) {
-      navigator.serviceWorker.register('./sw.js?v=5.24').catch(() => {});
+      navigator.serviceWorker.register('./sw.js?v=5.26').catch(() => {});
     }
 
     // 連網且已綁定 GAS 時，背景自動同步雲端最新 Google 試算表資料（不影響開頁秒開速度）
