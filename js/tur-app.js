@@ -1034,7 +1034,7 @@
                     <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${ev.raceType === 'lap_timed' ? 'bg-indigo-100 text-indigo-800' : 'bg-sky-100 text-sky-800'}">${ev.raceType === 'lap_timed' ? '🔁 繞圈賽' : '🏃 距離賽'}</span>
                     ${evFull ? '<span class="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-bold">已額滿</span>' : ''}
                   </div>
-                  <div class="text-[11px] text-slate-500 mt-0.5">📍 ${C.escapeHtml(ev.location || '-')} ｜ 🏁 起跑：${ev.raceStart ? ev.raceStart.slice(0, 16) : '待公告'} ｜ 主辦：${C.escapeHtml(ev.organizerZh || 'TUR')}</div>
+                  <div class="text-[11px] text-slate-500 mt-0.5">🏁 起跑：${ev.raceStart ? ev.raceStart.slice(0, 16) : '待公告'} ｜ 主辦：${C.escapeHtml(ev.organizerZh || 'TUR')}</div>
                 </div>
               </label>
               <div class="text-right shrink-0">
@@ -1079,19 +1079,20 @@
                   <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     ${customFields.map((f) => {
                       const curVal = st.customFields?.[f.key] ?? '';
-                      const reqMark = f.required ? ' <span class="text-rose-600">*</span>' : '';
+                      const reqMark = f.required ? ' <span class="text-rose-600 font-black">*</span>' : '';
+                      const errId = `err-mcf-${ev.eventId}-${C.escapeHtml(f.key)}`;
                       if (f.type === 'select') {
-                        return `<div><label class="font-bold text-[11px]">${C.escapeHtml(f.label)}${reqMark}</label><select data-m-cf-ev="${ev.eventId}" data-m-cf-key="${C.escapeHtml(f.key)}" class="w-full px-2 py-1.5 border rounded-lg bg-white mt-0.5"><option value="">請選擇</option>${(f.options || []).map((o) => `<option value="${C.escapeHtml(o)}" ${curVal === o ? 'selected' : ''}>${C.escapeHtml(o)}</option>`).join('')}</select></div>`;
+                        return `<div><label class="font-bold text-[11px]">${C.escapeHtml(f.label)}${reqMark}</label><select data-m-cf-ev="${ev.eventId}" data-m-cf-key="${C.escapeHtml(f.key)}" class="w-full px-2 py-1.5 border rounded-lg bg-white mt-0.5"><option value="">請選擇</option>${(f.options || []).map((o) => `<option value="${C.escapeHtml(o)}" ${curVal === o ? 'selected' : ''}>${C.escapeHtml(o)}</option>`).join('')}</select><p id="${errId}" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p></div>`;
                       }
                       if (f.type === 'radio') {
-                        return `<div><label class="font-bold text-[11px] block">${C.escapeHtml(f.label)}${reqMark}</label><div class="flex flex-wrap gap-2 mt-1">${(f.options || []).map((o) => `<label class="inline-flex items-center gap-1"><input type="radio" name="mcf_${ev.eventId}_${f.key}" data-m-cf-ev="${ev.eventId}" data-m-cf-key="${C.escapeHtml(f.key)}" value="${C.escapeHtml(o)}" ${curVal === o ? 'checked' : ''} /><span>${C.escapeHtml(o)}</span></label>`).join('')}</div></div>`;
+                        return `<div><label class="font-bold text-[11px] block">${C.escapeHtml(f.label)}${reqMark}</label><div class="flex flex-wrap gap-2 mt-1">${(f.options || []).map((o) => `<label class="inline-flex items-center gap-1"><input type="radio" name="mcf_${ev.eventId}_${f.key}" data-m-cf-ev="${ev.eventId}" data-m-cf-key="${C.escapeHtml(f.key)}" value="${C.escapeHtml(o)}" ${curVal === o ? 'checked' : ''} /><span>${C.escapeHtml(o)}</span></label>`).join('')}</div><p id="${errId}" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p></div>`;
                       }
                       if (f.type === 'checkbox') {
                         const arrVal = Array.isArray(curVal) ? curVal : [];
-                        return `<div><label class="font-bold text-[11px] block">${C.escapeHtml(f.label)}${reqMark}</label><div class="flex flex-wrap gap-2 mt-1">${(f.options || []).map((o) => `<label class="inline-flex items-center gap-1"><input type="checkbox" data-m-cf-ev="${ev.eventId}" data-m-cf-key="${C.escapeHtml(f.key)}" data-m-cf-multi="1" value="${C.escapeHtml(o)}" ${arrVal.includes(o) ? 'checked' : ''} /><span>${C.escapeHtml(o)}</span></label>`).join('')}</div></div>`;
+                        return `<div><label class="font-bold text-[11px] block">${C.escapeHtml(f.label)}${reqMark}</label><div class="flex flex-wrap gap-2 mt-1">${(f.options || []).map((o) => `<label class="inline-flex items-center gap-1"><input type="checkbox" data-m-cf-ev="${ev.eventId}" data-m-cf-key="${C.escapeHtml(f.key)}" data-m-cf-multi="1" value="${C.escapeHtml(o)}" ${arrVal.includes(o) ? 'checked' : ''} /><span>${C.escapeHtml(o)}</span></label>`).join('')}</div><p id="${errId}" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p></div>`;
                       }
                       const inpType = f.type === 'number' ? 'number' : (f.type === 'date' ? 'date' : (f.type === 'url' ? 'url' : 'text'));
-                      return `<div><label class="font-bold text-[11px]">${C.escapeHtml(f.label)}${reqMark}</label><input type="${inpType}" data-m-cf-ev="${ev.eventId}" data-m-cf-key="${C.escapeHtml(f.key)}" value="${C.escapeHtml(String(curVal || ''))}" placeholder="${C.escapeHtml(f.placeholder || '')}" class="w-full px-2 py-1.5 border rounded-lg bg-white mt-0.5" /></div>`;
+                      return `<div><label class="font-bold text-[11px]">${C.escapeHtml(f.label)}${reqMark}</label><input type="${inpType}" data-m-cf-ev="${ev.eventId}" data-m-cf-key="${C.escapeHtml(f.key)}" value="${C.escapeHtml(String(curVal || ''))}" placeholder="${C.escapeHtml(f.placeholder || '')}" autocomplete="off" class="w-full px-2 py-1.5 border rounded-lg bg-white mt-0.5" /><p id="${errId}" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p></div>`;
                     }).join('')}
                   </div>
                 </div>` : ''}
@@ -1258,42 +1259,96 @@
     const last5 = $('#mLast5').value.trim();
     const consent = $('#mConsent').checked;
 
+    // 比照個人／團體報名：各欄位即時驗證、即時紅綠框與欄位下方紅字提示
+    const checks = {};
+    checks.nat = /^[A-Z]{3}$/.test(nat) ? '' : '須為三碼國際國籍';
+    checks.name = (name.length >= 2 && name.length <= 40 && !/[<>|\d]/.test(name)) ? '' : '姓名 2~40 字且不可含數字';
+
+    let idErr = '';
+    if (!idCard) idErr = '請輸入身分證/護照';
+    else if (nat === 'TWN' && !C.verifyTaiwanIdChecksum(idCard)) idErr = '台灣身分證檢核碼錯誤';
+    else if (nat !== 'TWN' && !/^[A-Z0-9]{6,15}$/.test(idCard)) idErr = '護照限 6~15 碼英數字';
+
+    let gErr = !gender ? '請選擇性別' : '';
+    if (!gErr && nat === 'TWN' && /^[A-Z][1289]/.test(idCard)) {
+      const exp = C.inferGenderFromId(idCard);
+      if (gender !== exp) gErr = `與身分證第2碼不符，應為 ${exp}`;
+    }
+    checks.gender = gErr;
+
+    checks.birthday = age === null ? '請選出生日期' : (age < 10 || age > 80 ? `年齡 ${age} 歲，須 10~80 歲` : '');
+    checks.phone = /^09\d{8}$/.test(phone) ? '' : '須為 09 開頭 10 碼';
+    checks.email = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email) ? '' : 'Email 格式錯誤';
+    checks.diet = diet ? '' : '請選擇飲食習慣（必填）';
+    checks.emergName = !emergName ? '請填緊急聯絡人' : (emergName === name ? '不可與本人同名' : '');
+    checks.emergPhone = !/^0\d{8,9}$/.test(emergPhone) ? '電話格式錯誤' : (emergPhone === phone ? '不可同本人手機' : '');
+    checks.last5 = (isPayuni || !last5 || /^\d{5}$/.test(last5)) ? '' : '末五碼限 5 位純數字';
+    checks.consent = consent ? '' : '須勾選同意參賽切結書';
+
     const errs = [];
     if (!picked.length) errs.push('請至少勾選 1 場活動');
-    if (!/^[A-Z]{3}$/.test(nat)) errs.push('國籍須為 3 碼大寫英文');
-    if (name.length < 2 || /\d/.test(name)) errs.push('姓名須至少 2 字且不可含數字');
-    if (!idCard) errs.push('請填寫身分證字號或護照號碼');
-    else if (nat === 'TWN' && !C.verifyTaiwanIdChecksum(idCard)) errs.push('台灣身分證檢核碼不符');
-    if (!gender) errs.push('請選擇性別');
-    if (age === null || age < 10 || age > 80) errs.push('出生年月日須介於 10～80 歲');
-    if (!/^09\d{8}$/.test(phone)) errs.push('手機須為 09 開頭 10 碼');
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) errs.push('Email 格式不正確');
-    if (!diet) errs.push('請選擇飲食習慣');
-    if (!emergName || emergName === name) errs.push('請填寫緊急聯絡人且不可與本人同名');
-    if (!/^0\d{8,9}$/.test(emergPhone) || emergPhone === phone) errs.push('緊急聯絡電話格式錯誤或與本人相同');
-    if (!isPayuni && last5 && !/^\d{5}$/.test(last5)) errs.push('匯款末五碼限 5 位純數字');
-    if (!consent) errs.push('請勾選同意參賽切結書');
 
     // 跨場逐一檢查同一承辦人、重複報名、活動總名額、分組名額與自訂必填欄
     const pickedOwners = new Set(picked.map((x) => getEventOwnerKey(x.ev)));
     if (pickedOwners.size > 1) errs.push('僅限合併同一位承辦人舉辦之活動');
+    const dupEvNames = [];
     picked.forEach((it) => {
       const dup = idCard && State.participants.some((p) => p.eventId === it.ev.eventId && String(p.idCard).toUpperCase() === idCard && String(p.payStatus).toUpperCase() !== 'CANCELLED');
-      if (dup) errs.push(`身分證 ${C.maskIdCard(idCard)} 已報名「${it.ev.nameZh}」，請取消勾選該場`);
+      if (dup) {
+        dupEvNames.push(it.ev.nameZh);
+        errs.push(`身分證 ${C.maskIdCard(idCard)} 已報名「${it.ev.nameZh}」，請取消勾選該場`);
+      }
       const usedEv = State.participants.filter((p) => p.eventId === it.ev.eventId && String(p.payStatus).toUpperCase() !== 'CANCELLED').length;
       if (Number(it.ev.maxQuota) > 0 && usedEv >= Number(it.ev.maxQuota)) errs.push(`「${it.ev.nameZh}」活動總名額已滿`);
       const usedCat = State.participants.filter((p) => p.eventId === it.ev.eventId && p.catId === it.cat.catId && String(p.payStatus).toUpperCase() !== 'CANCELLED').length;
       if (Number(it.cat.quota) > 0 && usedCat >= Number(it.cat.quota)) errs.push(`「${it.ev.nameZh} - ${it.cat.name}」名額已滿`);
       it.cfDefs.forEach((f) => {
-        if (!f.required) return;
         const v = it.customFields[f.key];
-        if (Array.isArray(v) ? v.length === 0 : !String(v || '').trim()) {
-          errs.push(`請填寫「${it.ev.nameZh}」的必填欄：${f.label}`);
+        let cfErr = '';
+        if (f.required && (Array.isArray(v) ? v.length === 0 : !String(v || '').trim())) {
+          cfErr = `請填寫「${f.label}」`;
         }
+        if (!cfErr && f.type === 'url' && v && !/^https?:\/\/.+/i.test(String(v).trim())) {
+          cfErr = '請輸入 http:// 或 https:// 開頭之有效網址';
+        }
+        const cfErrEl = document.getElementById(`err-mcf-${it.ev.eventId}-${f.key}`);
+        if (cfErrEl) cfErrEl.textContent = cfErr;
+        const cfInp = document.querySelector(`[data-m-cf-ev="${it.ev.eventId}"][data-m-cf-key="${f.key}"]:not([type="radio"]):not([type="checkbox"])`);
+        if (cfInp) {
+          cfInp.classList.remove('input-valid', 'input-invalid');
+          if (f.required || cfErr) cfInp.classList.add(cfErr ? 'input-invalid' : 'input-valid');
+        }
+        if (cfErr) errs.push(`「${it.ev.nameZh}」${cfErr}`);
       });
     });
 
-    $('#multiValidationHint').innerHTML = errs.slice(0, 4).map((e) => `<div>• ${C.escapeHtml(e)}</div>`).join('') + (errs.length > 4 ? `<div>• 另有 ${errs.length - 4} 項待填</div>` : '');
+    if (!idErr && dupEvNames.length) idErr = `已重複報名：${dupEvNames.join('、')}`;
+    checks.idCard = idErr;
+
+    // 立即於每個欄位呈現紅／綠框與紅字錯誤訊息
+    const mFieldMap = [
+      ['#mNationality', 'nat', '#err-mNationality'], ['#mName', 'name', '#err-mName'],
+      ['#mIdCard', 'idCard', '#err-mIdCard'], ['#mGender', 'gender', '#err-mGender'],
+      ['#mBirthday', 'birthday', '#err-mBirthday'], ['#mPhone', 'phone', '#err-mPhone'],
+      ['#mEmail', 'email', '#err-mEmail'], ['#mDiet', 'diet', '#err-mDiet'],
+      ['#mEmergName', 'emergName', '#err-mEmergName'], ['#mEmergPhone', 'emergPhone', '#err-mEmergPhone'],
+      ['#mLast5', 'last5', '#err-mLast5']
+    ];
+    mFieldMap.forEach(([iSel, k, eSel]) => {
+      const el = $(iSel);
+      const errEl = $(eSel);
+      if (errEl) errEl.textContent = checks[k] || '';
+      if (el) {
+        el.classList.remove('input-valid', 'input-invalid');
+        el.classList.add(checks[k] ? 'input-invalid' : 'input-valid');
+      }
+      if (checks[k] && k !== 'idCard') errs.push(checks[k]);
+      else if (checks[k] && k === 'idCard' && !dupEvNames.length) errs.push(checks[k]);
+    });
+    if ($('#err-mConsent')) $('#err-mConsent').textContent = checks.consent;
+    if (checks.consent) errs.push(checks.consent);
+
+    $('#multiValidationHint').innerHTML = errs.slice(0, 4).map((e) => `<div>• ${C.escapeHtml(e)}</div>`).join('') + (errs.length > 4 ? `<div>• 另有 ${errs.length - 4} 項待填（請見左側紅框欄位）</div>` : '');
     const btn = $('#btnSubmitMulti');
     btn.disabled = errs.length > 0;
     btn.textContent = picked.length >= 2

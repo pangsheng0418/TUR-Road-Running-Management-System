@@ -393,7 +393,7 @@
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
             <div>
-              <label class="block font-semibold text-slate-700 mb-1">國籍 (三碼國際碼) *</label>
+              <label class="block font-semibold text-slate-700 mb-1">國籍 (三碼國際碼) <span class="text-rose-600 font-black">*</span></label>
               <div class="flex gap-2">
                 <select id="mNationality" class="flex-1 px-3 py-2 border rounded-lg text-sm">
                   <option value="TWN" selected>TWN - 台灣</option>
@@ -406,37 +406,44 @@
                 </select>
                 <input id="mNationalityCustom" type="text" maxlength="3" placeholder="3碼" class="hidden w-20 px-2 py-2 border rounded-lg text-sm uppercase mono" />
               </div>
+              <p id="err-mNationality" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
             <div>
-              <label class="block font-semibold text-slate-700 mb-1">選手姓名 *</label>
+              <label class="block font-semibold text-slate-700 mb-1">選手姓名 <span class="text-rose-600 font-black">*</span></label>
               <input id="mName" type="text" placeholder="請填寫真實姓名" class="w-full px-3 py-2 border rounded-lg text-sm" />
+              <p id="err-mName" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
             <div>
-              <label class="block font-semibold text-slate-700 mb-1">身分證字號 / 護照號碼 *</label>
+              <label class="block font-semibold text-slate-700 mb-1">身分證字號 / 護照號碼 <span class="text-rose-600 font-black">*</span></label>
               <input id="mIdCard" type="text" placeholder="自動檢核所有已選活動是否重複報名" class="w-full px-3 py-2 border rounded-lg text-sm uppercase mono" />
+              <p id="err-mIdCard" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
             <div>
-              <label class="block font-semibold text-slate-700 mb-1">性別 *</label>
+              <label class="block font-semibold text-slate-700 mb-1">性別 (與身分證第2碼聯動) <span class="text-rose-600 font-black">*</span></label>
               <select id="mGender" class="w-full px-3 py-2 border rounded-lg text-sm">
                 <option value="">請選擇</option>
-                <option value="M">M - 男</option>
-                <option value="F">F - 女</option>
+                <option value="M">M - 男 (1/8)</option>
+                <option value="F">F - 女 (2/9)</option>
               </select>
+              <p id="err-mGender" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
             <div>
-              <label class="block font-semibold text-slate-700 mb-1">出生年月日 (10～80 歲) *</label>
+              <label class="block font-semibold text-slate-700 mb-1">出生年月日 (10～80 歲) <span class="text-rose-600 font-black">*</span></label>
               <div class="flex gap-2 items-center">
                 <input id="mBirthday" type="date" class="flex-1 px-3 py-2 border rounded-lg text-sm" />
                 <span id="mAgeDisplay" class="px-2.5 py-2 rounded-lg bg-slate-100 text-xs font-bold min-w-[62px] text-center">-- 歲</span>
               </div>
+              <p id="err-mBirthday" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
             <div>
-              <label class="block font-semibold text-slate-700 mb-1">手機號碼 (09 開頭 10 碼) *</label>
+              <label class="block font-semibold text-slate-700 mb-1">手機號碼 (09 開頭 10 碼) <span class="text-rose-600 font-black">*</span></label>
               <input id="mPhone" type="tel" maxlength="10" placeholder="0912345678" class="w-full px-3 py-2 border rounded-lg text-sm mono" />
+              <p id="err-mPhone" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
             <div>
-              <label class="block font-semibold text-slate-700 mb-1">電子信箱 Email *</label>
+              <label class="block font-semibold text-slate-700 mb-1">電子信箱 Email <span class="text-rose-600 font-black">*</span></label>
               <input id="mEmail" type="email" placeholder="runner@example.com" class="w-full px-3 py-2 border rounded-lg text-sm" />
+              <p id="err-mEmail" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
             <div>
               <label class="block font-semibold text-slate-700 mb-1">飲食習慣 <span class="text-rose-600 font-black">*</span></label>
@@ -445,18 +452,21 @@
                 <option value="葷">葷食</option>
                 <option value="素">素食</option>
               </select>
+              <p id="err-mDiet" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
             <div>
               <label class="block font-semibold text-slate-700 mb-1">備註 / 跑團名稱（選填）</label>
               <input id="mRemark" type="text" placeholder="選填" class="w-full px-3 py-2 border rounded-lg text-sm" />
             </div>
             <div>
-              <label class="block font-semibold text-slate-700 mb-1">緊急聯絡人姓名 (不可同本人) *</label>
+              <label class="block font-semibold text-slate-700 mb-1">緊急聯絡人姓名 (不可同本人) <span class="text-rose-600 font-black">*</span></label>
               <input id="mEmergName" type="text" class="w-full px-3 py-2 border rounded-lg text-sm" />
+              <p id="err-mEmergName" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
             <div>
-              <label class="block font-semibold text-slate-700 mb-1">緊急聯絡人電話 (不可同本人) *</label>
+              <label class="block font-semibold text-slate-700 mb-1">緊急聯絡人電話 (不可同本人) <span class="text-rose-600 font-black">*</span></label>
               <input id="mEmergPhone" type="tel" maxlength="10" class="w-full px-3 py-2 border rounded-lg text-sm mono" />
+              <p id="err-mEmergPhone" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
             </div>
           </div>
 
@@ -464,6 +474,7 @@
           <div id="mLast5Wrap" class="p-3 rounded-xl bg-amber-50 border border-amber-300 space-y-1.5 text-xs">
             <label class="block font-black text-amber-950">🏦 統一合併匯款帳號末五碼（選填；先送出報名後再一次匯款補填亦可）</label>
             <input id="mLast5" type="text" maxlength="5" placeholder="例如 12345（將套用至本合併單全部場次）" class="w-full sm:w-80 px-3 py-2 border rounded-lg text-sm mono bg-white" />
+            <p id="err-mLast5" class="text-[11px] text-rose-600 mt-0.5 min-h-[14px]"></p>
           </div>
 
           <div id="mPayuniWrap" class="hidden p-3 rounded-xl bg-emerald-50 border border-emerald-300 space-y-1.5 text-xs">
@@ -479,6 +490,7 @@
             <input id="mConsent" type="checkbox" class="mt-0.5 accent-emerald-600" />
             <span>我已詳閱本次所勾選全部活動之簡章與風險告知，確認健康狀況適合參賽，並同意由大會合併計費與各場獨立建檔管理。*</span>
           </label>
+          <p id="err-mConsent" class="text-[11px] text-rose-600 min-h-[14px]"></p>
         </form>
       </div>
 
@@ -1021,9 +1033,9 @@
   </div>
 </div>
 
-<script src="js/tur-logo.js?v=5.19"></script>
-<script src="js/tur-core.js?v=5.19"></script>
-<script src="js/tur-zones.js?v=5.19"></script>
-<script src="js/tur-app.js?v=5.19"></script>
+<script src="js/tur-logo.js?v=5.20"></script>
+<script src="js/tur-core.js?v=5.20"></script>
+<script src="js/tur-zones.js?v=5.20"></script>
+<script src="js/tur-app.js?v=5.20"></script>
 </body>
 </html>
