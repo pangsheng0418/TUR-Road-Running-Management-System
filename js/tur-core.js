@@ -2405,9 +2405,9 @@
     });
 
     const users = [
-      { username: 'superadmin', passwordHash: 'tur2026', displayName: '最高管理員 Super Admin', role: 'super_admin', parentOrganizer: '', allowedEventId: 'ALL', allowedStation: 'ALL', enabled: 1 },
-      { username: 'org_north', passwordHash: 'org2026', displayName: '北區賽事承辦人', role: 'organizer', parentOrganizer: '', allowedEventId: 'ALL', allowedStation: 'ALL', enabled: 1 },
-      { username: 'org_south', passwordHash: 'org2026', displayName: '南區賽事承辦人', role: 'organizer', parentOrganizer: '', allowedEventId: 'ALL', allowedStation: 'ALL', enabled: 1 },
+      { username: 'superadmin', passwordHash: '1234', displayName: '最高管理員 Super Admin', role: 'super_admin', parentOrganizer: '', allowedEventId: 'ALL', allowedStation: 'ALL', enabled: 1 },
+      { username: 'org_north', passwordHash: '1234', displayName: '北區賽事承辦人', role: 'organizer', parentOrganizer: '', allowedEventId: 'ALL', allowedStation: 'ALL', enabled: 1 },
+      { username: 'org_south', passwordHash: '1234', displayName: '南區賽事承辦人', role: 'organizer', parentOrganizer: '', allowedEventId: 'ALL', allowedStation: 'ALL', enabled: 1 },
       { username: 'writer01', passwordHash: '1234', displayName: '晶片寫入發卡組 01', role: 'operator', parentOrganizer: 'org_north', allowedEventId: 'TUR-2026-50K', allowedStation: 'WRITER', enabled: 1 },
       { username: 'checkin01', passwordHash: '1234', displayName: '報到檢錄組 01', role: 'operator', parentOrganizer: 'org_north', allowedEventId: 'TUR-2026-50K', allowedStation: 'CHECKIN', enabled: 1 },
       { username: 'cp1', passwordHash: '1234', displayName: 'CP1 檢查站', role: 'operator', parentOrganizer: 'org_north', allowedEventId: 'TUR-2026-50K', allowedStation: 'CP1', enabled: 1 },
@@ -2783,9 +2783,14 @@
 
   function buildCleanBaseUsers() {
     return [
-      { username: 'superadmin', passwordHash: 'tur2026', displayName: '最高管理員 Super Admin', role: 'super_admin', parentOrganizer: '', allowedEventId: 'ALL', allowedStation: 'ALL', enabled: 1 },
-      { username: 'org_north', passwordHash: 'org2026', displayName: '北區賽事承辦人', role: 'organizer', parentOrganizer: '', allowedEventId: 'ALL', allowedStation: 'ALL', enabled: 1 },
-      { username: 'org_south', passwordHash: 'org2026', displayName: '南區賽事承辦人', role: 'organizer', parentOrganizer: '', allowedEventId: 'ALL', allowedStation: 'ALL', enabled: 1 }
+      { username: 'superadmin', passwordHash: '1234', displayName: '最高管理員 Super Admin', role: 'super_admin', parentOrganizer: '', allowedEventId: 'ALL', allowedStation: 'ALL', enabled: 1 },
+      { username: 'org_north', passwordHash: '1234', displayName: '北區賽事承辦人', role: 'organizer', parentOrganizer: '', allowedEventId: 'ALL', allowedStation: 'ALL', enabled: 1 },
+      { username: 'org_south', passwordHash: '1234', displayName: '南區賽事承辦人', role: 'organizer', parentOrganizer: '', allowedEventId: 'ALL', allowedStation: 'ALL', enabled: 1 },
+      { username: 'writer01', passwordHash: '1234', displayName: '晶片寫入發卡組 01', role: 'operator', parentOrganizer: 'org_north', allowedEventId: 'ALL', allowedStation: 'WRITER', enabled: 1 },
+      { username: 'checkin01', passwordHash: '1234', displayName: '報到檢錄組 01', role: 'operator', parentOrganizer: 'org_north', allowedEventId: 'ALL', allowedStation: 'CHECKIN', enabled: 1 },
+      { username: 'cp1', passwordHash: '1234', displayName: 'CP1 檢查站', role: 'operator', parentOrganizer: 'org_north', allowedEventId: 'ALL', allowedStation: 'CP1', enabled: 1 },
+      { username: 'finish01', passwordHash: '1234', displayName: '終點衝線站', role: 'operator', parentOrganizer: 'org_north', allowedEventId: 'ALL', allowedStation: 'FINISH', enabled: 1 },
+      { username: 'lap01', passwordHash: '1234', displayName: '繞圈主拱門站', role: 'operator', parentOrganizer: 'org_north', allowedEventId: 'ALL', allowedStation: 'LAP', enabled: 1 }
     ];
   }
 

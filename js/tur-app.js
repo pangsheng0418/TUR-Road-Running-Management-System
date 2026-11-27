@@ -57,12 +57,24 @@
   /* --------------------------------------------------------------------------
    * Application State (Zero-Trace Auth in Memory / sessionStorage Only)
    * -------------------------------------------------------------------------- */
+  const CFG = global.TUR_CONFIG || {};
+  const initGasUrl = (localStorage.getItem('TUR_GAS_URL') || '').trim() || String(CFG.gasUrl || '').trim() || C.DEFAULT_GAS_URL || '';
+  const savedSyncMode = localStorage.getItem('TUR_SYNC_MODE');
+  const initSyncMode = (savedSyncMode === 'offline' || savedSyncMode === 'cloud')
+    ? savedSyncMode
+    : (CFG.defaultSyncMode === 'offline' ? 'offline' : (initGasUrl ? 'cloud' : 'offline'));
+
   const State = {
     events: [], categories: [], stations: [], participants: [], timingLogs: [],
     historyResults: [], users: [], globalConfig: [], syncQueue: [],
-    gasUrl: (localStorage.getItem('TUR_GAS_URL') || '').trim() || C.DEFAULT_GAS_URL || '',
+    gasUrl: initGasUrl,
+    syncMode: initSyncMode, // 'offline' (📴 單機離線) | 'cloud' (🌐 雲端連線)
     currentUser: { username: 'public', displayName: '民眾 / 跑者', role: 'public', allowedStation: '' },
+    activePillar: 'register', // 'register' | 'scores' | 'timing' | 'admin'
     activeView: 'public-home',
+    scoreSubTab: 'live', // 'live' | 'history' | 'warriors' | 'cert'
+    hostSubTab: 'create', // 'create' | 'recon'
+    hostReconEventId: '',
     regEventId: '',
     regMode: 'solo', // 'solo' | 'group'
     multiOwner: '', // 先鎖定單一承辦人 (ownerUsername)，不同承辦人收款帳戶不同不可混單
@@ -70,6 +82,9 @@
     multiSelected: {}, // { [eventId]: { selected, catId, addons: [], customFields: {} } }
     multiLastReceipt: null,
     z1EventId: '',
+    z1ViewMode: 'lobby', // 'lobby' (活動卡片列表) | 'detail' (點入單一活動細部)
+    z1LobbyOwnerFilter: 'all',
+    loginAdminTab: 'super_admin', // 'super_admin' | 'organizer'
     z2EventId: '',
     opEventId: '',
     opLockedStation: '',
@@ -101,11 +116,36 @@
   }
 
   /* --------------------------------------------------------------------------
-   * Sync Engine (連網即時自動同步 + 刷卡 8 秒批次節流 + 斷網離線佇列)
+   * Sync Engine (📴 單機離線 ⇄ 🌐 雲端連線 ＋ 雙向同步 ＋ 進階單向同步)
    * -------------------------------------------------------------------------- */
   let syncInFlight = false;
   let syncAgainAfter = false;
   let batchTimer = null;
+
+  function isCloudSyncEnabled() {
+    return State.syncMode === 'cloud' && Boolean(State.gasUrl) && navigator.onLine;
+  }
+
+  function setSyncMode(mode, silent = false) {
+    const next = mode === 'offline' ? 'offline' : 'cloud';
+    State.syncMode = next;
+    localStorage.setItem('TUR_SYNC_MODE', next);
+    updateNetworkBadge();
+    if (!silent) {
+      if (next === 'offline') {
+        toast('📴 已切換至「單機離線」模式：所有異動只存本機，不自動上傳雲端', 'warn');
+      } else if (!State.gasUrl) {
+        toast('🌐 已切換至「雲端連線」，但尚未設定 GAS 網址（請至「四、後台管理 → 五、資料庫專區」設定）', 'warn');
+      } else if (!navigator.onLine) {
+        toast('🌐 已切換至「雲端連線」（目前裝置斷網，待恢復網路後再按「☁️ 同步」雙向同步）', 'warn');
+      } else if (State.syncQueue.length > 0) {
+        toast(`🌐 已切回「雲端連線」！本機有 ${State.syncQueue.length} 筆待同步資料，請點右上角「☁️ 同步 (${State.syncQueue.length})」立即雙向同步`, 'success');
+      } else {
+        toast('🌐 已切換至「雲端連線」模式：多機即時共用 Google 試算表', 'success');
+      }
+    }
+    if (State.activeView === 'zone5') Z.renderZone5(AppBridge);
+  }
 
   async function enqueueSync(action, payload, immediate = true) {
     const item = { qid: `Q-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, action, payload, createdAt: Date.now() };
@@ -113,14 +153,15 @@
     await C.TurDB.put('syncQueue', item);
     updateQueueBadge();
 
-    if (!State.gasUrl || !navigator.onLine) return;
+    // 📴 單機離線模式或無網路／無 GAS 時，只安全暫存於本機佇列，絕不自動上傳
+    if (!isCloudSyncEnabled()) return;
 
     // 賽道高頻刷卡採 8 秒背景批次合併上傳（不阻塞 <10ms 感應）；報名/對帳/設定則立即寫入雲端
     if (action === 'addTimingLog' && !immediate) {
       if (!batchTimer) {
         batchTimer = setTimeout(() => {
           batchTimer = null;
-          syncPushNow(true);
+          if (isCloudSyncEnabled()) syncPushNow(true);
         }, 8000);
       }
     } else {
@@ -129,24 +170,71 @@
   }
 
   function updateQueueBadge() {
-    $('#pendingQueueCount').textContent = State.syncQueue.length;
+    const cnt = State.syncQueue.length;
+    const el = $('#pendingQueueCount');
+    if (el) el.textContent = cnt;
+    const btn = $('#btnSyncBidirectional');
+    if (btn) {
+      btn.className = cnt > 0
+        ? 'px-2.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black flex items-center gap-1 whitespace-nowrap shadow'
+        : 'px-2.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold flex items-center gap-1 whitespace-nowrap';
+    }
   }
 
   function updateNetworkBadge() {
-    const b = $('#netBadge');
-    if (navigator.onLine) {
-      b.textContent = State.gasUrl ? '● 雲端同步' : '● 本機';
-      b.className = 'whitespace-nowrap text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
-    } else {
-      b.textContent = '● 離線';
-      b.className = 'whitespace-nowrap text-[11px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40';
+    const isOff = State.syncMode === 'offline';
+    const online = navigator.onLine;
+    const hasUrl = Boolean(State.gasUrl);
+    const cnt = State.syncQueue.length;
+
+    let label = '🌐 雲端連線';
+    let badgeCls = 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+    let lightBadgeCls = 'bg-emerald-100 text-emerald-800 border border-emerald-300';
+    if (isOff) {
+      label = '📴 單機離線';
+      badgeCls = 'bg-slate-700 text-amber-300 border border-amber-400/50';
+      lightBadgeCls = 'bg-amber-100 text-amber-900 border border-amber-300';
+    } else if (!online) {
+      label = '⚠️ 斷網暫存中';
+      badgeCls = 'bg-rose-500/25 text-rose-200 border border-rose-400/50';
+      lightBadgeCls = 'bg-rose-100 text-rose-800 border border-rose-300';
+    } else if (!hasUrl) {
+      label = '💻 本機模式（未綁 GAS）';
+      badgeCls = 'bg-sky-500/20 text-sky-200 border border-sky-400/40';
+      lightBadgeCls = 'bg-sky-100 text-sky-900 border border-sky-300';
     }
+
+    const b = $('#netBadge');
+    if (b) { b.textContent = label; b.className = `whitespace-nowrap text-[11px] px-2 py-0.5 rounded-full font-bold ${badgeCls}`; }
+    const dutyB = $('#opDutySyncBadge');
+    if (dutyB) {
+      dutyB.textContent = `${label}${cnt > 0 ? ` · 待傳 ${cnt}` : ''}`;
+      dutyB.className = `px-2.5 py-1.5 rounded-xl font-black ${badgeCls}`;
+    }
+    const inlineB = $('#opInlineSyncBadge');
+    if (inlineB) {
+      inlineB.textContent = `${label}${cnt > 0 ? ` · 待傳 ${cnt}` : ''}`;
+      inlineB.className = `px-2.5 py-1 rounded-full text-[11px] font-black ${lightBadgeCls}`;
+    }
+
+    const btnOff = $('#btnSyncModeOffline');
+    const btnCloud = $('#btnSyncModeCloud');
+    if (btnOff && btnCloud) {
+      btnOff.className = isOff
+        ? 'px-2 py-1 rounded text-[11px] font-black bg-amber-400 text-slate-950 whitespace-nowrap transition'
+        : 'px-2 py-1 rounded text-[11px] font-bold text-slate-300 hover:bg-slate-800 whitespace-nowrap transition';
+      btnCloud.className = !isOff
+        ? 'px-2 py-1 rounded text-[11px] font-black bg-emerald-500 text-slate-950 whitespace-nowrap transition'
+        : 'px-2 py-1 rounded text-[11px] font-bold text-slate-300 hover:bg-slate-800 whitespace-nowrap transition';
+    }
+    updateQueueBadge();
   }
 
   async function syncPushNow(silent = false) {
     if (!State.syncQueue.length) { if (!silent) toast('本機無待上傳紀錄，雲端已同步', 'info'); return { ok: true, uploaded: 0 }; }
-    if (!State.gasUrl) { if (!silent) toast(`本機已保存 ${State.syncQueue.length} 筆待同步資料（請於專區 5 設定 GAS URL）`, 'warn'); return { ok: false, error: '尚未設定 GAS URL' }; }
-    if (!navigator.onLine) { if (!silent) toast('目前離線中，連網後將自動批次上傳', 'warn'); return { ok: false, error: '目前為離線狀態' }; }
+    if (State.syncMode === 'offline') { if (!silent) toast('目前為 📴 單機離線模式，請先切回 🌐 雲端連線後再同步', 'warn'); return { ok: false, error: '單機離線模式' }; }
+    if (!State.gasUrl) { if (!silent) toast(`本機已保存 ${State.syncQueue.length} 筆待同步資料（請於資料庫專區設定 GAS 網址）`, 'warn'); return { ok: false, error: '尚未設定 GAS URL' }; }
+    if (!navigator.onLine) { if (!silent) toast('目前離線中，待恢復網路後請點「🔄 立即雙向同步」', 'warn'); return { ok: false, error: '目前為離線狀態' }; }
 
     if (syncInFlight) { syncAgainAfter = true; return { ok: true, queued: true }; }
     syncInFlight = true;
@@ -177,23 +265,23 @@
         for (const id of partQids) { await C.TurDB.remove('syncQueue', id); State.syncQueue = State.syncQueue.filter((x) => x.qid !== id); }
         uploaded += partUpd.length;
       }
-      // 3. 最後批次寫入高頻感應紀錄
+      // 3. 最後批次寫入高頻感應紀錄（伺服器端自動依 logId 去重）
       if (logItems.length) {
         const res = await C.gasPost(State.gasUrl, { action: 'batchUploadLogs', timingLogs: logItems });
         if (!res || !res.ok) throw new Error((res && res.error) || '批次上傳感應紀錄失敗');
         for (const id of logQids) { await C.TurDB.remove('syncQueue', id); State.syncQueue = State.syncQueue.filter((x) => x.qid !== id); }
         uploaded += logItems.length;
       }
-      updateQueueBadge();
-      if (!silent) toast(`☁️ 雲端同步完成！共寫入 ${uploaded} 筆至 Google 試算表`, 'success');
+      updateNetworkBadge();
+      if (!silent) toast(`☁️ 上傳完成！共寫入 ${uploaded} 筆至 Google 試算表`, 'success');
     } catch (err) {
       lastError = err.message || String(err);
-      updateQueueBadge();
+      updateNetworkBadge();
       if (!silent) toast(`上傳失敗：${lastError}`, 'error');
       else console.warn('[TUR AutoSync error]', lastError);
     } finally {
       syncInFlight = false;
-      if (syncAgainAfter && State.syncQueue.length > 0) {
+      if (syncAgainAfter && State.syncQueue.length > 0 && isCloudSyncEnabled()) {
         syncAgainAfter = false;
         setTimeout(() => syncPushNow(true), 600);
       }
@@ -201,38 +289,148 @@
     return lastError ? { ok: false, error: lastError, uploaded } : { ok: true, uploaded };
   }
 
-  async function syncPullFromGas(silent = false) {
-    if (!State.gasUrl) { if (!silent) toast('尚未設定 GAS Web App URL，請先於專區 5 貼上網址', 'warn'); return; }
-    if (!navigator.onLine) return;
+  async function applyCloudBootstrap(d) {
+    const keys = ['events', 'categories', 'stations', 'participants', 'timingLogs', 'historyResults', 'users', 'globalConfig'];
+    for (const k of keys) {
+      if (Array.isArray(d[k]) && (k !== 'users' || d[k].length)) {
+        const rows = k === 'events' ? d[k].map((e) => C.normalizeEventData({ ...e })) : d[k];
+        State[k] = rows;
+        await C.TurDB.clearAndFill(k, rows);
+      }
+    }
+    const cloudInited = (State.globalConfig || []).some((g) => g.configKey === 'platformInitialized' && String(g.configValue) === '1');
+    if (cloudInited || (Array.isArray(d.events) && d.events.length === 0)) {
+      localStorage.setItem('TUR_CLEAN_RESET', '1');
+    }
+    if (State.currentUser && State.currentUser.role !== 'public') {
+      const refreshed = State.users.find((x) => x.username === State.currentUser.username && Number(x.enabled));
+      if (refreshed) State.currentUser = refreshed;
+    }
+    rebuildIndices();
+    renderAll();
+  }
+
+  // 步驟 3：🔄 立即雙向同步（先上傳本機異動自動去重，再下載雲端最新資料）
+  async function syncBidirectional(silent = false) {
+    if (State.syncMode === 'offline') {
+      if (silent) return;
+      if (!confirm('目前為 📴 單機離線模式。\n是否切換至 🌐 雲端連線，並立即執行「🔄 雙向同步（先上傳本機異動，再下載雲端最新資料）」？')) return;
+      setSyncMode('cloud', true);
+    }
+    if (!State.gasUrl) { if (!silent) toast('尚未設定 GAS 網址（/exec），請先至「四、後台管理 → 五、資料庫專區」設定', 'warn'); return; }
+    if (!navigator.onLine) { if (!silent) toast('目前裝置無網路連線，請待恢復網路後再同步', 'warn'); return; }
     try {
-      // 若本機尚有未上傳的離線異動，先自動推播再拉取，避免覆蓋剛寫入的資料
-      if (State.syncQueue.length > 0) await syncPushNow(true);
+      let pushed = 0;
+      if (State.syncQueue.length > 0) {
+        const pushRes = await syncPushNow(true);
+        if (!pushRes.ok) {
+          if (!silent) toast(`⚠️ 上傳本機異動失敗（${pushRes.error}），已中止下載以避免覆蓋本機資料！`, 'error');
+          return;
+        }
+        pushed = pushRes.uploaded || 0;
+      }
+      const res = await C.gasGet(State.gasUrl, { action: 'getBootstrapData' });
+      if (!res || !res.ok) throw new Error(res?.error || '下載雲端資料失敗');
+      await applyCloudBootstrap(res.data || {});
+      updateNetworkBadge();
+      if (!silent) toast(`🔄 雙向同步完成！${pushed ? `已上傳 ${pushed} 筆，` : ''}已載入雲端最新 ${State.events.length} 場賽事、${State.participants.length} 位選手`, 'success');
+    } catch (err) {
+      if (!silent) toast(`雙向同步失敗：${err.message}`, 'error');
+      else console.warn('[TUR AutoSync skipped]', err.message);
+    }
+  }
+
+  // 向下相容別名
+  async function syncPullFromGas(silent = false) {
+    return syncBidirectional(silent);
+  }
+
+  // 步驟 4A（進階單向）：⬇️ 僅拉取雲端（新手機抓全量資料，不推送本機佇列）
+  async function syncPullOnlyFromCloud() {
+    if (!State.gasUrl) return toast('尚未設定 GAS 網址（/exec）', 'warn');
+    if (!navigator.onLine) return toast('目前無網路連線，無法拉取雲端資料', 'warn');
+    const pending = State.syncQueue.length;
+    const msg = pending > 0
+      ? `⚠️ 確定執行「⬇️ 僅拉取雲端」？\n\n本機目前尚有 ${pending} 筆未上傳異動，執行此操作將「捨棄這 ${pending} 筆待傳資料」並以雲端全量資料覆寫本機！`
+      : '確定執行「⬇️ 僅拉取雲端」？\n\n將直接下載雲端 Google 試算表最新全量資料覆寫本機資料庫（適合新手機初次同步）。';
+    if (!confirm(msg)) return;
+    try {
+      toast('⬇️ 正在從雲端抓取全量資料...', 'info');
       const res = await C.gasGet(State.gasUrl, { action: 'getBootstrapData' });
       if (!res || !res.ok) throw new Error(res?.error || '拉取失敗');
-      const d = res.data || {};
-      const keys = ['events', 'categories', 'stations', 'participants', 'timingLogs', 'historyResults', 'users', 'globalConfig'];
-      for (const k of keys) {
-        if (Array.isArray(d[k]) && (k !== 'users' || d[k].length)) {
-          const rows = k === 'events' ? d[k].map((e) => C.normalizeEventData({ ...e })) : d[k];
-          State[k] = rows;
-          await C.TurDB.clearAndFill(k, rows);
-        }
-      }
-      const cloudInited = (State.globalConfig || []).some((g) => g.configKey === 'platformInitialized' && String(g.configValue) === '1');
-      if (cloudInited || (Array.isArray(d.events) && d.events.length === 0)) {
-        localStorage.setItem('TUR_CLEAN_RESET', '1');
-      }
-      if (State.currentUser && State.currentUser.role !== 'public') {
-        const refreshed = State.users.find((x) => x.username === State.currentUser.username && Number(x.enabled));
-        if (refreshed) State.currentUser = refreshed;
-      }
-      rebuildIndices();
-      renderAll();
-      if (!silent) toast(`🔄 雙向同步成功！已載入 ${State.events.length} 場賽事、${State.participants.length} 位選手`, 'success');
+      State.syncQueue = [];
+      await C.TurDB.clear('syncQueue');
+      await applyCloudBootstrap(res.data || {});
+      updateNetworkBadge();
+      toast(`⬇️ 僅拉取雲端完成！已覆寫載入 ${State.events.length} 場活動、${State.participants.length} 位選手、${State.timingLogs.length} 筆計時紀錄`, 'success');
     } catch (err) {
-      if (!silent) toast(`拉取失敗：${err.message}`, 'error');
-      else console.warn('[TUR AutoPull skipped]', err.message);
+      toast(`拉取失敗：${err.message}`, 'error');
     }
+  }
+
+  // 步驟 4B（進階單向）：📤 強制推送本機設定至雲端（推送全 8 張資料表覆寫雲端）
+  async function syncForcePushAllToCloud() {
+    if (State.currentUser?.role !== 'super_admin') return toast('⛔ 僅最高管理員可執行強制推送至雲端', 'error');
+    if (!State.gasUrl) return toast('尚未設定 GAS 網址（/exec）', 'warn');
+    if (!navigator.onLine) return toast('目前無網路連線，無法推送至雲端', 'warn');
+    const word = prompt(
+      `⚠️ 高風險單向覆寫操作！即將把「本機全部 8 張資料表」強制覆寫上傳至雲端 Google 試算表：\n` +
+      `• GlobalConfig (${State.globalConfig.length})、Users (${State.users.length})\n` +
+      `• Events (${State.events.length})、Categories (${State.categories.length})、Stations (${State.stations.length})\n` +
+      `• Participants (${State.participants.length})、TimingLogs (${State.timingLogs.length})、HistoryResults (${State.historyResults.length})\n\n` +
+      `適用於剛用 JSON 還原備份後要整機覆蓋雲端。確定執行請輸入大寫 PUSH：`
+    );
+    if (word !== 'PUSH') return toast('輸入不符，已取消強制推送', 'info');
+
+    const pairs = [
+      ['GlobalConfig', State.globalConfig],
+      ['Users', State.users],
+      ['Events', State.events],
+      ['Categories', State.categories],
+      ['Stations', State.stations],
+      ['Participants', State.participants],
+      ['TimingLogs', State.timingLogs],
+      ['HistoryResults', State.historyResults]
+    ];
+    let okCnt = 0;
+    let totalRows = 0;
+    toast('📤 正在強制推送本機全 8 張資料表至雲端試算表...', 'info');
+    try {
+      for (const [sheetName, rows] of pairs) {
+        const res = await C.gasPost(State.gasUrl, {
+          action: 'adminBatchUpdateSheet',
+          sheetName,
+          rows: rows || [],
+          mode: 'replace'
+        });
+        if (!res || !res.ok) throw new Error(`${sheetName} 寫入失敗：${res?.error || '未知錯誤'}`);
+        okCnt++;
+        totalRows += Number(res.updatedRows || 0);
+      }
+      State.syncQueue = [];
+      await C.TurDB.clear('syncQueue');
+      updateNetworkBadge();
+      toast(`📤 強制推送完成！已覆寫雲端全部 ${okCnt}/8 張表（共 ${totalRows} 列）`, 'success');
+    } catch (err) {
+      toast(`強制推送中斷（已完成 ${okCnt}/8 表）：${err.message}`, 'error');
+    }
+  }
+
+  function buildConfigJsContent() {
+    const safeUrl = String(State.gasUrl || '').trim().replace(/'/g, "\\'");
+    const mode = State.syncMode === 'offline' ? 'offline' : 'cloud';
+    return [
+      '/**',
+      ' * 跑管家｜TUR 賽事管理系統 雲端連線設定檔 (config.js)',
+      ` * 產生時間：${C.formatDateTime()}`,
+      ' */',
+      'window.TUR_CONFIG = {',
+      `  gasUrl: '${safeUrl}',`,
+      `  defaultSyncMode: '${mode}',`,
+      `  version: '6.0'`,
+      '};',
+      ''
+    ].join('\n');
   }
 
   /* --------------------------------------------------------------------------
@@ -274,57 +472,101 @@
   }
 
   /* --------------------------------------------------------------------------
-   * RBAC Navigation & View Switcher (Strict 4-Tier Isolation)
+   * 4-Pillar RBAC Navigation & View Switcher
    * -------------------------------------------------------------------------- */
+  function getPillarForView(viewId) {
+    if (['public-home', 'public-register', 'public-multi', 'public-lookup', 'host-ops'].includes(viewId)) return 'register';
+    if (viewId === 'scores') return 'scores';
+    if (viewId === 'operator-station') return 'timing';
+    return 'admin';
+  }
+
   function renderNavAndHeader() {
     const u = State.currentUser;
     const isStaff = u.role !== 'public';
+    const isAdminOrOrg = u.role === 'super_admin' || u.role === 'organizer';
     $('#btnOpenLogin').classList.toggle('hidden', isStaff);
     $('#btnLogout').classList.toggle('hidden', !isStaff);
-    $('#btnSyncUpload').classList.toggle('hidden', !isStaff);
-    $('#btnSyncPull').classList.toggle('hidden', !isStaff);
 
     const roleLabels = {
-      public: '🏃 前台',
+      public: '🏃 民眾 / 跑者',
       operator: `📡 作業員：${u.displayName} [${State.opLockedStation}]`,
-      organizer: `👤 承辦：${u.displayName}`,
-      super_admin: `🛡️ 管理員：${u.displayName}`
+      organizer: `👤 承辦人：${u.displayName}`,
+      super_admin: `🛡️ 最高管理員：${u.displayName}`
     };
     $('#roleStatusBadge').textContent = roleLabels[u.role] || roleLabels.public;
 
+    const pillar = getPillarForView(State.activeView);
+    State.activePillar = pillar;
+
+    $$('[data-pillar]').forEach((b) => {
+      const act = b.dataset.pillar === pillar;
+      b.className = act
+        ? 'pillar-pill px-3.5 py-1.5 rounded-lg font-black whitespace-nowrap transition bg-amber-400 text-slate-950 shadow'
+        : 'pillar-pill px-3.5 py-1.5 rounded-lg font-bold whitespace-nowrap transition text-slate-200 hover:bg-slate-800';
+    });
+
     const nav = $('#mainNavInner');
     let pills = [];
-    if (u.role === 'public') {
+    if (pillar === 'register') {
       pills = [
-        ['public-home', '🏠 賽事報名'],
-        ['public-multi', '🛒 聯合報名'],
-        ['public-lookup', '🔍 查詢與修改']
+        ['public-home', '🏁 （一）選場次報名'],
+        ['public-multi', '🛒 （二）聯合報名'],
+        ['host-ops', '🛠️ （三）主辦作業（建立活動／核帳）'],
+        ['public-lookup', '🔍 報名查詢與修改']
       ];
-    } else if (u.role === 'operator') {
-      pills = [['operator-station', `🔒 ${State.opLockedStation}`]];
-    } else if (u.role === 'organizer') {
+    } else if (pillar === 'scores') {
       pills = [
-        ['zone1', '🏃 進行中'],
-        ['zone2', '📦 已結案'],
-        ['zone5', '🗄️ 同步狀態'],
-        ['public-home', '🌐 報名頁']
+        ['scores:live', '📊 （一）即時賽事'],
+        ['scores:history', '📚 （二）歷年成績'],
+        ['scores:warriors', '🏅 （三）八百壯士'],
+        ['scores:cert', '🏆 （四）完賽證書']
       ];
-    } else if (u.role === 'super_admin') {
-      pills = [
-        ['zone1', '🏃 進行中'],
-        ['zone2', '📦 已結案'],
-        ['zone3', '👥 帳號'],
-        ['zone4', '📚 歷屆成績'],
-        ['zone5', '🗄️ 系統設定'],
-        ['public-home', '🌐 報名頁']
-      ];
+    } else if (pillar === 'timing') {
+      pills = u.role === 'operator'
+        ? [['operator-station', `🔒 晶片感應作業（${State.opLockedStation}）`]]
+        : [['operator-station', '📡 作業人員登錄（選活動 → 選組別 → 帳密進入）']];
+    } else if (pillar === 'admin') {
+      if (u.role === 'super_admin') {
+        pills = [
+          ['zone1', '🏟️ 一、賽事作業區'],
+          ['zone2', '📦 二、已結案區'],
+          ['zone3', '👥 三、帳號管理'],
+          ['zone4', '📚 四、歷年活動成績匯入'],
+          ['zone5', '🗄️ 五、資料庫專區']
+        ];
+      } else if (u.role === 'organizer') {
+        pills = [
+          ['zone1', '🏟️ 一、賽事作業區'],
+          ['zone2', '📦 二、已結案區'],
+          ['zone5', '🗄️ 五、資料庫同步']
+        ];
+      } else {
+        pills = [['zone1', '🔐 請先登入最高管理員或活動承辦人帳號']];
+      }
     }
 
-    nav.innerHTML = pills.map(([vid, label]) => `
-      <button data-nav-view="${vid}" class="nav-pill ${State.activeView === vid ? 'active' : 'hover:bg-slate-100'} px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold whitespace-nowrap transition">${label}</button>
+    const activeKey = State.activeView === 'scores'
+      ? `scores:${State.scoreSubTab || 'live'}`
+      : (State.activeView === 'public-register' ? 'public-home' : State.activeView);
+
+    nav.innerHTML = pills.map(([key, label]) => `
+      <button type="button" data-nav-view="${key}" class="nav-pill ${activeKey === key ? 'active' : 'hover:bg-slate-100'} px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold whitespace-nowrap transition">${label}</button>
     `).join('');
 
-    $$('[data-nav-view]').forEach((b) => { b.onclick = () => switchView(b.dataset.navView); });
+    $$('[data-nav-view]').forEach((b) => {
+      b.onclick = () => {
+        const key = b.dataset.navView;
+        if (key.startsWith('scores:')) {
+          State.scoreSubTab = key.split(':')[1] || 'live';
+          switchView('scores');
+          return;
+        }
+        if (key === 'zone1') State.z1ViewMode = 'lobby';
+        if (key === 'zone1' && !isAdminOrOrg) { openLoginModal('organizer'); return; }
+        switchView(key);
+      };
+    });
     updateQueueBadge();
     updateNetworkBadge();
   }
@@ -332,17 +574,16 @@
   function switchView(viewId) {
     const role = State.currentUser?.role || 'public';
     const isAdminOrOrg = role === 'super_admin' || role === 'organizer';
-    // 嚴格 RBAC 路由守衛：作業員鎖定於執勤站點，禁止進入任何後台與權限畫面；承辦人禁止進入專區 3/4
-    if (role === 'operator' && viewId !== 'operator-station') {
-      toast('⛔ 權限不足：現場作業員無法進入管理與權限設定畫面', 'error');
+
+    if (role === 'operator' && ['zone1', 'zone2', 'zone3', 'zone4', 'zone5', 'host-ops'].includes(viewId)) {
+      toast('⛔ 權限不足：現場作業員無法進入後台管理畫面，請先登出作業員身分', 'error');
       viewId = 'operator-station';
-    } else if (role === 'public' && !['public-home', 'public-register', 'public-multi', 'public-lookup'].includes(viewId)) {
-      toast('🔒 請先登入管理員或承辦人帳號', 'warn');
-      viewId = 'public-home';
-    } else if (role === 'organizer' && (viewId === 'zone3' || viewId === 'zone4' || viewId === 'operator-station')) {
-      toast('⛔ 權限不足：最高管理員與承辦人帳號管制僅限最高權責管理員進入', 'error');
-      viewId = 'zone1';
-    } else if (isAdminOrOrg && viewId === 'operator-station') {
+    } else if (role === 'public' && ['zone1', 'zone2', 'zone3', 'zone4', 'zone5'].includes(viewId)) {
+      toast('🔒 請先登入最高管理員或活動承辦人帳號', 'warn');
+      openLoginModal('organizer');
+      return;
+    } else if (role === 'organizer' && (viewId === 'zone3' || viewId === 'zone4')) {
+      toast('⛔ 權限不足：此專區僅限最高權責管理員存取', 'error');
       viewId = 'zone1';
     }
 
@@ -360,6 +601,10 @@
     if (v === 'public-home') renderPublicHome();
     else if (v === 'public-register') renderPublicRegister();
     else if (v === 'public-multi') renderPublicMultiRegister();
+    else if (v === 'host-ops') renderHostOps();
+    else if (v === 'scores') {
+      if (global.TurScores?.renderScoresView) global.TurScores.renderScoresView(AppBridge);
+    }
     else if (v === 'operator-station') renderOperatorStation();
     else if (v === 'zone1') Z.renderZone1(AppBridge);
     else if (v === 'zone2') Z.renderZone2(AppBridge);
@@ -371,6 +616,403 @@
   function renderAll() {
     renderNavAndHeader();
     renderCurrentView();
+  }
+
+  /* --------------------------------------------------------------------------
+   * View C2：一、報名 →（三）主辦作業（1.建立活動欄位表格 2.核帳明細對帳）
+   * -------------------------------------------------------------------------- */
+  let hostCreateCats = [
+    { name: '100K 八百壯士組', distanceKm: 100, timeLimitHours: 16, fee: 2400, earlyBirdFee: 2100, bibPrefix: 'A', quota: 150, isWarrior800: true },
+    { name: '50K 超馬挑戰組', distanceKm: 50, timeLimitHours: 8, fee: 1800, earlyBirdFee: 1500, bibPrefix: 'B', quota: 250, isWarrior800: false }
+  ];
+
+  function renderHostOps() {
+    const box = $('#view-host-ops');
+    if (!box) return;
+    const u = State.currentUser;
+    const isAdminOrOrg = u && (u.role === 'super_admin' || u.role === 'organizer');
+
+    if (!isAdminOrOrg) {
+      box.innerHTML = `
+        <div class="max-w-xl mx-auto bg-white rounded-2xl border-2 border-sky-200 p-6 text-center space-y-4 shadow-sm">
+          <div class="text-3xl">🛠️</div>
+          <h2 class="text-lg font-black text-slate-900">主辦作業（建立活動 ／ 核帳）</h2>
+          <p class="text-xs text-slate-600">此區提供活動承辦人與最高管理員建立新活動並即時開放報名，以及核對報名匯款明細。</p>
+          <div class="flex flex-wrap justify-center gap-2">
+            <button type="button" id="btnHostPromptOrgLogin" class="px-5 py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-black text-xs shadow">👤 承辦人登入</button>
+            <button type="button" id="btnHostPromptSuperLogin" class="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 font-black text-xs shadow">🛡️ 最高管理員登入</button>
+          </div>
+        </div>`;
+      $('#btnHostPromptOrgLogin').onclick = () => openLoginModal('organizer');
+      $('#btnHostPromptSuperLogin').onclick = () => openLoginModal('super_admin');
+      return;
+    }
+
+    const isSuper = u.role === 'super_admin';
+    const managed = State.events.filter((e) => e.status !== 'finished' && (isSuper || e.ownerUsername === u.username));
+    const sub = State.hostSubTab === 'recon' ? 'recon' : 'create';
+    const totalPendingUnpaid = managed.reduce((sum, ev) => {
+      return sum + State.participants.filter((p) => p.eventId === ev.eventId && ['UNPAID', 'PENDING_PAY'].includes(String(p.payStatus || '').toUpperCase())).length;
+    }, 0);
+
+    box.innerHTML = `
+      <div class="bg-white p-4 rounded-2xl border shadow-sm space-y-3 text-xs">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
+          <div>
+            <h2 class="font-black text-base text-slate-900">🛠️ 一、報名 →（三）主辦作業</h2>
+            <p class="text-[11px] text-slate-500 mt-0.5">登入身分：<b>${C.escapeHtml(u.displayName || u.username)}</b>（${isSuper ? '最高管理員' : '活動承辦人'}）｜建立活動即可直接開放報名，並於核帳區一鍵對帳配號</p>
+          </div>
+          <div class="flex gap-1.5">
+            <button type="button" data-host-sub="create" class="px-4 py-2 rounded-xl font-black transition ${sub === 'create' ? 'bg-slate-900 text-amber-300 shadow' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">１．建立活動（欄位表）</button>
+            <button type="button" data-host-sub="recon" class="px-4 py-2 rounded-xl font-black transition flex items-center gap-1.5 ${sub === 'recon' ? 'bg-emerald-600 text-white shadow' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">
+              <span>２．核帳（明細對帳）</span>
+              ${totalPendingUnpaid > 0 ? `<span class="px-1.5 py-0.5 rounded-full text-[10px] mono ${sub === 'recon' ? 'bg-white text-rose-700' : 'bg-rose-600 text-white'}">${totalPendingUnpaid}</span>` : ''}
+            </button>
+          </div>
+        </div>
+        <div id="hostOpsBody" class="space-y-4"></div>
+      </div>`;
+
+    $$('[data-host-sub]').forEach((b) => {
+      b.onclick = () => { State.hostSubTab = b.dataset.hostSub; renderHostOps(); };
+    });
+
+    if (sub === 'create') renderHostCreateEventTable($('#hostOpsBody'), u);
+    else renderHostReconView($('#hostOpsBody'), managed, isSuper);
+  }
+
+  function renderHostCreateEventTable(container, u) {
+    const payuniOn = Boolean(C.PAYUNi_FEATURE_ENABLED);
+    const defaultStart = '2026-12-20T05:00:00';
+    const defaultRegEnd = '2026-12-15T23:59:59';
+    const defaultEbEnd = '2026-12-05T23:59:59';
+
+    container.innerHTML = `
+      <form id="hostCreateEventForm" class="space-y-4 text-xs">
+        <!-- 表格 1：活動基本欄位表格 -->
+        <div class="rounded-xl border overflow-hidden">
+          <div class="bg-slate-900 text-white px-3.5 py-2 font-black flex items-center justify-between">
+            <span>📋 表 1｜活動基本資料欄位表</span>
+            <span class="text-[11px] text-amber-300 font-bold">承辦人可直接開放報名</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <tbody class="divide-y">
+                <tr>
+                  <th class="p-2.5 bg-slate-50 w-36 font-bold">活動名稱 *</th>
+                  <td class="p-2" colspan="3"><input id="hcNameZh" required placeholder="例：2026 TUR 冬季 100K 超馬挑戰賽" class="w-full px-3 py-2 border rounded-lg font-bold" /></td>
+                </tr>
+                <tr>
+                  <th class="p-2.5 bg-slate-50 font-bold">主辦單位</th>
+                  <td class="p-2"><input id="hcOrganizer" value="${C.escapeHtml(u.displayName || 'TUR 台灣超馬協會')}" class="w-full px-2.5 py-1.5 border rounded-lg" /></td>
+                  <th class="p-2.5 bg-slate-50 w-32 font-bold">活動地點</th>
+                  <td class="p-2"><input id="hcLocation" placeholder="例：新北市淡水河濱公園" class="w-full px-2.5 py-1.5 border rounded-lg" /></td>
+                </tr>
+                <tr>
+                  <th class="p-2.5 bg-slate-50 font-bold">起跑日期時間 *</th>
+                  <td class="p-2"><input id="hcRaceStart" type="datetime-local" step="1" required value="${defaultStart}" class="w-full px-2.5 py-1.5 border border-amber-400 bg-amber-50/40 rounded-lg mono font-bold" /></td>
+                  <th class="p-2.5 bg-slate-50 font-bold">報名截止時間</th>
+                  <td class="p-2"><input id="hcRegEnd" type="datetime-local" step="1" value="${defaultRegEnd}" class="w-full px-2.5 py-1.5 border rounded-lg mono" /></td>
+                </tr>
+                <tr>
+                  <th class="p-2.5 bg-slate-50 font-bold">賽制類型 *</th>
+                  <td class="p-2">
+                    <select id="hcRaceType" class="w-full px-2.5 py-1.5 border rounded-lg font-bold bg-white">
+                      <option value="distance">🏃 一般距離賽（起點 → 檢查站 CP → 終點）</option>
+                      <option value="lap_timed">🔁 計時繞圈賽（主會場拱門重複計圈）</option>
+                    </select>
+                  </td>
+                  <th class="p-2.5 bg-slate-50 font-bold">單圈距離(km)</th>
+                  <td class="p-2"><input id="hcLapKm" type="number" step="0.05" min="0.1" value="1.0" class="w-full px-2.5 py-1.5 border rounded-lg mono" placeholder="繞圈賽適用" /></td>
+                </tr>
+                <tr>
+                  <th class="p-2.5 bg-slate-50 font-bold">收款方式</th>
+                  <td class="p-2">
+                    <select id="hcPayMode" class="w-full px-2.5 py-1.5 border rounded-lg font-bold bg-white">
+                      <option value="MANUAL_ATM">🏦 銀行轉帳（人工核對後五碼）</option>
+                      ${payuniOn ? '<option value="ONLINE_PAYUNi">⚡ 線上金流 PAYUNi（自動銷帳配號）</option>' : ''}
+                    </select>
+                  </td>
+                  <th class="p-2.5 bg-slate-50 font-bold">開放狀態</th>
+                  <td class="p-2">
+                    <select id="hcStatus" class="w-full px-2.5 py-1.5 border border-emerald-400 bg-emerald-50 rounded-lg font-black text-emerald-900">
+                      <option value="open" selected>🟢 立即開放報名（送出即上架）</option>
+                      <option value="draft">📝 草稿籌備（暫不公開）</option>
+                    </select>
+                  </td>
+                </tr>
+                <tr>
+                  <th class="p-2.5 bg-slate-50 font-bold">總名額上限</th>
+                  <td class="p-2"><input id="hcMaxQuota" type="number" min="10" value="500" class="w-full px-2.5 py-1.5 border rounded-lg mono" /></td>
+                  <th class="p-2.5 bg-slate-50 font-bold">早鳥價設定</th>
+                  <td class="p-2">
+                    <div class="flex flex-wrap items-center gap-2">
+                      <label class="inline-flex items-center gap-1 font-bold text-emerald-900 cursor-pointer">
+                        <input id="hcEarlyBird" type="checkbox" checked class="accent-emerald-600" /><span>🐤 啟用</span>
+                      </label>
+                      <input id="hcEarlyBirdEnd" type="datetime-local" step="1" value="${defaultEbEnd}" class="flex-1 min-w-[170px] px-2 py-1 border rounded-lg mono" />
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 表格 2：組別與報名費用表 -->
+        <div class="rounded-xl border overflow-hidden">
+          <div class="bg-sky-900 text-white px-3.5 py-2 font-black flex items-center justify-between">
+            <span>🏷️ 表 2｜賽事組別與費用明細表</span>
+            <button type="button" id="btnHcAddCat" class="px-2.5 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-[11px]">+ 新增組別列</button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead class="bg-slate-100 text-[11px]">
+                <tr>
+                  <th class="p-2">組別名稱 *</th>
+                  <th class="p-2 w-20">距離(km)</th>
+                  <th class="p-2 w-20">限時(時)</th>
+                  <th class="p-2 w-24">一般費(NT$)</th>
+                  <th class="p-2 w-24">早鳥費(NT$)</th>
+                  <th class="p-2 w-16">字首</th>
+                  <th class="p-2 w-20">名額</th>
+                  <th class="p-2 w-24 text-center">🏅 八百壯士</th>
+                  <th class="p-2 w-12 text-center">刪</th>
+                </tr>
+              </thead>
+              <tbody id="hcCatRows" class="divide-y"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 表格 3：加購項目設定表 -->
+        <div class="rounded-xl border overflow-hidden">
+          <div class="bg-indigo-900 text-white px-3.5 py-2 font-black flex items-center justify-between">
+            <span>🛍️ 表 3｜加購項目設定表（選填）</span>
+            <label class="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-200 cursor-pointer">
+              <input id="hcAddonNote" type="checkbox" class="accent-amber-400" />
+              <span>📝 附「加購項目補充說明／備註」欄</span>
+            </label>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead class="bg-slate-100 text-[11px]">
+                <tr>
+                  <th class="p-2 w-16 text-center">啟用</th>
+                  <th class="p-2">加購項目名稱</th>
+                  <th class="p-2 w-36">加購金額 (NT$)</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y">
+                <tr>
+                  <td class="p-2 text-center"><input id="hcAddonChip" type="checkbox" class="accent-indigo-600" /></td>
+                  <td class="p-2 font-bold">晶片採購</td>
+                  <td class="p-2"><input id="hcAddonChipPrice" type="number" min="0" value="300" class="w-full px-2 py-1 border rounded mono" /></td>
+                </tr>
+                <tr>
+                  <td class="p-2 text-center"><input id="hcAddonLodging" type="checkbox" class="accent-indigo-600" /></td>
+                  <td class="p-2 font-bold">住宿預訂價</td>
+                  <td class="p-2"><input id="hcAddonLodgingPrice" type="number" min="0" value="1500" class="w-full px-2 py-1 border rounded mono" /></td>
+                </tr>
+                <tr>
+                  <td class="p-2 text-center"><input id="hcAddonGear" type="checkbox" class="accent-indigo-600" /></td>
+                  <td class="p-2 font-bold">運動用品加購價</td>
+                  <td class="p-2"><input id="hcAddonGearPrice" type="number" min="0" value="680" class="w-full px-2 py-1 border rounded mono" /></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-end gap-2 pt-2 border-t">
+          <button type="submit" class="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm shadow">✅ 建立活動並儲存</button>
+        </div>
+      </form>`;
+
+    const drawCatRows = () => {
+      const tb = $('#hcCatRows');
+      if (!tb) return;
+      tb.innerHTML = hostCreateCats.map((c, idx) => `
+        <tr>
+          <td class="p-1.5"><input data-hc-cat="${idx}" data-hc-f="name" value="${C.escapeHtml(c.name)}" required class="w-full px-2 py-1 border rounded font-bold" /></td>
+          <td class="p-1.5"><input data-hc-cat="${idx}" data-hc-f="distanceKm" type="number" step="0.1" value="${c.distanceKm}" class="w-full px-2 py-1 border rounded mono" /></td>
+          <td class="p-1.5"><input data-hc-cat="${idx}" data-hc-f="timeLimitHours" type="number" step="0.5" value="${c.timeLimitHours}" class="w-full px-2 py-1 border rounded mono" /></td>
+          <td class="p-1.5"><input data-hc-cat="${idx}" data-hc-f="fee" type="number" min="0" value="${c.fee}" class="w-full px-2 py-1 border rounded mono" /></td>
+          <td class="p-1.5"><input data-hc-cat="${idx}" data-hc-f="earlyBirdFee" type="number" min="0" value="${c.earlyBirdFee}" class="w-full px-2 py-1 border rounded mono" /></td>
+          <td class="p-1.5"><input data-hc-cat="${idx}" data-hc-f="bibPrefix" value="${C.escapeHtml(c.bibPrefix)}" maxlength="3" class="w-full px-2 py-1 border rounded mono uppercase" /></td>
+          <td class="p-1.5"><input data-hc-cat="${idx}" data-hc-f="quota" type="number" min="1" value="${c.quota}" class="w-full px-2 py-1 border rounded mono" /></td>
+          <td class="p-1.5 text-center"><input data-hc-cat="${idx}" data-hc-f="isWarrior800" type="checkbox" ${c.isWarrior800 ? 'checked' : ''} class="accent-rose-600" /></td>
+          <td class="p-1.5 text-center">${hostCreateCats.length > 1 ? `<button type="button" data-hc-del-cat="${idx}" class="px-2 py-0.5 rounded bg-rose-100 text-rose-700 font-bold">✕</button>` : '-'}</td>
+        </tr>`).join('');
+      $$('[data-hc-cat]').forEach((inp) => {
+        inp.onchange = () => {
+          const i = Number(inp.dataset.hcCat);
+          const f = inp.dataset.hcF;
+          if (!hostCreateCats[i]) return;
+          if (f === 'isWarrior800') hostCreateCats[i][f] = inp.checked;
+          else if (['distanceKm', 'timeLimitHours', 'fee', 'earlyBirdFee', 'quota'].includes(f)) hostCreateCats[i][f] = Number(inp.value || 0);
+          else hostCreateCats[i][f] = inp.value.trim();
+        };
+      });
+      $$('[data-hc-del-cat]').forEach((btn) => {
+        btn.onclick = () => { hostCreateCats.splice(Number(btn.dataset.hcDelCat), 1); drawCatRows(); };
+      });
+    };
+    drawCatRows();
+
+    $('#btnHcAddCat').onclick = () => {
+      const nextLetter = String.fromCharCode(65 + (hostCreateCats.length % 26));
+      hostCreateCats.push({ name: '21K 體驗組', distanceKm: 21.1, timeLimitHours: 4, fee: 1200, earlyBirdFee: 1000, bibPrefix: nextLetter, quota: 200, isWarrior800: false });
+      drawCatRows();
+    };
+
+    $('#hostCreateEventForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const nameZh = $('#hcNameZh').value.trim();
+      if (!nameZh) return toast('請輸入活動名稱', 'warn');
+      const rawStart = ($('#hcRaceStart').value || '').trim();
+      if (!rawStart) return toast('請設定起跑日期時間', 'warn');
+      const raceStartNorm = rawStart.replace('T', ' ') + (rawStart.length === 16 ? ':00' : '');
+      const rawRegEnd = ($('#hcRegEnd').value || '').trim();
+      const regEndNorm = rawRegEnd ? rawRegEnd.replace('T', ' ') + (rawRegEnd.length === 16 ? ':00' : '') : '2026-12-31 23:59:59';
+      const raceType = $('#hcRaceType').value === 'lap_timed' ? 'lap_timed' : 'distance';
+      const isLap = raceType === 'lap_timed';
+      const payMode = (C.PAYUNi_FEATURE_ENABLED && $('#hcPayMode').value === 'ONLINE_PAYUNi') ? 'ONLINE_PAYUNi' : 'MANUAL_ATM';
+      const status = $('#hcStatus').value === 'draft' ? 'draft' : 'open';
+      const ebOn = Boolean($('#hcEarlyBird').checked);
+      const ebEndNorm = ebOn ? C.normalizeEarlyBirdEnd($('#hcEarlyBirdEnd').value || '') : '';
+      if (ebOn && !ebEndNorm) return toast('啟用早鳥價時，請設定早鳥截止時間', 'warn');
+
+      const newSchema = C.defaultFormSchema(payMode);
+      newSchema.earlyBirdEnabled = ebOn;
+      newSchema.earlyBirdEnd = ebEndNorm;
+      newSchema.addons = [
+        { code: 'chip_buy', name: '晶片採購', price: Math.max(0, Number($('#hcAddonChipPrice').value || 0)), enabled: Boolean($('#hcAddonChip').checked) },
+        { code: 'lodging', name: '住宿預訂價', price: Math.max(0, Number($('#hcAddonLodgingPrice').value || 0)), enabled: Boolean($('#hcAddonLodging').checked) },
+        { code: 'sport_gear', name: '運動用品加購價', price: Math.max(0, Number($('#hcAddonGearPrice').value || 0)), enabled: Boolean($('#hcAddonGear').checked) }
+      ];
+      newSchema.customFields = $('#hcAddonNote').checked ? [{ ...C.DEFAULT_ADDONS_NOTE_FIELD }] : [];
+
+      const evId = `TUR-${Date.now().toString().slice(-6)}`;
+      const lapDist = isLap ? Math.max(0.1, Number($('#hcLapKm').value || 1.0)) : 0;
+      const ev = {
+        eventId: evId,
+        ownerUsername: u.username,
+        nameZh,
+        nameEn: C.zhToEnEventName(nameZh),
+        organizerZh: $('#hcOrganizer').value.trim() || u.displayName || 'TUR 台灣超馬協會',
+        organizerEn: 'TUR',
+        location: $('#hcLocation').value.trim(),
+        raceType,
+        lapDistanceKm: lapDist,
+        debounceSeconds: 15,
+        status,
+        regStart: C.formatDateTime(),
+        regEnd: regEndNorm,
+        raceStart: raceStartNorm,
+        maxQuota: Math.max(10, Number($('#hcMaxQuota').value || 500)),
+        bannerUrl: isLap ? 'dyn-track' : 'dyn-road',
+        brochureText: '',
+        formSchemaJson: JSON.stringify(newSchema),
+        certConfigJson: JSON.stringify(C.defaultCertConfig())
+      };
+
+      const cats = hostCreateCats.map((c, idx) => {
+        const baseFee = Math.max(0, Number(c.fee || 0));
+        const rawEb = ebOn ? Math.max(0, Number(c.earlyBirdFee || 0)) : 0;
+        const validEb = (rawEb > 0 && rawEb < baseFee) ? rawEb : 0;
+        return {
+          catId: `CAT-${evId}-${idx + 1}`,
+          eventId: evId,
+          name: c.name || `組別 ${idx + 1}`,
+          distanceKm: isLap ? lapDist : Math.max(0.1, Number(c.distanceKm || 50)),
+          timeLimitHours: Math.max(0.5, Number(c.timeLimitHours || 8)),
+          fee: baseFee,
+          earlyBirdFee: validEb,
+          bibPrefix: String(c.bibPrefix || String.fromCharCode(65 + idx)).toUpperCase(),
+          bibStartNum: '001',
+          quota: Math.max(1, Number(c.quota || 200)),
+          customRaceStart: '',
+          isWarrior800: Boolean(c.isWarrior800)
+        };
+      });
+
+      const maxDist = Math.max(...cats.map((c) => Number(c.distanceKm || 50)));
+      const sts = isLap
+        ? [
+          { stationId: `ST-${evId}-0`, eventId: evId, stationCode: 'CHECKIN', name: '起點報到檢錄', distanceKm: 0, stationType: 'checkin', orderIndex: 0 },
+          { stationId: `ST-${evId}-1`, eventId: evId, stationCode: 'LAP', name: '主會場繞圈拱門', distanceKm: lapDist, stationType: 'lap', orderIndex: 1 }
+        ]
+        : [
+          { stationId: `ST-${evId}-0`, eventId: evId, stationCode: 'CHECKIN', name: '起點報到檢錄', distanceKm: 0, stationType: 'checkin', orderIndex: 0 },
+          { stationId: `ST-${evId}-1`, eventId: evId, stationCode: 'CP1', name: 'CP1 折返檢查站', distanceKm: Number((maxDist / 2).toFixed(1)), stationType: 'checkpoint', orderIndex: 1 },
+          { stationId: `ST-${evId}-2`, eventId: evId, stationCode: 'FINISH', name: '終點衝線拱門', distanceKm: maxDist, stationType: 'finish', orderIndex: 2 }
+        ];
+
+      State.events.push(ev);
+      State.categories.push(...cats);
+      State.stations.push(...sts);
+      await C.TurDB.put('events', ev);
+      await C.TurDB.bulkPut('categories', cats);
+      await C.TurDB.bulkPut('stations', sts);
+      await enqueueSync('saveEvent', { event: ev });
+      for (const cat of cats) await enqueueSync('saveCategory', { category: cat });
+      for (const st of sts) await enqueueSync('saveStation', { station: st });
+
+      State.hostReconEventId = evId;
+      State.z1EventId = evId;
+      toast(`✅ 已建立活動「${nameZh}」（${cats.length} 組）${status === 'open' ? '並立即開放報名！' : '（草稿）'}`, 'success');
+      if (status === 'open') {
+        switchView('public-home');
+      } else {
+        State.hostSubTab = 'recon';
+        renderHostOps();
+      }
+    };
+  }
+
+  function renderHostReconView(container, managed, isSuper) {
+    if (!managed.length) {
+      container.innerHTML = '<div class="p-8 text-center text-slate-400 border border-dashed rounded-xl">目前尚無進行中活動，請先切換至「１．建立活動」新增賽事。</div>';
+      return;
+    }
+    if (!managed.some((e) => e.eventId === State.hostReconEventId)) {
+      State.hostReconEventId = managed[0].eventId;
+    }
+    const activeEv = managed.find((e) => e.eventId === State.hostReconEventId);
+
+    container.innerHTML = `
+      <div class="space-y-3">
+        <div class="font-black text-slate-800">步驟 1｜點選要核帳對帳的活動（${managed.length} 場）</div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+          ${managed.map((ev) => {
+            const parts = State.participants.filter((p) => p.eventId === ev.eventId && String(p.payStatus).toUpperCase() !== 'CANCELLED');
+            const unpaid = parts.filter((p) => ['UNPAID', 'PENDING_PAY'].includes(String(p.payStatus || '').toUpperCase())).length;
+            const paid = parts.filter((p) => String(p.payStatus || '').toUpperCase() === 'PAID').length;
+            const isSel = ev.eventId === State.hostReconEventId;
+            return `
+              <button type="button" data-host-pick-ev="${ev.eventId}" class="text-left p-3 rounded-xl border-2 transition ${isSel ? 'border-emerald-600 bg-emerald-50 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-400'}">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="font-black text-slate-900 truncate">${C.escapeHtml(ev.nameZh)}</span>
+                  ${unpaid > 0 ? `<span class="px-2 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-black shrink-0">待核 ${unpaid}</span>` : '<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold shrink-0">已核清</span>'}
+                </div>
+                <div class="text-[11px] text-slate-500 mono mt-1">報名 ${parts.length} ｜ 已繳 ${paid}${isSuper ? ` ｜ 承辦 ${C.escapeHtml(ev.ownerUsername || '-')}` : ''}</div>
+              </button>`;
+          }).join('')}
+        </div>
+        <div id="hostReconDetail" class="pt-2 border-t space-y-4"></div>
+      </div>`;
+
+    $$('[data-host-pick-ev]').forEach((b) => {
+      b.onclick = () => {
+        State.hostReconEventId = b.dataset.hostPickEv;
+        renderHostReconView(container, managed, isSuper);
+      };
+    });
+
+    if (activeEv && Z.renderZ1Recon) {
+      Z.renderZ1Recon(AppBridge, activeEv, '#hostReconDetail');
+    }
   }
 
   /* --------------------------------------------------------------------------
@@ -1595,9 +2237,79 @@
   }
 
   /* --------------------------------------------------------------------------
-   * View D: Operator Locked Station Workspace (WRITER / CHECKIN / CP / FINISH / LAP)
+   * View D: 三、晶片計時（三步驟登錄 ＋ 晶片感應作業）
    * -------------------------------------------------------------------------- */
+  function renderOpInlineStationGrid() {
+    const evSel = $('#opInlineEventSelect');
+    const grid = $('#opInlineStationGrid');
+    if (!evSel || !grid) return;
+    const evId = evSel.value;
+    const evObj = State.events.find((e) => e.eventId === evId);
+    const evOwner = evObj ? String(evObj.ownerUsername || '') : '';
+    const stNameMap = new Map(
+      State.stations.filter((s) => s.eventId === evId).map((s) => [String(s.stationCode || '').toUpperCase(), s.name])
+    );
+    const ops = State.users.filter((u) => {
+      if (u.role !== 'operator' || !Number(u.enabled)) return false;
+      if (u.allowedEventId === evId) return true;
+      if (u.allowedEventId === 'ALL') return !u.parentOrganizer || u.parentOrganizer === evOwner;
+      return false;
+    });
+    if (State.pickedOpUser && !ops.some((x) => x.username === State.pickedOpUser.username)) {
+      State.pickedOpUser = null;
+      if ($('#opInlineUser')) $('#opInlineUser').value = '';
+      if ($('#opInlinePickedHint')) $('#opInlinePickedHint').textContent = '請點選本活動作業組別';
+    }
+    if (!ops.length) {
+      grid.innerHTML = '<div class="col-span-full p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold text-center">本活動尚未設定作業組別帳號，請承辦人至「四、後台管理 → 賽事作業區 → 作業員」新增</div>';
+      return;
+    }
+    grid.innerHTML = ops.map((op) => {
+      const stCode = String(op.allowedStation || '').toUpperCase();
+      const customStName = stCode === 'WRITER' ? '發卡寫入組' : (stNameMap.get(stCode) || '');
+      const picked = State.pickedOpUser?.username === op.username;
+      return `
+        <button type="button" data-inline-pick-op="${C.escapeHtml(op.username)}" class="p-3 rounded-xl border-2 text-left transition ${picked ? 'border-emerald-600 bg-emerald-50 shadow-sm' : 'border-slate-200 hover:border-slate-400 bg-white'}">
+          <div class="font-black text-xs mono text-slate-900">${C.escapeHtml(op.allowedStation)}</div>
+          ${customStName ? `<div class="text-[11px] font-bold text-indigo-700 truncate">${C.escapeHtml(customStName)}</div>` : ''}
+          <div class="text-[11px] text-slate-500 truncate">${C.escapeHtml(op.displayName)} (${C.escapeHtml(op.username)})</div>
+        </button>`;
+    }).join('');
+    $$('[data-inline-pick-op]').forEach((b) => {
+      b.onclick = () => {
+        State.pickedOpUser = ops.find((x) => x.username === b.dataset.inlinePickOp) || null;
+        if (State.pickedOpUser) {
+          const stCode = String(State.pickedOpUser.allowedStation || '').toUpperCase();
+          const stNm = stCode === 'WRITER' ? '發卡寫入組' : (stNameMap.get(stCode) || '');
+          if ($('#opInlineUser')) $('#opInlineUser').value = State.pickedOpUser.username;
+          if ($('#opInlinePickedHint')) $('#opInlinePickedHint').textContent = `已選組別：${State.pickedOpUser.allowedStation}${stNm ? ' ' + stNm : ''}（帳號 ${State.pickedOpUser.username}）`;
+          if ($('#opInlinePass')) $('#opInlinePass').focus();
+        }
+        renderOpInlineStationGrid();
+      };
+    });
+  }
+
   function renderOperatorStation() {
+    const isOp = State.currentUser?.role === 'operator';
+    const loginCard = $('#opInlineLoginCard');
+    const dutyBox = $('#opDutyWorkspace');
+    if (loginCard) loginCard.classList.toggle('hidden', isOp);
+    if (dutyBox) dutyBox.classList.toggle('hidden', !isOp);
+    updateNetworkBadge();
+
+    if (!isOp) {
+      const activeEvs = State.events.filter((e) => e.status !== 'finished');
+      const sel = $('#opInlineEventSelect');
+      if (sel) {
+        const prev = sel.value;
+        sel.innerHTML = activeEvs.map((e) => `<option value="${e.eventId}">${C.escapeHtml(e.nameZh)} (${e.raceType === 'lap_timed' ? '繞圈賽' : '距離賽'})</option>`).join('') || '<option value="">目前無進行中活動</option>';
+        if (prev && activeEvs.some((e) => e.eventId === prev)) sel.value = prev;
+      }
+      renderOpInlineStationGrid();
+      return;
+    }
+
     const ev = State.events.find((e) => e.eventId === State.opEventId) || State.events[0];
     if (!ev) return;
     const stCode = State.opLockedStation;
@@ -2093,7 +2805,7 @@
   /* --------------------------------------------------------------------------
    * Zero-Trace Login Modal & 3-Step Operator Login
    * -------------------------------------------------------------------------- */
-  function openLoginModal() {
+  function openLoginModal(defaultTab = 'super_admin') {
     // 強制清空所有帳密欄位（零紀錄安全防護）
     $('#loginUser').value = '';
     $('#loginPass').value = '';
@@ -2104,21 +2816,31 @@
     const activeEvs = State.events.filter((e) => e.status !== 'finished');
     $('#opLoginEventSelect').innerHTML = activeEvs.map((e) => `<option value="${e.eventId}">${C.escapeHtml(e.nameZh)}</option>`).join('');
     renderOpStationCards();
+    if (defaultTab === 'organizer') $('#loginModeOrg')?.click();
+    else if (defaultTab === 'operator') $('#loginModeOp')?.click();
+    else $('#loginModeSuper')?.click();
     $('#loginModal').classList.remove('hidden');
   }
 
   function renderOpStationCards() {
     const evId = $('#opLoginEventSelect').value;
+    const evObj = State.events.find((e) => e.eventId === evId);
+    const evOwner = evObj ? String(evObj.ownerUsername || '') : '';
     const stNameMap = new Map(
       State.stations.filter((s) => s.eventId === evId).map((s) => [String(s.stationCode || '').toUpperCase(), s.name])
     );
-    const ops = State.users.filter((u) => u.role === 'operator' && Number(u.enabled) && (u.allowedEventId === evId || u.allowedEventId === 'ALL'));
+    const ops = State.users.filter((u) => {
+      if (u.role !== 'operator' || !Number(u.enabled)) return false;
+      if (u.allowedEventId === evId) return true;
+      if (u.allowedEventId === 'ALL') return !u.parentOrganizer || u.parentOrganizer === evOwner;
+      return false;
+    });
     if (State.pickedOpUser && !ops.some((x) => x.username === State.pickedOpUser.username)) {
       State.pickedOpUser = null;
       $('#opPickedAccountHint').textContent = '請先點選站點';
     }
     if (!ops.length) {
-      $('#opStationCardGrid').innerHTML = '<div class="col-span-full p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold text-center">本活動尚未設定晶片作業員，請承辦人登入後於「5. 權限」建立站點帳密</div>';
+      $('#opStationCardGrid').innerHTML = '<div class="col-span-full p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs font-bold text-center">本活動尚未設定晶片作業員，請承辦人登入後點入活動至「5. 站點與作業員」建立站點帳密</div>';
       return;
     }
     $('#opStationCardGrid').innerHTML = ops.map((op) => {
@@ -2154,6 +2876,8 @@
       rebuildIndices(State.opEventId);
       switchView('operator-station');
     } else if (user.role === 'organizer' || user.role === 'super_admin') {
+      State.z1ViewMode = 'lobby';
+      State.z1LobbyOwnerFilter = 'all';
       switchView('zone1');
     }
     toast(`✅ 歡迎登入：${user.displayName}`, 'success');
@@ -2192,22 +2916,89 @@
       };
     });
 
-    $('#btnOpenLogin').onclick = openLoginModal;
+    $('#btnOpenLogin').onclick = () => openLoginModal('super_admin');
     $('#btnCloseLogin').onclick = () => $('#loginModal').classList.add('hidden');
     $('#btnLogout').onclick = logoutZeroTrace;
-    $('#btnSyncUpload').onclick = () => syncPushNow(false);
-    $('#btnSyncPull').onclick = () => syncPullFromGas();
+    if ($('#btnSyncModeOffline')) $('#btnSyncModeOffline').onclick = () => setSyncMode('offline');
+    if ($('#btnSyncModeCloud')) $('#btnSyncModeCloud').onclick = () => setSyncMode('cloud');
+    if ($('#btnSyncBidirectional')) $('#btnSyncBidirectional').onclick = () => syncBidirectional(false);
+    if ($('#btnSyncUpload')) $('#btnSyncUpload').onclick = () => syncPushNow(false);
+    if ($('#btnSyncPull')) $('#btnSyncPull').onclick = () => syncBidirectional(false);
 
-    $('#loginModeAdmin').onclick = () => {
-      $('#adminLoginForm').classList.remove('hidden'); $('#opLoginForm').classList.add('hidden');
-      $('#loginModeAdmin').className = 'flex-1 py-2 rounded-xl bg-slate-900 text-white font-bold';
-      $('#loginModeOp').className = 'flex-1 py-2 rounded-xl bg-slate-100 text-slate-700 font-bold';
+    // 頂層四大主頁籤切換
+    $$('[data-pillar]').forEach((b) => {
+      b.onclick = () => {
+        const p = b.dataset.pillar;
+        const role = State.currentUser?.role || 'public';
+        if (p === 'register') switchView('public-home');
+        else if (p === 'scores') switchView('scores');
+        else if (p === 'timing') switchView('operator-station');
+        else if (p === 'admin') {
+          if (role === 'super_admin' || role === 'organizer') {
+            State.z1ViewMode = 'lobby';
+            switchView('zone1');
+          } else if (role === 'operator') {
+            toast('⛔ 現場作業員無法進入後台管理，請先登出作業員帳號', 'error');
+          } else {
+            openLoginModal('organizer');
+          }
+        }
+      };
+    });
+
+    if ($('#btnGoHostOpsFromHome')) $('#btnGoHostOpsFromHome').onclick = () => switchView('host-ops');
+    if ($('#btnGoScoresFromHome')) $('#btnGoScoresFromHome').onclick = () => switchView('scores');
+
+    // 三、晶片計時頁籤內建三步驟登錄表單
+    if ($('#opInlineEventSelect')) $('#opInlineEventSelect').onchange = renderOpInlineStationGrid;
+    if ($('#opInlineLoginForm')) {
+      $('#opInlineLoginForm').onsubmit = (e) => {
+        e.preventDefault();
+        const selEvId = $('#opInlineEventSelect')?.value || '';
+        if (!selEvId) return toast('請先選擇作業活動', 'warn');
+        const typedUn = ($('#opInlineUser')?.value || '').trim();
+        const pw = ($('#opInlinePass')?.value || '').trim();
+        const targetOp = State.users.find((x) => x.role === 'operator' && Number(x.enabled) && x.username === (typedUn || State.pickedOpUser?.username));
+        if (!targetOp) return toast('請選擇本活動作業組別或輸入正確作業員帳號', 'error');
+        if (targetOp.allowedEventId !== 'ALL' && targetOp.allowedEventId !== selEvId) {
+          return toast('🔒 此作業員帳號不屬於目前選擇的活動', 'error');
+        }
+        if (String(targetOp.passwordHash) !== pw) return toast('密碼錯誤，請重新輸入', 'error');
+        $('#opInlinePass').value = '';
+        applySessionLogin(targetOp, selEvId);
+      };
+    }
+
+    const setLoginTab = (mode) => {
+      const isSuper = mode === 'super_admin';
+      const isOrg = mode === 'organizer';
+      const isOp = mode === 'operator';
+      if (isSuper || isOrg) State.loginAdminTab = mode;
+      $('#adminLoginForm').classList.toggle('hidden', isOp);
+      $('#opLoginForm').classList.toggle('hidden', !isOp);
+      $('#loginModeSuper').className = `py-2 px-2 rounded-xl font-black transition ${isSuper ? 'bg-slate-900 text-amber-300 shadow' : 'bg-slate-100 text-slate-700 font-bold hover:bg-slate-200'}`;
+      $('#loginModeOrg').className = `py-2 px-2 rounded-xl font-black transition ${isOrg ? 'bg-sky-600 text-white shadow' : 'bg-slate-100 text-slate-700 font-bold hover:bg-slate-200'}`;
+      $('#loginModeOp').className = `py-2 px-2 rounded-xl font-black transition ${isOp ? 'bg-emerald-600 text-white shadow' : 'bg-slate-100 text-slate-700 font-bold hover:bg-slate-200'}`;
+      const hint = $('#adminLoginRoleHint');
+      const submitBtn = $('#btnAdminLoginSubmit');
+      if (hint && submitBtn) {
+        if (isSuper) {
+          hint.className = 'p-2.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 font-bold';
+          hint.textContent = '🛡️ 最高權責管理員：檢視全平台所有活動細部，並於專區管制管理員與承辦人帳密';
+          submitBtn.className = 'w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-sm';
+          submitBtn.textContent = '🛡️ 登入最高管理員後台';
+        } else if (isOrg) {
+          hint.className = 'p-2.5 rounded-xl bg-sky-50 border border-sky-300 text-sky-950 font-bold';
+          hint.textContent = '👤 活動承辦人：僅顯示本人名下活動，點入自行配置管制點站名與晶片作業員帳密';
+          submitBtn.className = 'w-full py-2.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-black text-sm';
+          submitBtn.textContent = '👤 登入承辦人活動專區';
+        }
+      }
     };
-    $('#loginModeOp').onclick = () => {
-      $('#opLoginForm').classList.remove('hidden'); $('#adminLoginForm').classList.add('hidden');
-      $('#loginModeOp').className = 'flex-1 py-2 rounded-xl bg-slate-900 text-white font-bold';
-      $('#loginModeAdmin').className = 'flex-1 py-2 rounded-xl bg-slate-100 text-slate-700 font-bold';
-    };
+    $('#loginModeSuper').onclick = () => setLoginTab('super_admin');
+    $('#loginModeOrg').onclick = () => setLoginTab('organizer');
+    $('#loginModeOp').onclick = () => setLoginTab('operator');
+    setLoginTab('super_admin');
     $('#opLoginEventSelect').onchange = renderOpStationCards;
 
     $('#adminLoginForm').onsubmit = (e) => {
@@ -2216,6 +3007,11 @@
       const pw = $('#loginPass').value.trim();
       const u = State.users.find((x) => x.username === un && String(x.passwordHash) === pw && Number(x.enabled) && (x.role === 'super_admin' || x.role === 'organizer'));
       if (!u) return toast('帳號或密碼錯誤，或帳號已停用', 'error');
+      if (u.role !== State.loginAdminTab) {
+        const expectedLabel = u.role === 'super_admin' ? '🛡️ 最高管理員' : '👤 活動承辦人';
+        setLoginTab(u.role);
+        return toast(`此帳號身分為「${expectedLabel}」，已為您自動切至對應分頁，請再按一次登入確認！`, 'warn');
+      }
       applySessionLogin(u);
     };
 
@@ -2665,7 +3461,12 @@
     };
 
     // Zone 1 Controls
-    $('#z1EventSelect').onchange = (e) => { State.z1EventId = e.target.value; Z.renderZone1(AppBridge); };
+    $('#btnZ1BackToLobby').onclick = () => {
+      if (C.NFC?.isScanning) C.NFC.stopScanning();
+      State.z1ViewMode = 'lobby';
+      Z.renderZone1(AppBridge);
+    };
+    $('#z1EventSelect').onchange = (e) => { State.z1EventId = e.target.value; State.z1ViewMode = 'detail'; Z.renderZone1(AppBridge); };
     $$('[data-z1tab]').forEach((b) => {
       b.onclick = () => {
         $$('[data-z1tab]').forEach((x) => x.classList.remove('active'));
@@ -2780,6 +3581,7 @@
       await enqueueSync('saveEvent', { event: ev }); await enqueueSync('saveCategory', { category: cat });
       for (const st of sts) await enqueueSync('saveStation', { station: st });
       State.z1EventId = evId;
+      State.z1ViewMode = 'detail';
       $('#newEventModal').classList.add('hidden');
       renderAll();
       toast(`✅ 已建立【${isLap ? '計時繞圈賽' : '一般距離賽'}】「${nameZh}」並配置標準站點與分組！`, 'success');
@@ -2869,7 +3671,10 @@
       }
     };
 
-    window.addEventListener('online', () => { updateNetworkBadge(); syncPushNow(true); });
+    window.addEventListener('online', () => {
+      updateNetworkBadge();
+      if (isCloudSyncEnabled() && State.syncQueue.length > 0) syncPushNow(true);
+    });
     window.addEventListener('offline', updateNetworkBadge);
 
     // 碼錶與 45 分鐘查改倒數
@@ -2892,7 +3697,11 @@
     }, 500);
   }
 
-  const AppBridge = { State, toast, enqueueSync, syncPushNow, syncPullFromGas, updateNetworkBadge, autoAssignBibsForEvent, rebuildIndices, renderAll, switchView };
+  const AppBridge = {
+    State, toast, enqueueSync, syncPushNow, syncPullFromGas, syncBidirectional,
+    syncPullOnlyFromCloud, syncForcePushAllToCloud, setSyncMode, buildConfigJsContent,
+    updateNetworkBadge, autoAssignBibsForEvent, rebuildIndices, renderAll, switchView, openLoginModal
+  };
 
   /* --------------------------------------------------------------------------
    * Bootstrap Init
@@ -2943,7 +3752,19 @@
       }
     } catch (_) {}
 
-    if (location.hash === '#lookup') State.activeView = 'public-lookup';
+    const applyHashRoute = () => {
+      const h = String(location.hash || '').replace(/^#/, '').toLowerCase();
+      if (h === 'lookup') State.activeView = 'public-lookup';
+      else if (h === 'scores' || h.startsWith('scores/')) {
+        const sub = h.split('/')[1] || 'live';
+        State.scoreSubTab = ['live', 'history', 'warriors', 'cert'].includes(sub) ? sub : 'live';
+        State.activeView = 'scores';
+      } else if (h === 'timing') State.activeView = 'operator-station';
+      else if (h === 'host') State.activeView = 'host-ops';
+    };
+    applyHashRoute();
+    window.addEventListener('hashchange', () => { applyHashRoute(); switchView(State.activeView); });
+
     rebuildIndices();
     bindEvents();
     updatePayMethodUI();
@@ -2951,12 +3772,12 @@
 
     // 註冊 PWA Service Worker（僅在 http/https 下啟用，不干擾本機 file:// 開啟）
     if ('serviceWorker' in navigator && /^https?:/i.test(location.protocol)) {
-      navigator.serviceWorker.register('./sw.js?v=5.28').catch(() => {});
+      navigator.serviceWorker.register('./sw.js?v=6.0').catch(() => {});
     }
 
-    // 連網且已綁定 GAS 時，背景自動同步雲端最新 Google 試算表資料（不影響開頁秒開速度）
-    if (State.gasUrl && navigator.onLine) {
-      syncPullFromGas(true);
+    // 僅在 🌐 雲端連線模式且連網已綁定 GAS 時，背景自動同步雲端最新資料（單機離線模式絕不自動請求）
+    if (isCloudSyncEnabled()) {
+      syncBidirectional(true);
     }
   }
 

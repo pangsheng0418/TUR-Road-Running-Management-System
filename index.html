@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>跑管家｜TUR 賽事管理</title>
   <!-- PWA / 手機主畫面 App 圖示與全螢幕模式 -->
-  <link rel="manifest" href="manifest.webmanifest?v=5.28" />
+  <link rel="manifest" href="manifest.webmanifest?v=5.32" />
   <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png" />
   <link rel="icon" type="image/png" sizes="512x512" href="assets/icon-512.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="assets/icon-180.png" />
@@ -56,7 +56,7 @@
 
 <!-- 頂部治理導覽列 -->
 <header class="sticky top-0 z-40 bg-slate-950 text-white shadow-lg">
-  <div class="max-w-7xl mx-auto px-3 sm:px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
+  <div class="max-w-7xl mx-auto px-3 sm:px-4 py-2 flex flex-wrap items-center justify-between gap-2">
     <div class="flex items-center gap-3">
       <div class="bg-white rounded-xl px-2.5 py-1 shadow flex items-center justify-center shrink-0">
         <img src="assets/tur-logo.jpg" alt="TUR Taiwan Ultra Runners" class="h-7 sm:h-8 w-auto object-contain" />
@@ -64,33 +64,49 @@
       <div>
         <div class="font-bold text-base leading-tight flex items-center gap-2">
           <span>跑管家</span>
-          <span id="netBadge" class="whitespace-nowrap text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">● 本機</span>
+          <span id="netBadge" class="whitespace-nowrap text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">🌐 雲端連線</span>
         </div>
         <div class="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
-          <span id="roleStatusBadge" class="px-1.5 py-0.5 rounded bg-slate-800 text-sky-300 font-semibold">🏃 前台</span>
+          <span id="roleStatusBadge" class="px-1.5 py-0.5 rounded bg-slate-800 text-sky-300 font-semibold">🏃 民眾 / 跑者</span>
           <span id="topGunClock" class="mono text-amber-400 font-bold hidden"></span>
         </div>
       </div>
     </div>
 
-    <div class="flex flex-wrap items-center gap-2 text-xs">
+    <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs">
+      <!-- 步驟 1：單機離線 ⇄ 雲端連線 模式切換器 -->
+      <div id="syncModeSwitcher" class="flex items-center bg-slate-900 border border-slate-700 rounded-lg p-0.5" title="切換單機離線或雲端連線模式">
+        <button type="button" id="btnSyncModeOffline" data-sync-mode="offline" class="px-2 py-1 rounded text-[11px] font-bold text-slate-300 hover:bg-slate-800 whitespace-nowrap transition">📴 單機離線</button>
+        <button type="button" id="btnSyncModeCloud" data-sync-mode="cloud" class="px-2 py-1 rounded text-[11px] font-black bg-emerald-500 text-slate-950 whitespace-nowrap transition">🌐 雲端連線</button>
+      </div>
+      <!-- 步驟 2 & 3：右上角常駐待上傳筆數與立即雙向同步 -->
+      <button type="button" id="btnSyncBidirectional" class="px-2.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold flex items-center gap-1 whitespace-nowrap" title="先上傳本機異動（自動去重），再下載雲端最新資料">
+        <span>☁️ 同步</span><span class="bg-slate-950/60 px-1.5 rounded-full mono">(<span id="pendingQueueCount">0</span>)</span>
+      </button>
+      <button type="button" id="btnSyncUpload" class="hidden"></button>
+      <button type="button" id="btnSyncPull" class="hidden"></button>
       <!-- 全站字體大小即時調整器 -->
       <div id="fontSizeSwitcher" class="flex items-center bg-slate-800 border border-slate-700 rounded-lg p-0.5" title="調整畫面字體大小">
         <button type="button" data-font-scale="normal" class="px-2 py-1 rounded text-xs font-bold">A</button>
         <button type="button" data-font-scale="large" class="px-2 py-1 rounded text-xs font-bold">A+</button>
         <button type="button" data-font-scale="xlarge" class="px-2 py-1 rounded text-xs font-bold">A++</button>
       </div>
-      <button id="btnSyncUpload" class="hidden px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 font-bold flex items-center gap-1">
-        <span>☁️ 上傳</span><span id="pendingQueueCount" class="bg-slate-950/50 px-1.5 rounded-full mono">0</span>
-      </button>
-      <button id="btnSyncPull" class="hidden px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700">🔄 同步</button>
-      <a href="public.html" target="_blank" class="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black">🏅 成績 / 證書</a>
-      <button id="btnOpenLogin" class="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold">🔐 登入</button>
-      <button id="btnLogout" class="hidden px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold">🚪 登出</button>
+      <button type="button" id="btnOpenLogin" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold whitespace-nowrap">🔐 作業員 / 管理登入</button>
+      <button type="button" id="btnLogout" class="hidden px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold whitespace-nowrap">🚪 登出</button>
     </div>
   </div>
 
-  <!-- 依四層角色動態顯示之主導覽列 -->
+  <!-- 頂層四大主入口（一、報名｜二、成績查詢｜三、晶片計時｜四、後台管理） -->
+  <div id="topPillarBar" class="bg-slate-900 border-t border-slate-800 overflow-x-auto">
+    <div id="topPillarInner" class="max-w-7xl mx-auto px-3 py-1.5 flex items-center gap-1.5 min-w-max text-xs sm:text-sm">
+      <button type="button" data-pillar="register" class="pillar-pill px-3.5 py-1.5 rounded-lg font-black whitespace-nowrap transition bg-amber-400 text-slate-950">📝 一、報名</button>
+      <button type="button" data-pillar="scores" class="pillar-pill px-3.5 py-1.5 rounded-lg font-bold whitespace-nowrap transition text-slate-200 hover:bg-slate-800">🏆 二、成績查詢</button>
+      <button type="button" data-pillar="timing" class="pillar-pill px-3.5 py-1.5 rounded-lg font-bold whitespace-nowrap transition text-slate-200 hover:bg-slate-800">📡 三、晶片計時</button>
+      <button type="button" data-pillar="admin" class="pillar-pill px-3.5 py-1.5 rounded-lg font-bold whitespace-nowrap transition text-slate-200 hover:bg-slate-800">⚙️ 四、後台管理</button>
+    </div>
+  </div>
+
+  <!-- 依目前主入口與角色動態顯示之次級導覽列 -->
   <nav id="mainNavBar" class="bg-white text-slate-700 border-b border-slate-200 overflow-x-auto">
     <div id="mainNavInner" class="max-w-7xl mx-auto px-3 py-1.5 flex items-center gap-1.5 min-w-max"></div>
   </nav>
@@ -111,7 +127,8 @@
       <div class="flex flex-wrap gap-2 text-sm">
         <button id="btnGoMultiFromHome" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black shadow">🛒 聯合報名</button>
         <button id="btnGoLookupFromHome" class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 font-bold">🔍 查詢與修改</button>
-        <a href="public.html" target="_blank" class="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black">🏆 成績 / 證書</a>
+        <button type="button" id="btnGoHostOpsFromHome" class="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-black shadow">🛠️ 主辦作業</button>
+        <button type="button" id="btnGoScoresFromHome" class="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black">🏆 成績 / 證書</button>
       </div>
     </div>
     <div id="publicEventGroups" class="space-y-6"></div>
@@ -511,8 +528,54 @@
     <div id="lookupEditBox" class="hidden space-y-3 border-t pt-4"></div>
   </section>
 
-  <!-- ==================== 視圖 D：現場作業員工作台 (Operator) ==================== -->
+  <!-- ==================== 視圖 C2：一、報名 → 主辦作業（1.建立活動表格 2.核帳明細對帳） ==================== -->
+  <section id="view-host-ops" class="app-view hidden space-y-4"></section>
+
+  <!-- ==================== 視圖 C3：二、成績查詢（即時賽事 / 歷年成績 / 八百壯士 / 完賽證書） ==================== -->
+  <section id="view-scores" class="app-view hidden space-y-4"></section>
+
+  <!-- ==================== 視圖 D：三、晶片計時（三步驟登錄 ＋ 晶片感應作業） ==================== -->
   <section id="view-operator-station" class="app-view hidden space-y-4">
+    <!-- 三步驟作業人員登錄（直接作為「三、晶片計時」入口畫面） -->
+    <div id="opInlineLoginCard" class="hidden max-w-2xl mx-auto bg-white rounded-2xl border-2 border-slate-200 shadow-sm p-5 space-y-4 text-xs">
+      <div class="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
+        <div>
+          <h2 class="text-lg font-black text-slate-900">📡 三、晶片計時 — 作業人員登錄</h2>
+          <p class="text-[11px] text-slate-500 mt-0.5">1. 選擇作業活動 → 2. 點選本活動作業組別 → 3. 登錄帳號與密碼進入作業</p>
+        </div>
+        <span id="opInlineSyncBadge" class="px-2.5 py-1 rounded-full text-[11px] font-black bg-emerald-100 text-emerald-800">🌐 雲端連線</span>
+      </div>
+      <form id="opInlineLoginForm" autocomplete="off" class="space-y-4">
+        <div class="space-y-1.5">
+          <label class="block font-black text-sm text-slate-800">1. 選擇作業活動</label>
+          <select id="opInlineEventSelect" class="w-full px-3 py-2.5 border-2 border-slate-300 rounded-xl text-sm font-bold bg-slate-50"></select>
+        </div>
+        <div class="space-y-1.5">
+          <label class="block font-black text-sm text-slate-800">2. 點選本活動作業組別（站點）</label>
+          <div id="opInlineStationGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-2"></div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-50 border">
+          <div>
+            <label class="block font-bold mb-1 text-slate-700">3. 登錄帳號</label>
+            <input id="opInlineUser" type="text" autocomplete="off" placeholder="點選組別自動帶入或輸入帳號" class="w-full px-3 py-2 border rounded-lg text-sm mono bg-white font-bold" />
+          </div>
+          <div>
+            <label class="block font-bold mb-1 text-slate-700">登錄密碼</label>
+            <input id="opInlinePass" type="password" autocomplete="new-password" placeholder="輸入作業密碼" class="w-full px-3 py-2 border rounded-lg text-sm bg-white" />
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <span id="opInlinePickedHint" class="text-[11px] font-bold text-indigo-700">請先選擇活動與作業組別</span>
+          <button type="submit" class="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm shadow">📡 進入晶片感應作業</button>
+        </div>
+      </form>
+      <details class="text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-xl border">
+        <summary class="cursor-pointer font-bold text-slate-700">📖 預設作業員帳號參考（密碼皆為 1234）</summary>
+        <div class="mt-1.5 mono">writer01（寫卡）、checkin01（報到）、cp1（檢查站）、finish01（終點）、lap01（繞圈）</div>
+      </details>
+    </div>
+
+    <div id="opDutyWorkspace" class="space-y-4">
     <div id="opStationHeader" class="bg-slate-900 text-white rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow">
       <div>
         <div class="text-[11px] text-amber-400 font-bold">🔒 執勤站點</div>
@@ -520,6 +583,7 @@
         <div id="opEventSubtitle" class="text-xs text-slate-300 mt-0.5">-</div>
       </div>
       <div class="flex flex-wrap items-center gap-2 text-xs">
+        <span id="opDutySyncBadge" class="px-2.5 py-1.5 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 font-black">🌐 雲端連線</span>
         <div id="opClockBox" class="px-3 py-1.5 rounded-xl bg-slate-800 mono text-lg font-black text-amber-400">00:00:00</div>
         <button id="btnOutdoorToggle" class="px-3 py-2 rounded-xl bg-amber-400 text-slate-950 font-black">☀️ 高對比</button>
       </div>
@@ -686,39 +750,46 @@
         <div id="recentLogsList" class="divide-y text-xs max-h-[420px] overflow-y-auto"></div>
       </div>
     </div>
+    </div><!-- /#opDutyWorkspace -->
   </section>
 
-  <!-- ==================== 專區 1：進行中活動 ==================== -->
+  <!-- ==================== 專區 1：進行中活動（兩層：活動大廳列表 → 點入單一活動細部管理） ==================== -->
   <section id="view-zone1" class="app-view hidden space-y-4">
-    <div class="bg-white p-3.5 rounded-xl border shadow-sm flex flex-wrap items-center justify-between gap-2">
-      <div class="flex flex-wrap items-center gap-2">
-        <span class="text-xs font-bold text-slate-500">活動：</span>
-        <select id="z1EventSelect" class="px-3 py-1.5 border rounded-lg text-sm font-bold bg-slate-50"></select>
-        <span id="z1RoleScopeBadge" class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700"></span>
-        <button id="btnZ1NewEvent" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold">+ 新活動</button>
+    <!-- 層 1：活動大廳卡片頁（承辦人僅見本人活動；最高管理員見全平台所有活動） -->
+    <div id="z1EventLobby" class="space-y-4"></div>
+
+    <!-- 層 2：點入單一活動細部管理 -->
+    <div id="z1EventDetail" class="hidden space-y-4">
+      <div class="bg-white p-3.5 rounded-xl border shadow-sm flex flex-wrap items-center justify-between gap-2">
+        <div class="flex flex-wrap items-center gap-2">
+          <button type="button" id="btnZ1BackToLobby" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-amber-300 text-xs font-black">← 活動列表</button>
+          <select id="z1EventSelect" class="px-3 py-1.5 border rounded-lg text-sm font-bold bg-slate-50 max-w-[260px] sm:max-w-xs"></select>
+          <span id="z1RoleScopeBadge" class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700"></span>
+          <button id="btnZ1NewEvent" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold">+ 新活動</button>
+        </div>
+        <div class="flex flex-wrap gap-1.5 text-xs sm:text-sm">
+          <button data-z1tab="setup" class="sub-pill active px-3 py-1.5 rounded-lg bg-slate-100">1. 活動明細</button>
+          <button data-z1tab="recon" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">2. 名單（手動匯入／對帳）</button>
+          <button data-z1tab="chip" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">3. 起跑與站點（晶片管制）</button>
+          <button data-z1tab="ops" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">4. 作業員</button>
+          <button data-z1tab="score" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">5. 成績結案</button>
+        </div>
       </div>
-      <div class="flex flex-wrap gap-1.5 text-xs sm:text-sm">
-        <button data-z1tab="setup" class="sub-pill active px-3 py-1.5 rounded-lg bg-slate-100">1. 設定</button>
-        <button data-z1tab="recon" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">2. 對帳配號</button>
-        <button data-z1tab="chip" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">3. 晶片管制</button>
-        <button data-z1tab="score" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">4. 成績結案</button>
-        <button data-z1tab="ops" class="sub-pill px-3 py-1.5 rounded-lg bg-slate-100">5. 權限</button>
-      </div>
+
+      <!-- 五階段作業管制節點層層把關看板（報名 → 繳費 → 晶片整備 → 賽道管制 → 結案鎖定） -->
+      <div id="z1StageGateBar"></div>
+
+      <!-- 分頁 1：活動基本資料、橫幅、分組與動態加購 -->
+      <div id="z1-setup" class="z1-panel space-y-4"></div>
+      <!-- 分頁 2：雙軌對帳、整團一鍵入帳、配號、外部CSV/Excel雙向互通 -->
+      <div id="z1-recon" class="z1-panel hidden space-y-4"></div>
+      <!-- 分頁 3：晶片管制（寫卡讀取 → 報到管制 → 起跑與站點 → 賽道即時管制到終點） -->
+      <div id="z1-chip" class="z1-panel hidden space-y-4"></div>
+      <!-- 分頁 4：成績微調、完賽比例統計與結案鎖定移至專區 2 -->
+      <div id="z1-score" class="z1-panel hidden space-y-4"></div>
+      <!-- 分頁 5：自訂管制點站名配置與晶片作業員帳密管理 -->
+      <div id="z1-ops" class="z1-panel hidden space-y-4"></div>
     </div>
-
-    <!-- 五階段作業管制節點層層把關看板（報名 → 繳費 → 晶片整備 → 賽道管制 → 結案鎖定） -->
-    <div id="z1StageGateBar"></div>
-
-    <!-- 分頁 1：活動基本資料、橫幅、分組與動態加購 -->
-    <div id="z1-setup" class="z1-panel space-y-4"></div>
-    <!-- 分頁 2：雙軌對帳、整團一鍵入帳、配號、外部CSV/Excel雙向互通 -->
-    <div id="z1-recon" class="z1-panel hidden space-y-4"></div>
-    <!-- 分頁 3：晶片管制（寫卡讀取 → 報到管制 → 起跑與站點 → 賽道即時管制到終點） -->
-    <div id="z1-chip" class="z1-panel hidden space-y-4"></div>
-    <!-- 分頁 4：成績微調、完賽比例統計與結案鎖定移至專區 2 -->
-    <div id="z1-score" class="z1-panel hidden space-y-4"></div>
-    <!-- 分頁 5：站點配置與晶片作業員帳號權限管理 -->
-    <div id="z1-ops" class="z1-panel hidden space-y-4"></div>
   </section>
 
   <!-- ==================== 專區 2：📦 已結案專區（報表・DUV・動態證書引擎） ==================== -->
@@ -746,13 +817,17 @@
       <button id="btnCloseLogin" class="text-slate-400 hover:text-slate-800 text-lg">✕</button>
     </div>
 
-    <div class="flex gap-2 text-xs">
-      <button id="loginModeAdmin" class="flex-1 py-2 rounded-xl bg-slate-900 text-white font-bold">🛡️ 管理員 / 承辦人</button>
-      <button id="loginModeOp" class="flex-1 py-2 rounded-xl bg-slate-100 text-slate-700 font-bold">📡 現場作業員</button>
+    <div class="grid grid-cols-3 gap-1.5 text-xs">
+      <button type="button" id="loginModeSuper" class="py-2 px-2 rounded-xl bg-slate-900 text-amber-300 font-black">🛡️ 最高管理員</button>
+      <button type="button" id="loginModeOrg" class="py-2 px-2 rounded-xl bg-slate-100 text-slate-700 font-bold">👤 活動承辦人</button>
+      <button type="button" id="loginModeOp" class="py-2 px-2 rounded-xl bg-slate-100 text-slate-700 font-bold">📡 現場作業員</button>
     </div>
 
-    <!-- 模式 1：後台管理員 / 承辦人 -->
+    <!-- 模式 1：最高管理員 / 活動承辦人 -->
     <form id="adminLoginForm" autocomplete="off" class="space-y-3 text-xs">
+      <div id="adminLoginRoleHint" class="p-2.5 rounded-xl bg-amber-50 border border-amber-300 text-amber-950 font-bold">
+        🛡️ 最高權責管理員：檢視全平台所有活動細部，並於專區管制管理員與承辦人帳密
+      </div>
       <div>
         <label class="block font-bold mb-1">帳號</label>
         <input id="loginUser" type="text" autocomplete="off" value="" placeholder="輸入帳號" class="w-full px-3 py-2 border rounded-lg text-sm" />
@@ -761,7 +836,7 @@
         <label class="block font-bold mb-1">密碼</label>
         <input id="loginPass" type="password" autocomplete="new-password" value="" placeholder="輸入密碼" class="w-full px-3 py-2 border rounded-lg text-sm" />
       </div>
-      <button type="submit" class="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-sm">登入</button>
+      <button type="submit" id="btnAdminLoginSubmit" class="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-black text-sm">🛡️ 登入最高管理員後台</button>
     </form>
 
     <!-- 模式 2：現場作業員 -->
@@ -784,9 +859,9 @@
     <details class="text-[11px] text-slate-500 bg-slate-50 p-2.5 rounded-xl border">
       <summary class="cursor-pointer font-bold text-slate-700">📖 測試帳號參考</summary>
       <div class="mt-1.5 space-y-0.5 mono">
-        <div>• 管理員：<b>superadmin</b> / <b>tur2026</b></div>
-        <div>• 北區承辦：<b>org_north</b> / <b>org2026</b></div>
-        <div>• 南區承辦：<b>org_south</b> / <b>org2026</b></div>
+        <div>• 管理員：<b>superadmin</b> / <b>1234</b></div>
+        <div>• 北區承辦：<b>org_north</b> / <b>1234</b></div>
+        <div>• 南區承辦：<b>org_south</b> / <b>1234</b></div>
         <div>• 作業員：<b>writer01</b>、<b>checkin01</b>、<b>cp1</b>、<b>finish01</b>、<b>lap01</b> / <b>1234</b></div>
       </div>
     </details>
@@ -982,9 +1057,11 @@
   </div>
 </div>
 
-<script src="js/tur-logo.js?v=5.28"></script>
-<script src="js/tur-core.js?v=5.28"></script>
-<script src="js/tur-zones.js?v=5.28"></script>
-<script src="js/tur-app.js?v=5.28"></script>
+<script src="config.js?v=6.0"></script>
+<script src="js/tur-logo.js?v=6.0"></script>
+<script src="js/tur-core.js?v=6.0"></script>
+<script src="js/tur-scores.js?v=6.0"></script>
+<script src="js/tur-zones.js?v=6.0"></script>
+<script src="js/tur-app.js?v=6.0"></script>
 </body>
 </html>
