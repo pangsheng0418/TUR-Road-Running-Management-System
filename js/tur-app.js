@@ -2892,6 +2892,11 @@
     updatePayMethodUI();
     switchView(State.activeView);
 
+    // 註冊 PWA Service Worker（僅在 http/https 下啟用，不干擾本機 file:// 開啟）
+    if ('serviceWorker' in navigator && /^https?:/i.test(location.protocol)) {
+      navigator.serviceWorker.register('./sw.js?v=5.21').catch(() => {});
+    }
+
     // 連網且已綁定 GAS 時，背景自動同步雲端最新 Google 試算表資料（不影響開頁秒開速度）
     if (State.gasUrl && navigator.onLine) {
       syncPullFromGas(true);

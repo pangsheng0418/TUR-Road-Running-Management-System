@@ -1,0 +1,32 @@
+{
+  "name": "TUR計時王｜台灣超馬報名計時系統",
+  "short_name": "TUR計時王",
+  "description": "台灣超級馬拉松運動協會（TUR）一體化賽事報名、現場感應計時、即時成績與完賽證書系統",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#0f172a",
+  "lang": "zh-Hant-TW",
+  "icons": [
+    {
+      "src": "assets/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "assets/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
