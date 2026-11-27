@@ -2367,37 +2367,176 @@
 
   function renderZ1Ops(App, ev) {
     const u = App.State.currentUser;
-    const myOps = App.State.users.filter((x) => x.role === 'operator' && (u.role === 'super_admin' || x.parentOrganizer === u.username || x.allowedEventId === ev.eventId));
+    const isSuper = u?.role === 'super_admin';
+    const evNameMap = new Map(App.State.events.map((e) => [e.eventId, e.nameZh]));
+    const myOwnedEvents = isSuper
+      ? App.State.events
+      : App.State.events.filter((e) => e.ownerUsername === u.username);
+    const myEventIds = new Set(myOwnedEvents.map((e) => e.eventId));
+
+    // 權限隔離：最高管理員可看全平台全部帳號與密碼；承辦人僅能看到自己承辦場次的鎖定站點作業員與密碼
+    const scopedUsers = isSuper
+      ? [...App.State.users]
+      : App.State.users.filter((x) => {
+          if (x.role !== 'operator') return false;
+          const evId = String(x.allowedEventId || '');
+          if (evId && evId !== 'ALL') return myEventIds.has(evId);
+          return x.parentOrganizer === u.username;
+        });
+
     const sts = App.State.stations.filter((s) => s.eventId === ev.eventId);
+    const allStations = [...new Set(scopedUsers.map((x) => x.allowedStation || 'ALL'))].sort();
+    const roleLabelMap = { super_admin: '管理員', organizer: '承辦人', operator: '作業員' };
+    const roleBadgeMap = {
+      super_admin: 'bg-rose-100 text-rose-800',
+      organizer: 'bg-amber-100 text-amber-900',
+      operator: 'bg-sky-100 text-sky-800'
+    };
+
+    const flt = App.State.z1OpsFilter || { q: '', role: 'all', eventId: 'all', station: 'all', status: 'all' };
+    if (!isSuper) {
+      flt.role = 'all';
+      if (flt.eventId !== 'all' && !myEventIds.has(flt.eventId)) flt.eventId = 'all';
+    }
+    if (flt.station !== 'all' && !allStations.includes(flt.station)) flt.station = 'all';
+    App.State.z1OpsFilter = flt;
     const box = $('#z1-ops');
 
     box.innerHTML = `
       <div class="bg-white p-4 rounded-xl border shadow-sm space-y-3 text-xs">
-        <h3 class="font-black text-sm">👷 作業員帳號</h3>
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
+          <div class="flex items-center gap-2">
+            <h3 class="font-black text-sm">🔐 權限</h3>
+            <span id="z1OpsCount" class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold mono">${scopedUsers.length} 筆</span>
+          </div>
+          <span class="text-[11px] font-bold ${isSuper ? 'text-rose-700' : 'text-sky-700'}">
+            ${isSuper ? '🛡️ 最高管理員：顯示全平台帳號與密碼' : '👤 承辦人：僅顯示本人場次與鎖定站點密碼'}
+          </span>
+        </div>
+
         <form id="z1NewOpForm" autocomplete="off" class="grid grid-cols-2 sm:grid-cols-5 gap-2 bg-slate-50 p-3 rounded-xl border">
-          <input id="opNewUser" required placeholder="帳號 (例 cp2)" class="px-2.5 py-1.5 border rounded-lg" />
-          <input id="opNewPass" required type="password" autocomplete="new-password" placeholder="密碼" class="px-2.5 py-1.5 border rounded-lg" />
-          <input id="opNewName" required placeholder="名稱" class="px-2.5 py-1.5 border rounded-lg" />
-          <select id="opNewStation" class="px-2.5 py-1.5 border rounded-lg">
+          <input id="opNewUser" required placeholder="帳號 (例 cp2)" class="px-2.5 py-1.5 border rounded-lg bg-white" />
+          <input id="opNewPass" required type="text" autocomplete="off" placeholder="密碼" class="px-2.5 py-1.5 border rounded-lg bg-white mono" />
+          <input id="opNewName" required placeholder="名稱" class="px-2.5 py-1.5 border rounded-lg bg-white" />
+          <select id="opNewStation" class="px-2.5 py-1.5 border rounded-lg bg-white">
             <option value="WRITER">WRITER (發卡組)</option>
             ${sts.map((s) => `<option value="${s.stationCode}">${s.stationCode} (${C.escapeHtml(s.name)})</option>`).join('')}
           </select>
-          <button type="submit" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white font-bold">+ 新增</button>
+          <button type="submit" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white font-bold">+ 新增站點帳號</button>
         </form>
-        <table class="w-full text-left">
-          <thead class="bg-slate-100"><tr><th class="p-2">帳號</th><th class="p-2">名稱</th><th class="p-2">鎖定活動</th><th class="p-2">鎖定站點</th><th class="p-2">狀態</th></tr></thead>
-          <tbody class="divide-y">
-            ${myOps.map((op) => `
+
+        <!-- 欄位篩選查詢列 -->
+        <div class="flex flex-wrap items-center gap-2 bg-slate-50/70 p-2.5 rounded-xl border">
+          <input id="z1OpsSearch" type="text" value="${C.escapeHtml(flt.q)}" placeholder="🔎 搜尋帳號 / 密碼 / 名稱 / 站點" class="flex-1 min-w-[180px] px-2.5 py-1.5 border rounded-lg bg-white" />
+          ${isSuper ? `
+            <select id="z1OpsRoleFilter" class="px-2.5 py-1.5 border rounded-lg bg-white font-bold">
+              <option value="all" ${flt.role === 'all' ? 'selected' : ''}>全部角色</option>
+              <option value="super_admin" ${flt.role === 'super_admin' ? 'selected' : ''}>管理員</option>
+              <option value="organizer" ${flt.role === 'organizer' ? 'selected' : ''}>承辦人</option>
+              <option value="operator" ${flt.role === 'operator' ? 'selected' : ''}>作業員</option>
+            </select>` : ''}
+          <select id="z1OpsEventFilter" class="px-2.5 py-1.5 border rounded-lg bg-white font-bold max-w-[220px]">
+            <option value="all" ${flt.eventId === 'all' ? 'selected' : ''}>${isSuper ? '全部場次' : '本人全部場次'}</option>
+            ${isSuper ? `<option value="ALL" ${flt.eventId === 'ALL' ? 'selected' : ''}>全平台 (ALL)</option>` : ''}
+            ${myOwnedEvents.map((e) => `<option value="${e.eventId}" ${flt.eventId === e.eventId ? 'selected' : ''}>${C.escapeHtml(e.nameZh)}</option>`).join('')}
+          </select>
+          <select id="z1OpsStationFilter" class="px-2.5 py-1.5 border rounded-lg bg-white font-bold">
+            <option value="all" ${flt.station === 'all' ? 'selected' : ''}>全部站點</option>
+            ${allStations.map((st) => `<option value="${C.escapeHtml(st)}" ${flt.station === st ? 'selected' : ''}>${C.escapeHtml(st)}</option>`).join('')}
+          </select>
+          <select id="z1OpsStatusFilter" class="px-2.5 py-1.5 border rounded-lg bg-white font-bold">
+            <option value="all" ${flt.status === 'all' ? 'selected' : ''}>全部狀態</option>
+            <option value="1" ${flt.status === '1' ? 'selected' : ''}>啟用中</option>
+            <option value="0" ${flt.status === '0' ? 'selected' : ''}>已停用</option>
+          </select>
+          <button type="button" id="btnZ1OpsResetFilter" class="px-2.5 py-1.5 rounded-lg bg-white border hover:bg-slate-100 font-bold text-slate-600">↺ 重設</button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left">
+            <thead class="bg-slate-100">
               <tr>
-                <td class="p-2 mono font-bold">${op.username}</td>
-                <td class="p-2">${C.escapeHtml(op.displayName)}</td>
-                <td class="p-2 mono">${op.allowedEventId}</td>
-                <td class="p-2"><span class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold mono">${op.allowedStation}</span></td>
-                <td class="p-2"><button data-toggle-op="${op.username}" class="px-2 py-0.5 rounded font-bold ${Number(op.enabled) ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-500'}">${Number(op.enabled) ? '啟用中' : '已停用'}</button></td>
-              </tr>`).join('')}
-          </tbody>
-        </table>
+                <th class="p-2">帳號</th>
+                <th class="p-2">密碼</th>
+                <th class="p-2">名稱</th>
+                ${isSuper ? '<th class="p-2">角色</th><th class="p-2">承辦人</th>' : ''}
+                <th class="p-2">承辦場次</th>
+                <th class="p-2">鎖定站點</th>
+                <th class="p-2">狀態</th>
+              </tr>
+            </thead>
+            <tbody id="z1OpsTbody" class="divide-y"></tbody>
+          </table>
+        </div>
       </div>`;
+
+    const renderRows = () => {
+      const q = String(flt.q || '').trim().toUpperCase();
+      const filtered = scopedUsers.filter((op) => {
+        if (isSuper && flt.role !== 'all' && op.role !== flt.role) return false;
+        if (flt.eventId !== 'all' && String(op.allowedEventId || 'ALL') !== flt.eventId) return false;
+        if (flt.station !== 'all' && String(op.allowedStation || 'ALL') !== flt.station) return false;
+        if (flt.status !== 'all' && String(Number(op.enabled) ? 1 : 0) !== flt.status) return false;
+        if (!q) return true;
+        const evNm = evNameMap.get(op.allowedEventId) || '';
+        return `${op.username} ${op.passwordHash || ''} ${op.displayName || ''} ${op.role || ''} ${roleLabelMap[op.role] || ''} ${op.parentOrganizer || ''} ${op.allowedEventId || ''} ${evNm} ${op.allowedStation || ''}`.toUpperCase().includes(q);
+      });
+
+      const cntEl = $('#z1OpsCount');
+      if (cntEl) cntEl.textContent = `${filtered.length} / ${scopedUsers.length} 筆`;
+
+      const colSpan = isSuper ? 8 : 6;
+      $('#z1OpsTbody').innerHTML = filtered.map((op) => {
+        const evId = op.allowedEventId || 'ALL';
+        const evLabel = evId === 'ALL' ? '全部活動 (ALL)' : (evNameMap.get(evId) || evId);
+        const canToggle = op.username !== u.username;
+        return `
+          <tr class="hover:bg-slate-50">
+            <td class="p-2 mono font-bold whitespace-nowrap">${C.escapeHtml(op.username)}</td>
+            <td class="p-2 whitespace-nowrap"><span class="px-2 py-0.5 rounded bg-amber-50 border border-amber-300 text-amber-950 mono font-bold select-all">${C.escapeHtml(op.passwordHash || '-')}</span></td>
+            <td class="p-2 whitespace-nowrap">${C.escapeHtml(op.displayName)}</td>
+            ${isSuper ? `
+              <td class="p-2 whitespace-nowrap"><span class="px-2 py-0.5 rounded font-bold ${roleBadgeMap[op.role] || 'bg-slate-100 text-slate-700'}">${roleLabelMap[op.role] || op.role}</span></td>
+              <td class="p-2 mono whitespace-nowrap">${C.escapeHtml(op.parentOrganizer || '-')}</td>
+            ` : ''}
+            <td class="p-2">
+              <div class="font-semibold text-slate-800">${C.escapeHtml(evLabel)}</div>
+              ${evId !== 'ALL' ? `<div class="text-[10px] mono text-slate-400">${C.escapeHtml(evId)}</div>` : ''}
+            </td>
+            <td class="p-2 whitespace-nowrap"><span class="px-2 py-0.5 rounded bg-indigo-100 text-indigo-800 font-bold mono">${C.escapeHtml(op.allowedStation || 'ALL')}</span></td>
+            <td class="p-2 whitespace-nowrap">
+              <button data-toggle-op="${C.escapeHtml(op.username)}" ${canToggle ? '' : 'disabled'} class="px-2 py-0.5 rounded font-bold ${Number(op.enabled) ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-500'} ${canToggle ? '' : 'opacity-50 cursor-not-allowed'}">${Number(op.enabled) ? '啟用中' : '已停用'}</button>
+            </td>
+          </tr>`;
+      }).join('') || `<tr><td colspan="${colSpan}" class="p-6 text-center text-slate-400">查無符合條件之帳號</td></tr>`;
+
+      $$('[data-toggle-op]').forEach((b) => {
+        b.onclick = async () => {
+          const target = App.State.users.find((x) => x.username === b.dataset.toggleOp);
+          if (!target || target.username === u.username) return;
+          target.enabled = Number(target.enabled) ? 0 : 1;
+          await C.TurDB.put('users', target);
+          await App.enqueueSync('saveUser', { user: target });
+          renderRows();
+        };
+      });
+    };
+
+    renderRows();
+    C.bindFastInput($('#z1OpsSearch'), (e) => { flt.q = e.target.value; renderRows(); }, 100);
+    if ($('#z1OpsRoleFilter')) $('#z1OpsRoleFilter').onchange = (e) => { flt.role = e.target.value; renderRows(); };
+    $('#z1OpsEventFilter').onchange = (e) => { flt.eventId = e.target.value; renderRows(); };
+    $('#z1OpsStationFilter').onchange = (e) => { flt.station = e.target.value; renderRows(); };
+    $('#z1OpsStatusFilter').onchange = (e) => { flt.status = e.target.value; renderRows(); };
+    $('#btnZ1OpsResetFilter').onclick = () => {
+      flt.q = ''; flt.role = 'all'; flt.eventId = 'all'; flt.station = 'all'; flt.status = 'all';
+      $('#z1OpsSearch').value = '';
+      if ($('#z1OpsRoleFilter')) $('#z1OpsRoleFilter').value = 'all';
+      $('#z1OpsEventFilter').value = 'all';
+      $('#z1OpsStationFilter').value = 'all';
+      $('#z1OpsStatusFilter').value = 'all';
+      renderRows();
+    };
 
     $('#z1NewOpForm').onsubmit = async (e) => {
       e.preventDefault();
@@ -2405,25 +2544,15 @@
       if (App.State.users.some((x) => x.username === un)) return App.toast('帳號已存在', 'error');
       const userObj = {
         username: un, passwordHash: $('#opNewPass').value.trim(), displayName: $('#opNewName').value.trim(),
-        role: 'operator', parentOrganizer: u.username, allowedEventId: ev.eventId,
+        role: 'operator', parentOrganizer: ev.ownerUsername || u.username, allowedEventId: ev.eventId,
         allowedStation: $('#opNewStation').value, enabled: 1
       };
       App.State.users.push(userObj);
       await C.TurDB.put('users', userObj);
       await App.enqueueSync('saveUser', { user: userObj });
       renderZ1Ops(App, ev);
-      App.toast(`已核發作業員帳號 ${un}`, 'success');
+      App.toast(`已新增站點帳號 ${un}`, 'success');
     };
-    $$('[data-toggle-op]').forEach((b) => {
-      b.onclick = async () => {
-        const target = App.State.users.find((x) => x.username === b.dataset.toggleOp);
-        if (!target) return;
-        target.enabled = Number(target.enabled) ? 0 : 1;
-        await C.TurDB.put('users', target);
-        await App.enqueueSync('saveUser', { user: target });
-        renderZ1Ops(App, ev);
-      };
-    });
   }
 
   /* --------------------------------------------------------------------------
@@ -2931,25 +3060,32 @@
   function renderZone3(App) {
     const box = $('#view-zone3');
     if (App.State.currentUser?.role !== 'super_admin') {
-      box.innerHTML = '<div class="bg-rose-50 text-rose-700 p-6 rounded-xl font-bold text-center">⛔ 權限不足：專區 3 僅限最高管理員（Super Admin）存取。</div>';
+      box.innerHTML = '<div class="bg-rose-50 text-rose-700 p-6 rounded-xl font-bold text-center">⛔ 權限不足：僅限最高管理員存取。</div>';
       return;
     }
 
+    const evNameMap = new Map(App.State.events.map((e) => [e.eventId, e.nameZh]));
+    const roleLabelMap = { super_admin: '管理員', organizer: '承辦人', operator: '作業員' };
+    const allStations = [...new Set(App.State.users.map((x) => x.allowedStation || 'ALL'))].sort();
+    const flt = App.State.z3Filter || { q: '', role: 'all', station: 'all', status: 'all' };
+    App.State.z3Filter = flt;
+
     box.innerHTML = `
       <div class="bg-white p-4 rounded-2xl border shadow-sm space-y-4 text-xs">
-        <div class="border-b pb-2">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b pb-2">
           <h2 class="font-black text-base">👥 帳號管理</h2>
+          <span id="z3UsersCount" class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold mono">${App.State.users.length} 筆</span>
         </div>
         <form id="z3NewUserForm" autocomplete="off" class="grid grid-cols-2 sm:grid-cols-6 gap-2 bg-slate-50 p-3 rounded-xl border">
-          <input id="z3User" required placeholder="帳號" class="px-2.5 py-1.5 border rounded-lg" />
-          <input id="z3Pass" required type="password" autocomplete="new-password" placeholder="密碼" class="px-2.5 py-1.5 border rounded-lg" />
-          <input id="z3Name" required placeholder="姓名" class="px-2.5 py-1.5 border rounded-lg" />
-          <select id="z3Role" class="px-2.5 py-1.5 border rounded-lg">
+          <input id="z3User" required placeholder="帳號" class="px-2.5 py-1.5 border rounded-lg bg-white" />
+          <input id="z3Pass" required type="text" autocomplete="off" placeholder="密碼" class="px-2.5 py-1.5 border rounded-lg bg-white mono" />
+          <input id="z3Name" required placeholder="姓名" class="px-2.5 py-1.5 border rounded-lg bg-white" />
+          <select id="z3Role" class="px-2.5 py-1.5 border rounded-lg bg-white">
             <option value="organizer">承辦人</option>
             <option value="operator">作業員</option>
             <option value="super_admin">管理員</option>
           </select>
-          <select id="z3Station" class="px-2.5 py-1.5 border rounded-lg">
+          <select id="z3Station" class="px-2.5 py-1.5 border rounded-lg bg-white">
             <option value="ALL">ALL</option>
             <option value="WRITER">WRITER</option>
             <option value="CHECKIN">CHECKIN</option>
@@ -2958,23 +3094,102 @@
           </select>
           <button type="submit" class="px-3 py-1.5 rounded-lg bg-slate-900 text-white font-black">+ 新增</button>
         </form>
+
+        <div class="flex flex-wrap items-center gap-2 bg-slate-50/70 p-2.5 rounded-xl border">
+          <input id="z3Search" type="text" value="${C.escapeHtml(flt.q)}" placeholder="🔎 搜尋帳號 / 密碼 / 名稱 / 承辦人 / 場次" class="flex-1 min-w-[200px] px-2.5 py-1.5 border rounded-lg bg-white" />
+          <select id="z3RoleFilter" class="px-2.5 py-1.5 border rounded-lg bg-white font-bold">
+            <option value="all" ${flt.role === 'all' ? 'selected' : ''}>全部角色</option>
+            <option value="super_admin" ${flt.role === 'super_admin' ? 'selected' : ''}>管理員</option>
+            <option value="organizer" ${flt.role === 'organizer' ? 'selected' : ''}>承辦人</option>
+            <option value="operator" ${flt.role === 'operator' ? 'selected' : ''}>作業員</option>
+          </select>
+          <select id="z3StationFilter" class="px-2.5 py-1.5 border rounded-lg bg-white font-bold">
+            <option value="all" ${flt.station === 'all' ? 'selected' : ''}>全部站點</option>
+            ${allStations.map((st) => `<option value="${C.escapeHtml(st)}" ${flt.station === st ? 'selected' : ''}>${C.escapeHtml(st)}</option>`).join('')}
+          </select>
+          <select id="z3StatusFilter" class="px-2.5 py-1.5 border rounded-lg bg-white font-bold">
+            <option value="all" ${flt.status === 'all' ? 'selected' : ''}>全部狀態</option>
+            <option value="1" ${flt.status === '1' ? 'selected' : ''}>啟用</option>
+            <option value="0" ${flt.status === '0' ? 'selected' : ''}>停用</option>
+          </select>
+          <button type="button" id="btnZ3ResetFilter" class="px-2.5 py-1.5 rounded-lg bg-white border hover:bg-slate-100 font-bold text-slate-600">↺ 重設</button>
+        </div>
+
         <div class="overflow-x-auto">
           <table class="w-full text-left">
-            <thead class="bg-slate-100"><tr><th class="p-2">帳號</th><th class="p-2">顯示名稱</th><th class="p-2">角色</th><th class="p-2">歸屬承辦人</th><th class="p-2">鎖定站點</th><th class="p-2">啟用</th></tr></thead>
-            <tbody class="divide-y">
-              ${App.State.users.map((u) => `
-                <tr>
-                  <td class="p-2 mono font-bold">${u.username}</td>
-                  <td class="p-2">${C.escapeHtml(u.displayName)}</td>
-                  <td class="p-2"><span class="px-2 py-0.5 rounded font-bold ${u.role === 'super_admin' ? 'bg-rose-100 text-rose-800' : (u.role === 'organizer' ? 'bg-amber-100 text-amber-900' : 'bg-sky-100 text-sky-800')}">${u.role}</span></td>
-                  <td class="p-2 mono">${u.parentOrganizer || '-'}</td>
-                  <td class="p-2 mono">${u.allowedStation || 'ALL'}</td>
-                  <td class="p-2"><button data-z3-toggle="${u.username}" class="px-2 py-0.5 rounded font-bold ${Number(u.enabled) ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-500'}">${Number(u.enabled) ? '啟用' : '停用'}</button></td>
-                </tr>`).join('')}
-            </tbody>
+            <thead class="bg-slate-100">
+              <tr>
+                <th class="p-2">帳號</th>
+                <th class="p-2">密碼</th>
+                <th class="p-2">名稱</th>
+                <th class="p-2">角色</th>
+                <th class="p-2">承辦人</th>
+                <th class="p-2">鎖定場次</th>
+                <th class="p-2">鎖定站點</th>
+                <th class="p-2">啟用</th>
+              </tr>
+            </thead>
+            <tbody id="z3UsersTbody" class="divide-y"></tbody>
           </table>
         </div>
       </div>`;
+
+    const renderZ3Rows = () => {
+      const q = String(flt.q || '').trim().toUpperCase();
+      const filtered = App.State.users.filter((u) => {
+        if (flt.role !== 'all' && u.role !== flt.role) return false;
+        if (flt.station !== 'all' && String(u.allowedStation || 'ALL') !== flt.station) return false;
+        if (flt.status !== 'all' && String(Number(u.enabled) ? 1 : 0) !== flt.status) return false;
+        if (!q) return true;
+        const evNm = evNameMap.get(u.allowedEventId) || '';
+        return `${u.username} ${u.passwordHash || ''} ${u.displayName || ''} ${u.role || ''} ${roleLabelMap[u.role] || ''} ${u.parentOrganizer || ''} ${u.allowedEventId || ''} ${evNm} ${u.allowedStation || ''}`.toUpperCase().includes(q);
+      });
+
+      const cntEl = $('#z3UsersCount');
+      if (cntEl) cntEl.textContent = `${filtered.length} / ${App.State.users.length} 筆`;
+
+      $('#z3UsersTbody').innerHTML = filtered.map((u) => {
+        const evId = u.allowedEventId || 'ALL';
+        const evLabel = evId === 'ALL' ? 'ALL' : (evNameMap.get(evId) || evId);
+        return `
+          <tr class="hover:bg-slate-50">
+            <td class="p-2 mono font-bold whitespace-nowrap">${C.escapeHtml(u.username)}</td>
+            <td class="p-2 whitespace-nowrap"><span class="px-2 py-0.5 rounded bg-amber-50 border border-amber-300 text-amber-950 mono font-bold select-all">${C.escapeHtml(u.passwordHash || '-')}</span></td>
+            <td class="p-2 whitespace-nowrap">${C.escapeHtml(u.displayName)}</td>
+            <td class="p-2 whitespace-nowrap"><span class="px-2 py-0.5 rounded font-bold ${u.role === 'super_admin' ? 'bg-rose-100 text-rose-800' : (u.role === 'organizer' ? 'bg-amber-100 text-amber-900' : 'bg-sky-100 text-sky-800')}">${roleLabelMap[u.role] || u.role}</span></td>
+            <td class="p-2 mono whitespace-nowrap">${C.escapeHtml(u.parentOrganizer || '-')}</td>
+            <td class="p-2">
+              <div class="font-semibold text-slate-800">${C.escapeHtml(evLabel)}</div>
+              ${evId !== 'ALL' ? `<div class="text-[10px] mono text-slate-400">${C.escapeHtml(evId)}</div>` : ''}
+            </td>
+            <td class="p-2 mono whitespace-nowrap">${C.escapeHtml(u.allowedStation || 'ALL')}</td>
+            <td class="p-2 whitespace-nowrap"><button data-z3-toggle="${C.escapeHtml(u.username)}" class="px-2 py-0.5 rounded font-bold ${Number(u.enabled) ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-500'}">${Number(u.enabled) ? '啟用' : '停用'}</button></td>
+          </tr>`;
+      }).join('') || '<tr><td colspan="8" class="p-6 text-center text-slate-400">查無符合條件之帳號</td></tr>';
+
+      $$('[data-z3-toggle]').forEach((b) => {
+        b.onclick = async () => {
+          const u = App.State.users.find((x) => x.username === b.dataset.z3Toggle);
+          if (!u || u.username === App.State.currentUser.username) return;
+          u.enabled = Number(u.enabled) ? 0 : 1;
+          await C.TurDB.put('users', u);
+          await App.enqueueSync('saveUser', { user: u });
+          renderZ3Rows();
+        };
+      });
+    };
+
+    renderZ3Rows();
+    C.bindFastInput($('#z3Search'), (e) => { flt.q = e.target.value; renderZ3Rows(); }, 100);
+    $('#z3RoleFilter').onchange = (e) => { flt.role = e.target.value; renderZ3Rows(); };
+    $('#z3StationFilter').onchange = (e) => { flt.station = e.target.value; renderZ3Rows(); };
+    $('#z3StatusFilter').onchange = (e) => { flt.status = e.target.value; renderZ3Rows(); };
+    $('#btnZ3ResetFilter').onclick = () => {
+      flt.q = ''; flt.role = 'all'; flt.station = 'all'; flt.status = 'all';
+      $('#z3Search').value = ''; $('#z3RoleFilter').value = 'all';
+      $('#z3StationFilter').value = 'all'; $('#z3StatusFilter').value = 'all';
+      renderZ3Rows();
+    };
 
     $('#z3NewUserForm').onsubmit = async (e) => {
       e.preventDefault();
@@ -2989,18 +3204,8 @@
       await C.TurDB.put('users', obj);
       await App.enqueueSync('saveUser', { user: obj });
       renderZone3(App);
-      App.toast(`✅ 已核發帳號 ${un}`, 'success');
+      App.toast(`✅ 已新增帳號 ${un}`, 'success');
     };
-    $$('[data-z3-toggle]').forEach((b) => {
-      b.onclick = async () => {
-        const u = App.State.users.find((x) => x.username === b.dataset.z3Toggle);
-        if (!u || u.username === App.State.currentUser.username) return;
-        u.enabled = Number(u.enabled) ? 0 : 1;
-        await C.TurDB.put('users', u);
-        await App.enqueueSync('saveUser', { user: u });
-        renderZone3(App);
-      };
-    });
   }
 
   /* --------------------------------------------------------------------------
